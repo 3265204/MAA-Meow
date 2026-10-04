@@ -35,6 +35,8 @@ public final class IndependentDisplayDevice implements AutoCloseable {
     private static final int TRUSTED = 1 << 10;
     private static final int SUPPORTS_TOUCH = 1 << 6;
     private static final int OWN_FOCUS = 1 << 14;
+    // Keep display-0 Back gestures away from the game; targeted input still reaches this display.
+    private static final int STEAL_TOP_FOCUS_DISABLED = 1 << 16;
     private static final long COMMAND_TIMEOUT_SECONDS = 5;
 
     private final String address;
@@ -111,7 +113,7 @@ public final class IndependentDisplayDevice implements AutoCloseable {
 
             VirtualDisplayConfig config = new VirtualDisplayConfig.Builder(name, width, height, dpi)
                     .setSurface(surface)
-                    .setFlags(TRUSTED | SUPPORTS_TOUCH | OWN_FOCUS)
+                    .setFlags(TRUSTED | SUPPORTS_TOUCH | OWN_FOCUS | STEAL_TOP_FOCUS_DISABLED)
                     .build();
             Method createDisplay = device.getClass().getMethod("createVirtualDisplay",
                     VirtualDisplayConfig.class, Executor.class, VirtualDisplay.Callback.class);

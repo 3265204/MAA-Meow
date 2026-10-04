@@ -173,7 +173,8 @@ object VirtualDisplayManager {
                     ", actual=${d.mode.physicalWidth}x${d.mode.physicalHeight}" +
                     ", rotation=${d.rotation}" +
                     ", groupId=${groupId ?: "unknown"}" +
-                    ", flags=0x${flags.toString(16)}"
+                    ", requestedFlags=0x${flags.toString(16)}" +
+                    ", actualFlags=0x${d.flags.toString(16)}"
         )
         if (groupId == 0) {
             Ln.w("VD remained in default display group; system sleep may stop its rendering")
