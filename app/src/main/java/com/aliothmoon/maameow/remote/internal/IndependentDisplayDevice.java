@@ -4,7 +4,9 @@ import android.content.Context;
 import android.hardware.display.VirtualDisplay;
 import android.hardware.display.VirtualDisplayConfig;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Process;
 import android.view.Surface;
 
@@ -17,8 +19,12 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Locale;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /** Owns a temporary companion association and the virtual device attached to it. */
 public final class IndependentDisplayDevice implements AutoCloseable {
@@ -43,6 +49,11 @@ public final class IndependentDisplayDevice implements AutoCloseable {
 
     public static IndependentDisplayDevice create(String name, int width, int height, int dpi,
                                                   Surface surface) throws Exception {
+        return onOwnerThread(() -> createOnOwnerThread(name, width, height, dpi, surface));
+    }
+
+    private static IndependentDisplayDevice createOnOwnerThread(String name, int width, int height,
+                                                                 int dpi, Surface surface) throws Exception {
         if (Build.VERSION.SDK_INT < 34) throw new UnsupportedOperationException("VDM requires Android 14");
         if (Process.myUid() != Process.ROOT_UID && Process.myUid() != Process.SHELL_UID) {
             throw new SecurityException("VDM helper requires root or shell identity");
@@ -129,6 +140,13 @@ public final class IndependentDisplayDevice implements AutoCloseable {
 
     @Override
     public void close() throws Exception {
+        onOwnerThread(() -> {
+            closeOnOwnerThread();
+            return null;
+        });
+    }
+
+    private void closeOnOwnerThread() throws Exception {
         try {
             try (ShellIdentity ignored = ShellIdentity.enter()) {
                 try {
@@ -142,7 +160,31 @@ public final class IndependentDisplayDevice implements AutoCloseable {
         }
     }
 
-    /** Binder identifies the caller by this thread's effective UID, not its process name. */
+    /** Binder uses the process leader's credential on this kernel, so Root VDM calls run there. */
+    private static <T> T onOwnerThread(Callable<T> action) throws Exception {
+        if (Process.myUid() != Process.ROOT_UID) return action.call();
+        Looper mainLooper = Looper.getMainLooper();
+        if (mainLooper == null) throw new IllegalStateException("Root service has no main Looper");
+        if (Looper.myLooper() == mainLooper) return action.call();
+
+        FutureTask<T> task = new FutureTask<>(action);
+        if (!new Handler(mainLooper).post(task)) {
+            throw new IllegalStateException("Root service main Looper rejected VDM work");
+        }
+        try {
+            return task.get(30, TimeUnit.SECONDS);
+        } catch (InterruptedException | TimeoutException failure) {
+            task.cancel(true);
+            throw failure;
+        } catch (ExecutionException failure) {
+            Throwable cause = failure.getCause();
+            if (cause instanceof Exception) throw (Exception) cause;
+            if (cause instanceof Error) throw (Error) cause;
+            throw new IllegalStateException(cause);
+        }
+    }
+
+    /** VDM checks the shell package against the Binder caller UID on this device. */
     private static final class ShellIdentity implements AutoCloseable {
         private final boolean switched;
 
