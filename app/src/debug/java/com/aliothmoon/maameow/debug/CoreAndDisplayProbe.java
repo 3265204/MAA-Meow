@@ -37,9 +37,13 @@ public final class CoreAndDisplayProbe {
             Workarounds.apply();
             texture = new SurfaceTexture(false);
             surface = new Surface(texture);
+            // Match scrcpy's --new-display flag combination on Android 14+.
             privateDisplay = ServiceManager.getDisplayManager().createNewVirtualDisplay(
-                    "MAA_PROBE_PRIVATE", 1280, 720, 160, surface, 0x17d48);
-            System.err.println("PROBE PRIVATE id=" + privateDisplay.getDisplay().getDisplayId());
+                    "SCRCPY_FLAGS_PROBE", 1280, 720, 160, surface, 0xfdcb);
+            int comparisonId = privateDisplay.getDisplay().getDisplayId();
+            System.err.println("PROBE SCRCPY_FLAGS id=" + comparisonId
+                    + " groupId=" + ServiceManager.getDisplayManager().getDisplayGroupId(comparisonId)
+                    + " state=" + privateDisplay.getDisplay().getState());
             Thread.sleep(10_000);
         } finally {
             if (privateDisplay != null) privateDisplay.release();
