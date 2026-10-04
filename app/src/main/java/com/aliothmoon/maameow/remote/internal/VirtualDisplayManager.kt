@@ -140,13 +140,20 @@ object VirtualDisplayManager {
         displayId.set(vdId)
 
         val d = vd.display
+        val groupId = runCatching {
+            ServiceManager.getDisplayManager().getDisplayGroupId(vdId)
+        }.onFailure { Ln.w("Could not read VD display group: ${it.message}") }.getOrNull()
         Ln.i(
             "VD created: id=$vdId" +
                     ", configured=${cfg.width}x${cfg.height}" +
                     ", actual=${d.mode.physicalWidth}x${d.mode.physicalHeight}" +
                     ", rotation=${d.rotation}" +
+                    ", groupId=${groupId ?: "unknown"}" +
                     ", flags=0x${flags.toString(16)}"
         )
+        if (groupId == 0) {
+            Ln.w("VD remained in default display group; system sleep may stop its rendering")
+        }
 
         if (d.rotation != Surface.ROTATION_0) {
             // 所有旋转非零的情况都先尝试 freezeRotation

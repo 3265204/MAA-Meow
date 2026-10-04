@@ -133,6 +133,9 @@ android {
         // local.properties: maa.debugR8=true 时 debug 也走 R8
         val debugR8 = localProperties.getProperty("maa.debugR8", "false").toBoolean()
         getByName("debug") {
+            // Keep local test builds alongside the release-signed app and its data.
+            applicationIdSuffix = ".vdtest"
+            versionNameSuffix = "-vdtest"
             isMinifyEnabled = debugR8
             isShrinkResources = debugR8
             if (debugR8) {
