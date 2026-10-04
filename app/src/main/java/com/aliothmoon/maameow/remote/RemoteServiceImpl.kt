@@ -60,6 +60,7 @@ class RemoteServiceImpl : RemoteService.Stub() {
             runCatching {
                 GameAudioMuteController.restoreAll()
                 XmsfFirewall.restoreIfNeeded()
+                VirtualDisplayManager.stop()
                 PowerController.destroy()
                 ScreenManager.destroy()
                 MaaCoreManager.destroy()

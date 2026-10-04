@@ -27,7 +27,7 @@ import java.util.UUID
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.milliseconds
 
-/** Android 14+ 输入注入需要 Root UID；launcher 在 shell 身份下忽略该标志 */
+/** Android 14+ 优先保留 Root UID 以兼容输入注入限制；shell 身份由 launcher 保持原样。 */
 internal val keepRootForInputInjection: Boolean
     get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
 
