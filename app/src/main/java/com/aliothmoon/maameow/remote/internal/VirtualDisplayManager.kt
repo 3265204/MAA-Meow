@@ -51,6 +51,7 @@ object VirtualDisplayManager {
     private val config = AtomicReference(DisplayConfig())
     private val displayId = AtomicInteger(DISPLAY_NONE)
     private val virtualDisplay = AtomicReference<VirtualDisplay?>()
+    private val independentDevice = AtomicReference<IndependentDisplayDevice?>()
 
     private val monitorSurface = AtomicReference<Surface?>()
 
@@ -109,13 +110,21 @@ object VirtualDisplayManager {
             return displayId.get()
         } catch (e: Exception) {
             Ln.e("VirtualDisplayManager start failed", e)
+            releaseResources()
             state.set(STATE_IDLE)
             return DISPLAY_NONE
         }
     }
 
     private fun releaseResources() {
-        virtualDisplay.getAndSet(null)?.release()
+        val vd = virtualDisplay.getAndSet(null)
+        val device = independentDevice.getAndSet(null)
+        if (device != null) {
+            runCatching { device.close() }
+                .onFailure { Ln.e("Failed to close independent virtual device", it) }
+        } else {
+            vd?.release()
+        }
         NativeBridgeLib.releaseNativeCapturer()
         displayId.set(DISPLAY_NONE)
     }
@@ -126,27 +135,50 @@ object VirtualDisplayManager {
         val physicalRotation = runCatching { wm.rotation }.getOrDefault(-1)
         Ln.i("Physical display rotation: $physicalRotation")
 
-        val vd = ServiceManager.getDisplayManager()
-            .createNewVirtualDisplay(
-                VD_NAME,
-                cfg.width,
-                cfg.height,
-                cfg.dpi,
-                surface,
-                flags
-            )
+        val displayManager = ServiceManager.getDisplayManager()
+        var vd = displayManager.createNewVirtualDisplay(
+            VD_NAME, cfg.width, cfg.height, cfg.dpi, surface, flags
+        )
+        val initialGroup = runCatching { displayManager.getDisplayGroupId(vd.display.displayId) }
+            .getOrNull()
+        if (Build.VERSION.SDK_INT >= AndroidVersions.API_34_ANDROID_14 && initialGroup == 0) {
+            // On One UI, the requested OWN_DISPLAY_GROUP flag still yields group 0. A VDM-owned
+            // display gets a real independent group and can remain ON while display 0 sleeps.
+            vd.release()
+            try {
+                val device = IndependentDisplayDevice.create(
+                    VD_NAME, cfg.width, cfg.height, cfg.dpi, surface
+                )
+                independentDevice.set(device)
+                vd = device.display
+                Ln.i("Using VDM-backed independent display group")
+            } catch (e: Exception) {
+                Ln.e("Independent display unavailable; returning to legacy virtual display", e)
+                vd = displayManager.createNewVirtualDisplay(
+                    VD_NAME, cfg.width, cfg.height, cfg.dpi, surface, flags
+                )
+            }
+        }
         virtualDisplay.set(vd)
         val vdId = vd.display.displayId
         displayId.set(vdId)
 
         val d = vd.display
+        val groupId = runCatching {
+            ServiceManager.getDisplayManager().getDisplayGroupId(vdId)
+        }.onFailure { Ln.w("Could not read VD display group: ${it.message}") }.getOrNull()
         Ln.i(
             "VD created: id=$vdId" +
                     ", configured=${cfg.width}x${cfg.height}" +
                     ", actual=${d.mode.physicalWidth}x${d.mode.physicalHeight}" +
                     ", rotation=${d.rotation}" +
-                    ", flags=0x${flags.toString(16)}"
+                    ", groupId=${groupId ?: "unknown"}" +
+                    ", requestedFlags=0x${flags.toString(16)}" +
+                    ", actualFlags=0x${d.flags.toString(16)}"
         )
+        if (groupId == 0) {
+            Ln.w("VD remained in default display group; system sleep may stop its rendering")
+        }
 
         if (d.rotation != Surface.ROTATION_0) {
             // 所有旋转非零的情况都先尝试 freezeRotation

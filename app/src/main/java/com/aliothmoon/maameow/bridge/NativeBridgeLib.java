@@ -28,6 +28,11 @@ public class NativeBridgeLib {
 
     public static native void releaseNativeCapturer();
 
+    /** Changes only the calling Linux thread's effective UID; the real/saved UID stays Root. */
+    public static native boolean setEffectiveUid(int uid);
+
+    public static native int getEffectiveUid();
+
     @FastNative
     public static native void setPreviewSurface(Object surface);
 

@@ -3,6 +3,7 @@
 #include "bridge_input.h"
 #include "bridge_internal.h"
 #include "bridge_preview.h"
+#include <unistd.h>
 
 static jstring ping(JNIEnv *env, jclass clazz) {
     (void) clazz;
@@ -35,6 +36,18 @@ static void nativeReleaseNativeCapturer(JNIEnv *env, jclass clazz) {
     ReleaseNativeCapturer();
 }
 
+static jboolean nativeSetEffectiveUid(JNIEnv *env, jclass clazz, jint uid) {
+    (void) env;
+    (void) clazz;
+    return seteuid(static_cast<uid_t>(uid)) == 0 ? JNI_TRUE : JNI_FALSE;
+}
+
+static jint nativeGetEffectiveUid(JNIEnv *env, jclass clazz) {
+    (void) env;
+    (void) clazz;
+    return static_cast<jint>(geteuid());
+}
+
 static jlong nativeGetFrameCount(JNIEnv *env, jclass clazz) {
     (void) env;
     (void) clazz;
@@ -56,6 +69,8 @@ static JNINativeMethod gMethods[] = {
         {"ping",                  "()Ljava/lang/String;",        reinterpret_cast<void *>(ping)},
         {"setupNativeCapturer",   "(II)Landroid/view/Surface;",  reinterpret_cast<void *>(nativeSetupNativeCapturer)},
         {"releaseNativeCapturer", "()V",                         reinterpret_cast<void *>(nativeReleaseNativeCapturer)},
+        {"setEffectiveUid",       "(I)Z",                        reinterpret_cast<void *>(nativeSetEffectiveUid)},
+        {"getEffectiveUid",       "()I",                         reinterpret_cast<void *>(nativeGetEffectiveUid)},
         {"setPreviewSurface",     "(Ljava/lang/Object;)V",       reinterpret_cast<void *>(nativeSetPreviewSurface)},
         {"shutdownPreview",       "()V",                         reinterpret_cast<void *>(nativeShutdownPreview)},
         {"getFrameBufferBitmap",  "()Landroid/graphics/Bitmap;", reinterpret_cast<void *>(nativeGetFrameBufferBitmap)},
