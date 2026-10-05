@@ -1,5 +1,6 @@
 package com.aliothmoon.maameow.remote.internal;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.hardware.display.VirtualDisplay;
 import android.hardware.display.VirtualDisplayConfig;
@@ -10,12 +11,16 @@ import android.os.Looper;
 import android.os.Process;
 import android.view.Surface;
 
+import androidx.annotation.RequiresApi;
+
 import com.aliothmoon.maameow.BuildConfig;
 import com.aliothmoon.maameow.bridge.NativeBridgeLib;
 import com.aliothmoon.maameow.third.FakeContext;
 import com.aliothmoon.maameow.third.wrappers.ServiceManager;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Locale;
@@ -83,6 +88,8 @@ public final class IndependentDisplayDevice implements AutoCloseable {
         }
     }
 
+    @RequiresApi(34)
+    @SuppressLint("WrongConstant") // The SDK IntDef omits these valid system virtual-display flags.
     private static IndependentDisplayDevice createForAssociation(String address, int associationId,
             String name, int width, int height, int dpi, Surface surface) throws Exception {
         Object device = null;
@@ -247,7 +254,15 @@ public final class IndependentDisplayDevice implements AutoCloseable {
             process.destroyForcibly();
             throw new IOException("companiondevice command timed out");
         }
-        String output = new String(process.getInputStream().readAllBytes());
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (InputStream input = process.getInputStream()) {
+            byte[] buffer = new byte[4096];
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                bytes.write(buffer, 0, count);
+            }
+        }
+        String output = bytes.toString("UTF-8");
         if (process.exitValue() != 0) {
             throw new IOException("companiondevice command failed: " + output.trim());
         }
