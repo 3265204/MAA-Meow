@@ -1,6 +1,7 @@
 package com.aliothmoon.maameow.domain.service
 
 import android.content.Context
+import android.os.RemoteException
 import com.alibaba.fastjson2.JSON
 import com.aliothmoon.maameow.MaaCoreCallback
 import com.aliothmoon.maameow.MaaCoreService
@@ -44,6 +45,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -801,28 +803,39 @@ class MaaCompositionService(
         sessionLogger.appendAndWait(context.getString(R.string.runlog_task_stopping), LogLevel.INFO)
 
         return withContext(Dispatchers.IO) {
-            useRemoteService { service ->
-                val maa = service.maaCoreService
-                if (!maa.Running()) {
-                    return@useRemoteService finishStop(StopResult.Success)
-                }
+            try {
+                useRemoteService { service ->
+                    val maa = service.maaCoreService
+                    if (!maa.Running()) {
+                        return@useRemoteService finishStop(StopResult.Success)
+                    }
 
-                if (!maa.Stop()) {
-                    return@useRemoteService finishStop(StopResult.Failed)
-                }
+                    if (!maa.Stop()) {
+                        return@useRemoteService finishStop(StopResult.Failed)
+                    }
 
-                // 轮询等待 Core 真正停止，60 秒超时
-                var elapsed = 0
-                while (maa.Running() && elapsed < 60_000) {
-                    delay(100)
-                    elapsed += 100
-                }
+                    // 轮询等待 Core 真正停止，60 秒超时
+                    var elapsed = 0
+                    while (maa.Running() && elapsed < 60_000) {
+                        delay(100)
+                        elapsed += 100
+                    }
 
-                if (maa.Running()) {
-                    finishStop(StopResult.Failed)
-                } else {
-                    finishStop(StopResult.Success)
+                    if (maa.Running()) {
+                        finishStop(StopResult.Failed)
+                    } else {
+                        finishStop(StopResult.Success)
+                    }
                 }
+            } catch (e: RemoteException) {
+                // 进程已死，Core 随之没了；不收尾会卡在 STOPPING
+                Timber.w(e, "performStop: elevated service gone")
+                finishStop(StopResult.Success)
+            } catch (e: Exception) {
+                // 真取消照抛；等连接超时、未授权、连接出错时 Core 停没停不确定
+                if (e is CancellationException && e !is TimeoutCancellationException) throw e
+                Timber.w(e, "performStop: remote service unavailable")
+                finishStop(StopResult.Failed)
             }
         }
     }
@@ -858,7 +871,12 @@ class MaaCompositionService(
             withContext(Dispatchers.IO) {
                 val service = RemoteServiceManager.getInstanceOrNull()
                     ?: return@withContext
-                service.stopVirtualDisplay()
+                try {
+                    service.stopVirtualDisplay()
+                } catch (e: RemoteException) {
+                    // 进程已死，虚拟屏随之销毁
+                    Timber.w(e, "stopVirtualDisplay: elevated service gone")
+                }
             }
         } finally {
             withContext(NonCancellable) {

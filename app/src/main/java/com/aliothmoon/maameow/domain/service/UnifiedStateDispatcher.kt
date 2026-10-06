@@ -1,5 +1,6 @@
 package com.aliothmoon.maameow.domain.service
 
+import android.os.RemoteException
 import com.aliothmoon.maameow.RemoteService
 import com.aliothmoon.maameow.data.model.WakeUpConfig
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
@@ -148,9 +149,14 @@ class UnifiedStateDispatcher(
 
     suspend fun onServiceConnected(srv: RemoteService) {
         withContext(Dispatchers.IO) {
-            permissionManager.grantRequiredPermissions(srv)
-            val mode = appSettingsManager.runMode.value
-            srv.setVirtualDisplayMode(mode.displayMode)
+            try {
+                permissionManager.grantRequiredPermissions(srv)
+                val mode = appSettingsManager.runMode.value
+                srv.setVirtualDisplayMode(mode.displayMode)
+            } catch (e: RemoteException) {
+                // 刚连上就死了，下次连上会重做
+                Timber.w(e, "onServiceConnected: remote call failed")
+            }
         }
     }
 
