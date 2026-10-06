@@ -239,8 +239,13 @@ val appModule = module {
             },
             // 与 MaaCompositionService 启动前检查同口径，免得倒计时走完才被拒
             remoteAccessBlocker = {
-                val access = RemoteAccessCoordinator.refresh()
+                var access = RemoteAccessCoordinator.refresh()
                 val backend = access.configuredBackend
+                // 冷启动时 Root shell 还在异步申请，快照会误报未授权；和 useRemoteService 一样先申请一次
+                if (access.isAvailable(backend) && !access.isGranted(backend)) {
+                    RemoteAccessCoordinator.request(backend)
+                    access = RemoteAccessCoordinator.refresh()
+                }
                 when {
                     !access.isAvailable(backend) ->
                         uiTextOf(R.string.runlog_backend_unavailable, backend.display)

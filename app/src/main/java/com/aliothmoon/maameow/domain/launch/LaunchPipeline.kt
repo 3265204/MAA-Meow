@@ -60,8 +60,8 @@ class LaunchPipeline(
     private val deviceLocked: () -> Boolean,
     private val screenInteractive: () -> Boolean,
     private val activityLauncher: suspend (LaunchRequest) -> Boolean,
-    /** 提权后端用不了的原因，null = 可用 */
-    private val remoteAccessBlocker: () -> UiText?,
+    /** 提权后端用不了的原因，null = 可用；未授权时会先申请，可能挂起 */
+    private val remoteAccessBlocker: suspend () -> UiText?,
 ) {
     private val _session = MutableStateFlow<LaunchSession>(LaunchSession.Idle)
     val session: StateFlow<LaunchSession> = _session.asStateFlow()
