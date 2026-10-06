@@ -331,6 +331,38 @@ class LaunchPipelineTest {
         }
     }
 
+    // 强制启动若先停在跑的再查后端，后端挂了就两头落空
+    @Test
+    fun forceStart_remoteUnavailable_keepsRunningTask() = runBlocking<Unit> {
+        compositionState.value = MaaExecutionState.RUNNING
+        remoteBlocker = uiTextOf(R.string.runlog_backend_unavailable, "Shizuku")
+
+        pipeline().execute(scheduleRequest(force = true)).join()
+
+        assertEquals(listOf(ExecutionResult.FAILED_START), recorded.toList())
+        assertEquals(0, stopCalls.get())
+        assertEquals(MaaExecutionState.RUNNING, compositionState.value)
+    }
+
+    @Test
+    fun forcePreempt_remoteUnavailable_keepsInFlightLaunch() = runBlocking<Unit> {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val p = pipeline(countdown = gatedCountdown(entered, release))
+        val first = p.execute(scheduleRequest("a"))
+        withTimeout(5_000) { entered.await() }
+
+        remoteBlocker = uiTextOf(R.string.runlog_backend_unavailable, "Shizuku")
+        p.execute(scheduleRequest("b", force = true)).join()
+        assertEquals(listOf(ExecutionResult.FAILED_START), recorded.toList())
+
+        // 第一个没被抢占，照常跑完
+        remoteBlocker = null
+        release.complete(Unit)
+        first.join()
+        assertEquals(listOf(ExecutionResult.FAILED_START, ExecutionResult.STARTED), recorded.toList())
+    }
+
     @Test
     fun remoteAvailable_launchesUiAndStarts() = runBlocking<Unit> {
         pipeline().execute(scheduleRequest()).join()

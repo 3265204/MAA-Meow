@@ -114,6 +114,11 @@ class LaunchPipeline(
 
         if (!mutex.tryAcquire(request.requestId)) {
             if (request.forceStart) {
+                // 后端用不了还抢占，只会把别人停了、自己也起不来
+                remoteAccessBlocker()?.let {
+                    finishWithoutHold(request, ExecutionResult.FAILED_START, it)
+                    return
+                }
                 preemptInFlight(request)
                 mutex.forceAcquire(request.requestId)
             } else {
@@ -144,27 +149,28 @@ class LaunchPipeline(
             log.append(uiTextOf(R.string.schedule_log_received, request.displayName))
 
             val state = compositionService.state.value
-            if (state == MaaExecutionState.RUNNING
-                || state == MaaExecutionState.STARTING
-                || state == MaaExecutionState.STOPPING
-            ) {
-                if (request.forceStart) {
-                    log.append(uiTextOf(R.string.schedule_log_force_stop_running))
-                    takeOverFromPreviousRun()
-                    compositionService.stop()
-                    compositionService.stopVirtualDisplay()
-                } else {
-                    terminalResult = ExecutionResult.SKIPPED_BUSY
-                    terminalMessage = uiTextOf(R.string.schedule_log_task_running_busy)
-                    return
-                }
+            val busy = state == MaaExecutionState.RUNNING
+                    || state == MaaExecutionState.STARTING
+                    || state == MaaExecutionState.STOPPING
+            if (busy && !request.forceStart) {
+                terminalResult = ExecutionResult.SKIPPED_BUSY
+                terminalMessage = uiTextOf(R.string.schedule_log_task_running_busy)
+                return
             }
 
             // 解锁、拉起界面、跑任务都靠提权进程，后端没起来就别往下走，否则会被报成锁屏或拉起失败
+            // 强制启动也得先查，免得把在跑的停了、自己又起不来
             remoteAccessBlocker()?.let {
                 terminalResult = ExecutionResult.FAILED_START
                 terminalMessage = it
                 return
+            }
+
+            if (busy) {
+                log.append(uiTextOf(R.string.schedule_log_force_stop_running))
+                takeOverFromPreviousRun()
+                compositionService.stop()
+                compositionService.stopVirtualDisplay()
             }
 
             // 须在唤醒前采样；无锁屏时熄屏也不上锁，亮屏与 keyguard 都看
