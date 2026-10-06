@@ -59,6 +59,9 @@ object RemoteServiceManager {
 
     @Volatile
     private var boundBackend: RemoteBackend? = null
+
+    // 起进程时的身份（uid），guarded by lock
+    private var boundIdentity: Int? = null
     val state: StateFlow<ServiceState> = _state.asStateFlow()
 
     // 携带绑定时的 binder，迟到的死亡通知靠身份比对丢弃
@@ -195,10 +198,20 @@ object RemoteServiceManager {
             return
         }
 
+        val identity = spawnIdentity(backend)
         val attempt: Int
         synchronized(lock) {
             if (_state.value is ServiceState.Connecting && boundBackend == backend) {
                 ServiceBootLogger.event("BIND_SKIP", "already connecting backend=$backend")
+                return
+            }
+            // Shizuku / su 重启不影响已起的进程，身份没变就别杀了重起
+            if (_state.value is ServiceState.Connected && boundBackend == backend &&
+                currentBinder.get()?.isBinderAlive == true &&
+                identity != null && identity == boundIdentity
+            ) {
+                ServiceBootLogger.event("BIND_SKIP", "already connected backend=$backend uid=$identity")
+                Timber.i("Keep connected %s service (uid=%d)", backend, identity)
                 return
             }
 
@@ -208,6 +221,7 @@ object RemoteServiceManager {
             }
 
             boundBackend = backend
+            boundIdentity = identity
             attempt = connectAttempt.incrementAndGet()
             ServiceBootLogger.event("BIND", "backend=$backend attempt=$attempt")
             _state.value = ServiceState.Connecting
@@ -215,6 +229,12 @@ object RemoteServiceManager {
             connectors.getValue(backend).connect(connectorCallbacks)
         }
         startConnectTimeout(attempt, backend)
+    }
+
+    /** 现在新起的进程会是什么身份，adb ↔ root 切换后旧进程不能沿用 */
+    private fun spawnIdentity(backend: RemoteBackend): Int? = when (backend) {
+        RemoteBackend.SHIZUKU -> ShizukuManager.serverUid()
+        RemoteBackend.ROOT -> 0
     }
 
     private fun startConnectTimeout(attempt: Int, backend: RemoteBackend) {
@@ -319,6 +339,11 @@ object RemoteServiceManager {
         timeoutMs: Long? = null,
         action: suspend (RemoteService) -> R
     ): R = withContext(Dispatchers.IO) {
+        // 已连着当前后端就直接用：Shizuku / su 挂了，已起的进程照样能用
+        if (boundBackend == RemoteAccessCoordinator.configuredBackend()) {
+            getInstanceOrNull()?.let { return@withContext action(it) }
+        }
+
         var accessState = RemoteAccessCoordinator.refresh()
         var backend = accessState.configuredBackend
         if (!accessState.isGranted(backend)) {
