@@ -1,5 +1,6 @@
 package com.aliothmoon.maameow
 
+import android.os.IBinder
 import com.aliothmoon.maameow.data.config.MaaPathConfig
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.data.preferences.TaskChainState
@@ -254,6 +255,44 @@ class MaaResourceLoaderTest {
         }
     }
 
+    // Shizuku 重启后直接 Connected -> Connecting -> Connected，新进程没加载过资源
+    @Test
+    fun ensureLoaded_reloads_whenServiceReplacedWithoutDisconnect() = runBlocking {
+        withEnv { env ->
+            assertTrue(env.loader.load("Official").isSuccess)
+            env.replaceService()
+            env.loadedDirs.clear()
+
+            assertTrue(env.loader.ensureLoaded("Official").isSuccess)
+            assertTrue(env.loadedDirs.isNotEmpty())
+            // 新进程是干净的，不该再换一次
+            verify(exactly = 0) { RemoteServiceManager.unbind() }
+        }
+    }
+
+    @Test
+    fun resetIfStale_keepsReady_forSameService() = runBlocking {
+        withEnv { env ->
+            assertTrue(env.loader.load("Official").isSuccess)
+            assertFalse(env.loader.resetIfStale(RemoteServiceManager.getInstanceOrNull()!!))
+            assertTrue(env.loader.state.value is MaaResourceLoader.State.Ready)
+        }
+    }
+
+    @Test
+    fun resetIfStale_dropsReady_whenServiceReplaced() = runBlocking {
+        withEnv { env ->
+            assertTrue(env.loader.load("YoStarJP").isSuccess)
+            val fresh = env.replaceService()
+
+            assertTrue(env.loader.resetIfStale(fresh))
+            assertTrue(env.loader.state.value is MaaResourceLoader.State.NotLoaded)
+            // 旧进程的资源档也一并作废，换客户端不该多重启
+            assertTrue(env.loader.load("Official").isSuccess)
+            verify(exactly = 0) { RemoteServiceManager.unbind() }
+        }
+    }
+
     private class Env(
         val loader: MaaResourceLoader,
         val loadedDirs: MutableList<String>,
@@ -263,6 +302,8 @@ class MaaResourceLoaderTest {
         /** 置 true 模拟换进程后服务没能回来 */
         val rebindFails: AtomicBoolean,
         val coreDataPusher: CoreDataPusher,
+        /** 换一个新提权进程并直接置 Connected，不经过 Disconnected */
+        val replaceService: () -> RemoteService,
     )
 
     private suspend fun withEnv(
@@ -306,7 +347,6 @@ class MaaResourceLoaderTest {
             val itemHelper = mockk<ItemHelper>()
             val resourceDataManager = mockk<ResourceDataManager>()
             val activityManager = mockk<ActivityManager>()
-            val service = mockk<RemoteService>()
             every { pathConfig.isCoreSeparated } returns coreSeparated
             every { pathConfig.coreRootDir } answers {
                 if (coreSeparated) "/data/local/tmp/maameow" else rootDir.absolutePath
@@ -319,19 +359,25 @@ class MaaResourceLoaderTest {
             val coreDataPusher = mockk<CoreDataPusher> {
                 coEvery { prepare(any()) } returns true
             }
-            val maaCore = mockk<MaaCoreService>()
             val loadedDirs = mutableListOf<String>()
 
             coEvery { resourceDataManager.load(any(), any()) } returns Unit
             coEvery { itemHelper.load() } returns Unit
             coEvery { activityManager.load(any()) } returns Unit
-            every { service.setup(any(), any()) } returns setupCode
-            justRun { service.setForceFullscreenOnVirtualDisplay(any()) }
-            every { service.maaCoreService } returns maaCore
-            every { maaCore.LoadResource(any()) } answers {
-                loadedDirs += firstArg<String>()
-                true
+            fun newService(): RemoteService {
+                val maaCore = mockk<MaaCoreService>()
+                every { maaCore.LoadResource(any()) } answers {
+                    loadedDirs += firstArg<String>()
+                    true
+                }
+                return mockk<RemoteService> {
+                    every { asBinder() } returns mockk<IBinder>()
+                    every { setup(any(), any()) } returns setupCode
+                    justRun { setForceFullscreenOnVirtualDisplay(any()) }
+                    every { maaCoreService } returns maaCore
+                }
             }
+            var service = newService()
 
             // 解绑置 Disconnected，取到服务即视为 Connected
             val serviceState = MutableStateFlow<RemoteServiceManager.ServiceState>(
@@ -343,6 +389,9 @@ class MaaResourceLoaderTest {
             every { RemoteServiceManager.state } returns serviceState
             every { RemoteServiceManager.unbind() } answers {
                 serviceState.value = RemoteServiceManager.ServiceState.Disconnected
+            }
+            every { RemoteServiceManager.getInstanceOrNull() } answers {
+                (serviceState.value as? RemoteServiceManager.ServiceState.Connected)?.service
             }
             coEvery { RemoteServiceManager.useRemoteService<Result<Unit>>(any(), any()) } coAnswers {
                 if (rebindFails.get()) error("elevated service gone")
@@ -367,6 +416,11 @@ class MaaResourceLoaderTest {
                     activityManager = activityManager,
                     rebindFails = rebindFails,
                     coreDataPusher = coreDataPusher,
+                    replaceService = {
+                        service = newService()
+                        serviceState.value = RemoteServiceManager.ServiceState.Connected(service)
+                        service
+                    },
                 )
             )
         } finally {

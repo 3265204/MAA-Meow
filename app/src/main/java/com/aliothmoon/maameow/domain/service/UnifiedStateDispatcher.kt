@@ -104,6 +104,7 @@ class UnifiedStateDispatcher(
                     if (serviceState is RemoteServiceManager.ServiceState.Connected
                         && initState is ResourceInitState.Ready
                     ) {
+                        resourceLoader.resetIfStale(serviceState.service)
                         val loaderState = resourceLoader.state.value
                         val shouldLoad = loaderState is MaaResourceLoader.State.NotLoaded
                                 || (loaderState is MaaResourceLoader.State.Failed && !loaderState.permanent)
