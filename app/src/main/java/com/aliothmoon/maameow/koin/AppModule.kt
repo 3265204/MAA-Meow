@@ -3,6 +3,7 @@ package com.aliothmoon.maameow.koin
 import android.app.KeyguardManager
 import android.content.Context
 import android.os.PowerManager
+import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.announcement.AnnouncementManager
 import com.aliothmoon.maameow.data.achievement.AchievementRepository
 import com.aliothmoon.maameow.data.achievement.PallasDrunkState
@@ -108,6 +109,7 @@ import com.aliothmoon.maameow.maa.callback.TaskChainHandler
 import com.aliothmoon.maameow.maa.callback.TaskChainStatusTracker
 import com.aliothmoon.maameow.maa.callback.ToolboxResultCollector
 import com.aliothmoon.maameow.manager.PermissionManager
+import com.aliothmoon.maameow.manager.RemoteAccessCoordinator
 import com.aliothmoon.maameow.manager.RemoteGameAudioAdapter
 import com.aliothmoon.maameow.manager.RemoteServiceManager
 import com.aliothmoon.maameow.manager.ShizukuReadinessProvider
@@ -126,6 +128,7 @@ import com.aliothmoon.maameow.schedule.service.ScheduleTriggerHandler
 import com.aliothmoon.maameow.schedule.service.ScheduleTriggerLogger
 import com.aliothmoon.maameow.telemetry.TelemetryController
 import com.aliothmoon.maameow.utils.CrashHandler
+import com.aliothmoon.maameow.utils.i18n.uiTextOf
 import com.aliothmoon.maameow.utils.log.LogTreeHolder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -232,6 +235,20 @@ val appModule = module {
                         }
                     }.getOrDefault(false)
                 } ?: false
+            },
+            // 与 MaaCompositionService 启动前检查同口径，免得倒计时走完才被拒
+            remoteAccessBlocker = {
+                val access = RemoteAccessCoordinator.refresh()
+                val backend = access.configuredBackend
+                when {
+                    !access.isAvailable(backend) ->
+                        uiTextOf(R.string.runlog_backend_unavailable, backend.display)
+
+                    !access.isGranted(backend) ->
+                        uiTextOf(R.string.runlog_backend_not_granted, backend.display)
+
+                    else -> null
+                }
             },
         )
     }

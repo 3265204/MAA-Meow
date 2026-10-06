@@ -61,6 +61,8 @@ class LaunchPipeline(
     private val deviceLocked: () -> Boolean,
     private val screenInteractive: () -> Boolean,
     private val activityLauncher: suspend (LaunchRequest) -> Boolean,
+    /** 提权后端用不了的原因，null = 可用 */
+    private val remoteAccessBlocker: () -> UiText?,
 ) {
     private val _session = MutableStateFlow<LaunchSession>(LaunchSession.Idle)
     val session: StateFlow<LaunchSession> = _session.asStateFlow()
@@ -160,6 +162,13 @@ class LaunchPipeline(
                     terminalMessage = uiTextOf(R.string.schedule_log_task_running_busy)
                     return
                 }
+            }
+
+            // 解锁、拉起界面、跑任务都靠提权进程，后端没起来就别往下走，否则会被报成锁屏或拉起失败
+            remoteAccessBlocker()?.let {
+                terminalResult = ExecutionResult.FAILED_START
+                terminalMessage = it
+                return
             }
 
             // 须在唤醒前采样；无锁屏时熄屏也不上锁，亮屏与 keyguard 都看

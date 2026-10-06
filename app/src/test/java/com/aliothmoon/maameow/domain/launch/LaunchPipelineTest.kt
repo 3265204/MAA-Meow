@@ -71,6 +71,10 @@ class LaunchPipelineTest {
     private val startCalls = AtomicInteger(0)
     private val recorded = CopyOnWriteArrayList<ExecutionResult>()
     private val stopCalls = AtomicInteger(0)
+    private val uiLaunches = AtomicInteger(0)
+
+    @Volatile
+    private var remoteBlocker: UiText? = null
 
     private val runMode = MutableStateFlow(RunMode.BACKGROUND)
     private val unlockType = MutableStateFlow("swipe")
@@ -121,6 +125,8 @@ class LaunchPipelineTest {
         mutex = LaunchMutex()
         startCalls.set(0)
         stopCalls.set(0)
+        uiLaunches.set(0)
+        remoteBlocker = null
         recorded.clear()
         keyguardLocked.set(false)
         deviceLocked.set(false)
@@ -235,7 +241,11 @@ class LaunchPipelineTest {
         keyguardLocked = { keyguardLocked.get() },
         deviceLocked = { deviceLocked.get() },
         screenInteractive = { screenInteractive.get() },
-        activityLauncher = { true },
+        activityLauncher = {
+            uiLaunches.incrementAndGet()
+            true
+        },
+        remoteAccessBlocker = { remoteBlocker },
     )
 
     private fun givenWakeGate(
@@ -295,6 +305,31 @@ class LaunchPipelineTest {
         compositionState.value = MaaExecutionState.STOPPING
         delay(200)
         compositionState.value = MaaExecutionState.IDLE
+    }
+
+    // Shizuku 没起来时解锁注入必失败，以前被报成锁屏 / 拉起界面失败
+    @Test
+    fun remoteUnavailable_failsStartBeforeUnlock() = runBlocking<Unit> {
+        val reason = uiTextOf(R.string.runlog_backend_unavailable, "Shizuku")
+        remoteBlocker = reason
+        givenWakeGate(interactive = false, keyguard = true, locked = true)
+
+        pipeline().execute(scheduleRequest()).join()
+
+        assertEquals(listOf(ExecutionResult.FAILED_START), recorded.toList())
+        verify { logSession.end(ExecutionResult.FAILED_START, reason) }
+        coVerify(exactly = 0) { wake.unlock(any()) }
+        assertEquals(0, uiLaunches.get())
+        assertEquals(0, startCalls.get())
+    }
+
+    @Test
+    fun remoteAvailable_launchesUiAndStarts() = runBlocking<Unit> {
+        pipeline().execute(scheduleRequest()).join()
+
+        assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
+        assertEquals(1, uiLaunches.get())
+        assertEquals(1, startCalls.get())
     }
 
     @Test
