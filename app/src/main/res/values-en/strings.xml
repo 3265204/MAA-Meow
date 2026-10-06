@@ -1650,6 +1650,8 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="notification_event_task_error">Task Error</string>
     <string name="notification_event_task_stopped">Task stopped</string>
     <string name="notification_event_task_stopped_text">The task was stopped</string>
+    <string name="notification_event_task_aborted_text">Tasks were aborted due to an error; see the previous notification or the run log</string>
+    <string name="notification_event_task_time_limit_text">Reached the per-run time limit; tasks were stopped</string>
     <string name="notification_event_service_died">Service error</string>
     <string name="notification_event_service_died_text">The MAA service terminated unexpectedly</string>
     <string name="notification_event_recruit_tip">Recruitment Tip</string>

@@ -866,7 +866,7 @@ class MaaCompositionService(
             if (result is StopResult.Success) LogLevel.INFO else LogLevel.ERROR
         )
         sessionLogger.endSession(status)
-        notificationCenter.notifyTaskStopped()
+        notificationCenter.notifyTaskStopped(lastStopOrigin)
         return result
     }
 

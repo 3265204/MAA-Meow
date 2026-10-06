@@ -1706,6 +1706,8 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="notification_event_task_error">任务出错</string>
     <string name="notification_event_task_stopped">任务已停止</string>
     <string name="notification_event_task_stopped_text">任务已手动停止</string>
+    <string name="notification_event_task_aborted_text">任务因异常中止，原因见上一条通知或运行日志</string>
+    <string name="notification_event_task_time_limit_text">已达到单次运行时长上限，任务已停止</string>
     <string name="notification_event_service_died">服务异常</string>
     <string name="notification_event_service_died_text">MAA 服务意外终止</string>
     <string name="notification_event_recruit_tip">招募提示</string>

@@ -41,10 +41,19 @@ class MaaNotificationCenter(
         }
     }
 
-    fun notifyTaskStopped() {
+    /** 掉线 / 游戏退出与到达时长上限都走停止流程，不能都报成手动停止 */
+    fun notifyTaskStopped(origin: MaaCompositionService.StopOrigin) {
         val title = appContext.getString(R.string.notification_event_task_stopped)
-        val text = appContext.getString(R.string.notification_event_task_stopped_text)
-        publishResult(title, text, timeoutSec = 15)
+        val text = appContext.getString(
+            when (origin) {
+                MaaCompositionService.StopOrigin.USER -> R.string.notification_event_task_stopped_text
+                MaaCompositionService.StopOrigin.CALLBACK -> R.string.notification_event_task_aborted_text
+                MaaCompositionService.StopOrigin.RUN_DURATION_LIMIT -> R.string.notification_event_task_time_limit_text
+            }
+        )
+        // 非手动停止多半没人看着，留久一点
+        val timeoutSec = if (origin == MaaCompositionService.StopOrigin.USER) 15 else 120
+        publishResult(title, text, timeoutSec)
     }
 
     fun notifyTaskError(taskName: String) {
