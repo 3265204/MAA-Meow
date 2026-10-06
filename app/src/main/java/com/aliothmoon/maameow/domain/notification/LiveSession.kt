@@ -78,10 +78,14 @@ object LiveNotifyIds {
     const val RESULT = 9002
     const val PROGRESS = 9003
     const val TEST = 9005
+    const val LAUNCH = 9006
 
     const val PROGRESS_SESSION = "maa:task-progress"
     const val RESULT_SESSION = "maa:task-result"
     const val TEST_SESSION = "maa:live-test"
+
+    /** 定时 / 外部触发没跑起来；与任务结果分开，免得互相顶掉 */
+    const val LAUNCH_SESSION = "maa:launch-result"
 
     const val CHANNEL_PROGRESS = "task_execution_live"
 
@@ -101,6 +105,7 @@ object LiveNotifyIds {
         PROGRESS_SESSION -> PROGRESS
         RESULT_SESSION -> RESULT
         TEST_SESSION -> TEST
+        LAUNCH_SESSION -> LAUNCH
         else -> sessionId.hashCode() and Int.MAX_VALUE
     }
 }

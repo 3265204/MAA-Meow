@@ -6,6 +6,7 @@ import com.aliothmoon.maameow.data.preferences.TaskChainState
 import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.domain.models.UnlockCredential
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
+import com.aliothmoon.maameow.domain.service.MaaNotificationCenter
 import com.aliothmoon.maameow.domain.service.ScreenSaverController
 import com.aliothmoon.maameow.domain.service.TaskEndRegistry
 import com.aliothmoon.maameow.domain.service.UnlockGestureReader
@@ -22,13 +23,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -56,6 +54,7 @@ class LaunchPipeline(
     private val countdownUI: CountdownUI,
     private val screenSaver: ScreenSaverController,
     private val taskEndRegistry: TaskEndRegistry,
+    private val notificationCenter: MaaNotificationCenter,
     private val keyguardLocked: () -> Boolean,
     /** 此刻要密码才能进桌面；不是 isDeviceSecure（只说明设过密码） */
     private val deviceLocked: () -> Boolean,
@@ -66,9 +65,6 @@ class LaunchPipeline(
 ) {
     private val _session = MutableStateFlow<LaunchSession>(LaunchSession.Idle)
     val session: StateFlow<LaunchSession> = _session.asStateFlow()
-
-    private val _effects = Channel<LaunchEffect>(capacity = Channel.BUFFERED)
-    val effects: Flow<LaunchEffect> = _effects.receiveAsFlow()
 
     private val executeLock = Any()
     private val jobs = ConcurrentHashMap<String, Job>()
@@ -367,15 +363,7 @@ class LaunchPipeline(
                 )
             }
             if (result != ExecutionResult.STARTED && result != ExecutionResult.CANCELLED) {
-                _effects.trySend(
-                    LaunchEffect.Feedback(
-                        uiTextOf(
-                            R.string.notification_schedule_detail,
-                            request.displayName,
-                            terminalMessage ?: uiTextOf(R.string.schedule_result_failed_start),
-                        ),
-                    ),
-                )
+                notificationCenter.notifyLaunchNotStarted(request.displayName, result, terminalMessage)
             }
         } finally {
             lastCompletedRequestId.set(request.requestId)
@@ -453,11 +441,7 @@ class LaunchPipeline(
                     message = triggerLogger.resolveMessage(message),
                 )
             }
-            _effects.trySend(
-                LaunchEffect.Feedback(
-                    uiTextOf(R.string.notification_schedule_detail, request.displayName, message),
-                ),
-            )
+            notificationCenter.notifyLaunchNotStarted(request.displayName, result, message)
             lastCompletedRequestId.set(request.requestId)
         }
     }

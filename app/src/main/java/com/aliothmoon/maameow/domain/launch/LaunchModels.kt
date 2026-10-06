@@ -1,7 +1,6 @@
 package com.aliothmoon.maameow.domain.launch
 
 import com.aliothmoon.maameow.schedule.model.CountdownState
-import com.aliothmoon.maameow.utils.i18n.UiText
 import java.util.UUID
 
 enum class LaunchSource {
@@ -54,10 +53,6 @@ sealed interface LaunchSession {
 sealed interface LaunchUserEvent {
     data object Cancel : LaunchUserEvent
     data object StartNow : LaunchUserEvent
-}
-
-sealed interface LaunchEffect {
-    data class Feedback(val message: UiText) : LaunchEffect
 }
 
 fun LaunchSession.toCountdownState(): CountdownState {

@@ -1942,6 +1942,8 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="notification_channel_schedule">Scheduled Tasks</string>
     <string name="notification_channel_schedule_desc">Scheduled task execution and result notifications</string>
     <string name="notification_schedule_title">Scheduled Task</string>
+    <string name="notification_schedule_skipped">Scheduled task skipped</string>
+    <string name="notification_schedule_failed">Scheduled task failed to start</string>
     <string name="notification_schedule_preparing">Preparing to launch…</string>
     <string name="notification_schedule_device_locked">Device is locked</string>
     <string name="notification_schedule_pin_required">Skipped: a device lock password is set. Configure a PIN or record an unlock gesture in "Schedule → Wake &amp; Unlock", or use "Tasks → Options → Screen Off" instead of the system lock screen</string>

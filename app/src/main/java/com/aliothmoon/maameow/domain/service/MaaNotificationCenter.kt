@@ -8,6 +8,10 @@ import com.aliothmoon.maameow.domain.notification.LiveCategory
 import com.aliothmoon.maameow.domain.notification.LiveNotifyIds
 import com.aliothmoon.maameow.domain.notification.LiveSession
 import com.aliothmoon.maameow.domain.notification.LiveSessionCoordinator
+import com.aliothmoon.maameow.schedule.model.ExecutionResult
+import com.aliothmoon.maameow.utils.i18n.UiText
+import com.aliothmoon.maameow.utils.i18n.resolve
+import com.aliothmoon.maameow.utils.i18n.uiTextOf
 import kotlinx.coroutines.flow.StateFlow
 
 /** 聚合实况结果、队列卡片和外推 */
@@ -86,6 +90,26 @@ class MaaNotificationCenter(
         pushExternal(settings.sendOnServiceDied, "服务异常", "MAA 服务意外终止")
     }
 
+    /**
+     * 定时 / 外部触发没跑起来，多半没人看着界面，只能靠通知
+     * 不设超时，免得凌晨失败、早上已经消失；跳过量大且多在预期内，不外推
+     */
+    fun notifyLaunchNotStarted(name: String, result: ExecutionResult, reason: UiText?) {
+        val skipped = result == ExecutionResult.SKIPPED_BUSY || result == ExecutionResult.SKIPPED_LOCKED
+        val title = appContext.getString(
+            if (skipped) R.string.notification_schedule_skipped else R.string.notification_schedule_failed
+        )
+        val detail = (reason ?: uiTextOf(R.string.schedule_result_failed_start)).resolve(appContext)
+        val text = appContext.getString(R.string.notification_schedule_detail, name, detail)
+        liveCoordinator.publishStandalone(
+            resultSession(title, text, timeoutSec = null, isError = !skipped)
+                .copy(sessionId = LiveNotifyIds.LAUNCH_SESSION)
+        )
+        if (!skipped) {
+            pushExternal(settings.sendOnError, title, text)
+        }
+    }
+
     /** 按对应开关外推 */
     private fun pushExternal(gate: StateFlow<Boolean>, title: String, content: String) {
         if (gate.value) {
@@ -108,7 +132,7 @@ class MaaNotificationCenter(
     private fun resultSession(
         title: String,
         text: String,
-        timeoutSec: Int,
+        timeoutSec: Int?,
         isError: Boolean,
     ) = LiveSession(
         sessionId = LiveNotifyIds.RESULT_SESSION,

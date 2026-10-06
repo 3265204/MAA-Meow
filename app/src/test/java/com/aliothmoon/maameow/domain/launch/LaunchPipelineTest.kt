@@ -8,6 +8,7 @@ import com.aliothmoon.maameow.data.preferences.TaskChainState
 import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.domain.models.UnlockCredential
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
+import com.aliothmoon.maameow.domain.service.MaaNotificationCenter
 import com.aliothmoon.maameow.domain.service.ScreenSaverController
 import com.aliothmoon.maameow.domain.service.TaskEndRegistry
 import com.aliothmoon.maameow.domain.service.UnlockGestureReader
@@ -64,6 +65,7 @@ class LaunchPipelineTest {
     private lateinit var startTaskChain: StartTaskChainUseCase
     private lateinit var screenSaver: ScreenSaverController
     private lateinit var taskEndRegistry: TaskEndRegistry
+    private lateinit var notificationCenter: MaaNotificationCenter
 
     private val keyguardLocked = java.util.concurrent.atomic.AtomicBoolean(false)
     private val deviceLocked = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -197,6 +199,7 @@ class LaunchPipelineTest {
             every { resolveMessage(any()) } answers { firstArg<UiText?>()?.toString() }
         }
         repository = mockk(relaxed = true)
+        notificationCenter = mockk(relaxed = true)
         // B1: 真正挂起，确保 cancel 后仍能在 NonCancellable 下完成落库
         coEvery {
             repository.recordExecutionResult(any(), any(), any(), any())
@@ -238,6 +241,7 @@ class LaunchPipelineTest {
         countdownUI = countdown,
         screenSaver = screenSaver,
         taskEndRegistry = taskEndRegistry,
+        notificationCenter = notificationCenter,
         keyguardLocked = { keyguardLocked.get() },
         deviceLocked = { deviceLocked.get() },
         screenInteractive = { screenInteractive.get() },
@@ -321,6 +325,10 @@ class LaunchPipelineTest {
         coVerify(exactly = 0) { wake.unlock(any()) }
         assertEquals(0, uiLaunches.get())
         assertEquals(0, startCalls.get())
+        // 界面没拉起来，toast 没人看得到
+        verify(exactly = 1) {
+            notificationCenter.notifyLaunchNotStarted("Test", ExecutionResult.FAILED_START, reason)
+        }
     }
 
     @Test
@@ -330,6 +338,7 @@ class LaunchPipelineTest {
         assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
         assertEquals(1, uiLaunches.get())
         assertEquals(1, startCalls.get())
+        verify(exactly = 0) { notificationCenter.notifyLaunchNotStarted(any(), any(), any()) }
     }
 
     @Test

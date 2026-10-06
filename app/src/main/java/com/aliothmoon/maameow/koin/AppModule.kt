@@ -215,6 +215,7 @@ val appModule = module {
             countdownUI = get(),
             screenSaver = get(),
             taskEndRegistry = get(),
+            notificationCenter = get(),
             keyguardLocked = {
                 val km = appContext.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
                 km.isKeyguardLocked

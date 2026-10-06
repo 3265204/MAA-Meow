@@ -1998,6 +1998,8 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="notification_channel_schedule">定时任务</string>
     <string name="notification_channel_schedule_desc">定时任务执行与结果通知</string>
     <string name="notification_schedule_title">定时任务</string>
+    <string name="notification_schedule_skipped">定时任务已跳过</string>
+    <string name="notification_schedule_failed">定时任务未能启动</string>
     <string name="notification_schedule_preparing">正在准备拉起界面…</string>
     <string name="notification_schedule_device_locked">设备处于锁屏状态</string>
     <string name="notification_schedule_pin_required">已跳过：设备有锁屏密码。请在「定时 → 唤醒解锁」中配置 PIN 或录制解锁手势，或用「任务 → 快捷选项 → 熄屏挂机」代替系统锁屏</string>
