@@ -127,11 +127,24 @@ class LiveSessionCoordinator(
             EventNotificationLevel.DEFAULT -> session.copy(alert = false)
         }
 
-    /** 不进结果槽：新一轮开跑不收它，运行中也不用等进度结束 */
+    /**
+     * 不进结果槽：新一轮开跑不收它，运行中也不用等进度结束
+     * 只发普通通知，HyperOS 焦点通知到点会被系统收走；先撤旧的，否则 onlyAlertOnce 让新事件静默顶掉旧的
+     */
     fun publishStandalone(session: LiveSession) {
         val styled = withAlertLevel(session) ?: return
-        publisher.publish(styled)
+        publisher.cancel(styled.sessionId)
+        publisher.publishPlain(styled)
         scheduleResultTimeout(styled)
+    }
+
+    /** 撤掉当前结果通知，如被定时启动结果取代的「任务出错」 */
+    fun withdrawResult() {
+        synchronized(lock) {
+            cancelResultTimeoutLocked(LiveNotifyIds.RESULT_SESSION)
+            slot.clearResult()
+        }
+        publisher.cancel(LiveNotifyIds.RESULT_SESSION)
     }
 
     fun publishTest(title: String, text: String) {

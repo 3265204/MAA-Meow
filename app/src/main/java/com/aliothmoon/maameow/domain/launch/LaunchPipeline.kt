@@ -319,6 +319,7 @@ class LaunchPipeline(
                 }
 
                 is StartTaskChainUseCase.Result.Failed -> {
+                    outcome.startFailureNotified = result.startFailureNotified
                     terminalResult = result.executionResult
                     terminalMessage = result.message
                     log.append(uiTextOf(R.string.schedule_log_start_failed, result.message))
@@ -369,7 +370,10 @@ class LaunchPipeline(
                 )
             }
             if (result != ExecutionResult.STARTED && result != ExecutionResult.CANCELLED) {
-                notificationCenter.notifyLaunchNotStarted(request.displayName, result, terminalMessage)
+                notificationCenter.notifyLaunchNotStarted(
+                    request.displayName, result, terminalMessage,
+                    replacesStartFailure = outcome.startFailureNotified,
+                )
             }
         } finally {
             lastCompletedRequestId.set(request.requestId)
@@ -500,6 +504,7 @@ class LaunchPipeline(
         /** 启动采样：熄屏或锁屏 */
         var tookOverIdleDevice = false
         var screenSaverEngaged = false
+        var startFailureNotified = false
     }
 
     companion object {

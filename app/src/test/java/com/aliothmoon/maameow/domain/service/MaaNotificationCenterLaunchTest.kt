@@ -12,6 +12,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import io.mockk.verifyOrder
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -44,31 +45,30 @@ class MaaNotificationCenterLaunchTest {
         frameSnapshotter = mockk(relaxed = true),
     )
 
-    @Test
-    fun failure_notifiesAndPushes() {
+    private fun published(result: ExecutionResult, reason: String): LiveSession {
         val session = slot<LiveSession>()
         every { live.publishStandalone(capture(session)) } returns Unit
+        center.notifyLaunchNotStarted("Daily", result, uiTextDynamic(reason))
+        return session.captured
+    }
 
-        center.notifyLaunchNotStarted("Daily", ExecutionResult.FAILED_START, uiTextDynamic("Shizuku down"))
+    @Test
+    fun failure_notifiesAndPushes() {
+        val session = published(ExecutionResult.FAILED_START, "Shizuku down")
 
         // 独立 ID：下一轮开跑、任务结果都不会把它顶掉
-        assertEquals(LiveNotifyIds.LAUNCH_SESSION, session.captured.sessionId)
-        assertEquals("failed", session.captured.title)
-        assertEquals("Daily: Shizuku down", session.captured.text)
-        assertTrue(session.captured.isError)
+        assertEquals(LiveNotifyIds.LAUNCH_SESSION, session.sessionId)
+        assertEquals("failed", session.title)
+        assertEquals("Daily: Shizuku down", session.text)
+        assertTrue(session.isError)
         // 凌晨失败到早上还得在
-        assertNull(session.captured.timeoutSec)
+        assertNull(session.timeoutSec)
         verify(exactly = 1) { external.send("failed", "Daily: Shizuku down") }
     }
 
     @Test
     fun skip_notifiesWithoutPush() {
-        val session = slot<LiveSession>()
-        every { live.publishStandalone(capture(session)) } returns Unit
-
-        center.notifyLaunchNotStarted("Daily", ExecutionResult.SKIPPED_LOCKED, uiTextDynamic("locked"))
-
-        assertEquals("skipped", session.captured.title)
+        assertEquals("skipped", published(ExecutionResult.SKIPPED_LOCKED, "locked").title)
         verify(exactly = 0) { external.send(any(), any()) }
     }
 
@@ -80,5 +80,25 @@ class MaaNotificationCenterLaunchTest {
 
         verify(exactly = 1) { live.publishStandalone(any()) }
         verify(exactly = 0) { external.send(any(), any()) }
+    }
+
+    @Test
+    fun replacingStartFailure_withdrawsResultFirst() {
+        center.notifyLaunchNotStarted(
+            "Daily", ExecutionResult.FAILED_START, uiTextDynamic("x"), replacesStartFailure = true,
+        )
+
+        verifyOrder {
+            live.withdrawResult()
+            live.publishStandalone(any())
+        }
+    }
+
+    // 调用方在流水线收尾，抛出去会把进程带崩
+    @Test
+    fun publishFailure_doesNotEscape() {
+        every { live.publishStandalone(any()) } throws IllegalStateException("boom")
+
+        center.notifyLaunchNotStarted("Daily", ExecutionResult.FAILED_START, uiTextDynamic("x"))
     }
 }

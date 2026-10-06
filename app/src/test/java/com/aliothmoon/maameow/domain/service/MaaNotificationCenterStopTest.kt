@@ -4,6 +4,7 @@ import android.content.Context
 import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.domain.notification.LiveSession
 import com.aliothmoon.maameow.domain.notification.LiveSessionCoordinator
+import com.aliothmoon.maameow.domain.service.MaaCompositionService.StopOrigin
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -32,7 +33,7 @@ class MaaNotificationCenterStopTest {
         frameSnapshotter = mockk(relaxed = true),
     )
 
-    private fun published(origin: MaaCompositionService.StopOrigin): LiveSession {
+    private fun published(origin: StopOrigin): LiveSession {
         val session = slot<LiveSession>()
         every { live.publishResult(any(), capture(session)) } returns Unit
         center.notifyTaskStopped(origin)
@@ -41,14 +42,14 @@ class MaaNotificationCenterStopTest {
 
     @Test
     fun userStop_saysManual() {
-        val session = published(MaaCompositionService.StopOrigin.USER)
+        val session = published(StopOrigin.USER)
         assertEquals("manual", session.text)
         assertEquals(15, session.timeoutSec)
     }
 
     @Test
     fun callbackStop_saysAborted() {
-        val session = published(MaaCompositionService.StopOrigin.CALLBACK)
+        val session = published(StopOrigin.CALLBACK)
         assertEquals("aborted", session.text)
         // 多半没人看着，留久一点
         assertEquals(120, session.timeoutSec)
@@ -56,6 +57,6 @@ class MaaNotificationCenterStopTest {
 
     @Test
     fun durationLimit_saysLimitReached() {
-        assertEquals("limit", published(MaaCompositionService.StopOrigin.RUN_DURATION_LIMIT).text)
+        assertEquals("limit", published(StopOrigin.RUN_DURATION_LIMIT).text)
     }
 }

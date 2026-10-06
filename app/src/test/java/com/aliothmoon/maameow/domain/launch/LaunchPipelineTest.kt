@@ -363,6 +363,27 @@ class LaunchPipelineTest {
         assertEquals(listOf(ExecutionResult.FAILED_START, ExecutionResult.STARTED), recorded.toList())
     }
 
+    // Core 启动阶段已发过不带策略名的「任务出错」，只留带策略名的这条
+    @Test
+    fun coreStartFailure_replacesStartFailureNotification() = runBlocking<Unit> {
+        val reason = uiTextOf(R.string.task_start_error_start_failed)
+        coEvery {
+            startTaskChain.invoke(chain = any(), context = any(), scheduleLabel = any())
+        } returns StartTaskChainUseCase.Result.Failed(
+            executionResult = ExecutionResult.FAILED_START,
+            message = reason,
+            startFailureNotified = true,
+        )
+
+        pipeline().execute(scheduleRequest()).join()
+
+        verify(exactly = 1) {
+            notificationCenter.notifyLaunchNotStarted(
+                "Test", ExecutionResult.FAILED_START, reason, replacesStartFailure = true,
+            )
+        }
+    }
+
     @Test
     fun remoteAvailable_launchesUiAndStarts() = runBlocking<Unit> {
         pipeline().execute(scheduleRequest()).join()
