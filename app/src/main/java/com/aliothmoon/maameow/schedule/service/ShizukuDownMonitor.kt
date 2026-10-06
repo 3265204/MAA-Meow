@@ -22,9 +22,8 @@ import timber.log.Timber
 /**
  * Shizuku 没在跑就提前提醒，别等定时到点才失败
  *
- * adb 模式一重启就没了，运行中也可能被停；两种都先留宽限期再查，Root 模式开机自启、用户重启 Shizuku 都要点时间
- * 到点仍不可用、后端选的是 Shizuku、且有启用的定时才提醒
- * 用闹钟排检查而不是协程 delay：进程进了缓存会被冻结，delay 到不了点
+ * 开机与停止后都留宽限期再查：Root 模式开机自启、用户重启 Shizuku 都要点时间
+ * 用闹钟而不是 delay：进程进缓存会被冻结
  */
 class ShizukuDownMonitor(
     private val context: Context,
@@ -34,7 +33,7 @@ class ShizukuDownMonitor(
 ) {
     private val alarmManager by lazy { context.getSystemService(AlarmManager::class.java) }
 
-    /** 本进程见过 Shizuku 活着之后它没了，才算「停了」；冷启动时 binder 还没到不算 */
+    /** 见过它活着后又没了才算停了，冷启动时 binder 未到不算 */
     fun start(scope: CoroutineScope) {
         scope.launch {
             var seenAlive = false
@@ -73,7 +72,7 @@ class ShizukuDownMonitor(
         RemoteAccessCoordinator.state.first { it.shizukuAvailable }
     } != null
 
-    // 不用精确闹钟：晚几分钟提醒无妨，也不必占精确闹钟权限
+    // 晚几分钟无妨，不占精确闹钟权限
     private fun arm(afterBoot: Boolean, delayMs: Long) {
         val intent = checkIntent(afterBoot, PendingIntent.FLAG_UPDATE_CURRENT) ?: return
         runCatching {
@@ -91,7 +90,7 @@ class ShizukuDownMonitor(
         intent.cancel()
     }
 
-    // extras 不参与 PendingIntent 判等，开机与停止共用一个闹钟，后排的覆盖先排的
+    // extras 不参与判等：开机与停止共用一个闹钟，后排的覆盖先排的
     private fun checkIntent(afterBoot: Boolean, flag: Int): PendingIntent? = PendingIntent.getBroadcast(
         context,
         0,

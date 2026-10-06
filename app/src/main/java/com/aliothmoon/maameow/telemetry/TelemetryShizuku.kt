@@ -5,11 +5,7 @@ import android.os.SystemClock
 import com.aliothmoon.maameow.constant.OFFICIAL_SHIZUKU_PACKAGE
 import com.aliothmoon.maameow.manager.ShizukuManager
 
-/**
- * Shizuku 在本进程里的来去：定时起不来时据此分清是开机后就没起、中途停了还是压根没装
- *
- * 时刻都是 elapsedRealtime，进程重启即清零，只说明这个进程看到的
- */
+/** Shizuku 在本进程里的来去：分清是开机后没起、中途停了还是没装 */
 internal object TelemetryShizuku {
 
     fun tags(context: Context): Map<String, String> = buildMap {

@@ -60,7 +60,7 @@ class LaunchPipeline(
     private val deviceLocked: () -> Boolean,
     private val screenInteractive: () -> Boolean,
     private val activityLauncher: suspend (LaunchRequest) -> Boolean,
-    /** 提权后端用不了的原因，null = 可用且已连上；未授权会先申请，还要等连接，会挂起 */
+    /** 提权后端用不了的原因，null = 已连上；会申请授权、等连接 */
     private val remoteAccessBlocker: suspend () -> UiText?,
 ) {
     private val _session = MutableStateFlow<LaunchSession>(LaunchSession.Idle)

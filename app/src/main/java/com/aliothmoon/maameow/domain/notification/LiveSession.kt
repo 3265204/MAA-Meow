@@ -71,7 +71,7 @@ data class LiveSession(
     }
 }
 
-/** 通知上的按钮；PendingIntent 由数据层按类型构造 */
+/** 通知按钮，PendingIntent 由数据层构造 */
 sealed interface LiveAction {
     data object OpenShizuku : LiveAction
 }
@@ -94,7 +94,6 @@ object LiveNotifyIds {
     /** 定时 / 外部触发没跑起来；与任务结果分开，免得互相顶掉 */
     const val LAUNCH_SESSION = "maa:launch-result"
 
-    /** 有启用的定时而 Shizuku 没在跑；Shizuku 回来就撤 */
     const val SHIZUKU_DOWN_SESSION = "maa:shizuku-down"
 
     const val CHANNEL_PROGRESS = "task_execution_live"

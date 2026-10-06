@@ -103,7 +103,7 @@ class MaaNotificationCenterLaunchTest {
         center.notifyLaunchNotStarted("Daily", ExecutionResult.FAILED_START, uiTextDynamic("x"))
     }
 
-    // 到点必失败的提前提醒：不设超时，带打开 Shizuku，不外推（真到点失败时才推）
+    // 不外推：真到点失败时才推
     @Test
     fun shizukuDown_staysUntilWithdrawnAndOffersOpenShizuku() {
         every { context.getString(R.string.notification_shizuku_down_title) } returns "down"

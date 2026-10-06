@@ -256,7 +256,7 @@ val appModule = module {
                     !access.isGranted(backend) ->
                         uiTextOf(R.string.runlog_backend_not_granted, backend.display)
 
-                    // 解锁、拉起界面都要用它，先连上；否则拉起失败会被报成锁屏或拉起界面失败
+                    // 先连上，否则拉起失败会被报成锁屏或拉起界面失败
                     else -> RemoteServiceManager.awaitConnected()?.let {
                         Timber.w(it, "launch: elevated service connect failed")
                         uiTextOf(

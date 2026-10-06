@@ -101,7 +101,7 @@ class MaaNotificationCenter(
         pushExternal(settings.sendOnServiceDied, "服务异常", "MAA 服务意外终止")
     }
 
-    /** 有启用的定时而 Shizuku 没在跑：到点必失败，提前说；不设超时，Shizuku 回来时撤 */
+    /** 不设超时，Shizuku 回来时撤 */
     fun notifyShizukuDown(afterBoot: Boolean) {
         val title = appContext.getString(R.string.notification_shizuku_down_title)
         val text = appContext.getString(

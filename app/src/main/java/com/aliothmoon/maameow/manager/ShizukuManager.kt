@@ -26,7 +26,7 @@ object ShizukuManager : RemoteAccessPermissionBackend {
     var isSui: Boolean = false
         private set
 
-    /** 本进程最近一次收到 / 失去 binder 的时刻（elapsedRealtime），排查 Shizuku 何时没的 */
+    /** 本进程最近一次收到 / 失去 binder 的 elapsedRealtime */
     @Volatile
     var binderReceivedAt: Long? = null
         private set
@@ -35,7 +35,7 @@ object ShizukuManager : RemoteAccessPermissionBackend {
     var binderDeadAt: Long? = null
         private set
 
-    /** 最近一次连上时服务端的 uid，死后还能知道死的是 adb 还是 root 起的 */
+    /** 最近一次连上时服务端的 uid，死后不清 */
     @Volatile
     var lastServerUid: Int? = null
         private set

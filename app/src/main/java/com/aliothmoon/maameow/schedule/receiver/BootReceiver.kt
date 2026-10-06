@@ -31,7 +31,7 @@ class BootReceiver : BroadcastReceiver() {
         val repository: ScheduleStrategyRepository = GlobalContext.get().get()
         val alarmManager: ScheduleAlarmManager = GlobalContext.get().get()
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            // adb 模式的 Shizuku 一重启就没了，过会儿查一次
+            // adb 模式的 Shizuku 重启即失效
             GlobalContext.get().get<ShizukuDownMonitor>().armAfterBoot()
         }
 

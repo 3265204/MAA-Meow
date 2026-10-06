@@ -76,7 +76,7 @@ internal class IncidentReporter(
             } else {
                 CompletableDeferred(wholeFile(incident.logFile))
             }
-            // 说的是 Shizuku 不在，本地日志里没有它的死因
+            // 本地日志里没有 Shizuku 的死因
             is ShizukuDown -> null
             // 启动失败与进程死亡看整轮的
             else -> runStart
@@ -170,7 +170,7 @@ internal class IncidentReporter(
             images = null,
         )
 
-        /** 绑定与拉起日志不分轮次，只取最近一段；launcher 日志每次拉起都会清空重写，本就不大 */
+        /** 不分轮次，只取最近一段 */
         val BOOT_LOGS = listOf(
             EvidenceFile("service_bind_debug.log", kind = "boot", core = false),
             EvidenceFile("shizuku_launch_debug.log", kind = "boot", core = true),

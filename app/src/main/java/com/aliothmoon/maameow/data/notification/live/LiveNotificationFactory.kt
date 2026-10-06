@@ -181,7 +181,7 @@ class LiveNotificationFactory(
     private fun actionOf(action: LiveAction): NotificationCompat.Action? {
         val (title, intent) = when (action) {
             LiveAction.OpenShizuku -> {
-                // 装的不是官方 Shizuku（如 Sui）就没有可打开的界面
+                // Sui 等非官方 Shizuku 没有可打开的界面
                 val launch = appContext.packageManager
                     .getLaunchIntentForPackage(OFFICIAL_SHIZUKU_PACKAGE) ?: return null
                 appContext.getString(R.string.notification_action_open_shizuku) to PendingIntent.getActivity(

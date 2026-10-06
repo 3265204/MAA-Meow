@@ -378,7 +378,7 @@ object RemoteServiceManager {
         action(service)
     }
 
-    /** 连上当前后端为止，等待按后端推算；连不上返回原因而不抛，调用方自己被取消照常抛 */
+    /** 连不上返回原因而不抛；调用方被取消照常抛 */
     suspend fun awaitConnected(): Throwable? = try {
         useRemoteService { }
         null
@@ -390,7 +390,7 @@ object RemoteServiceManager {
         e
     }
 
-    /** 一句话原因：launcher 日志尾巴等细节已进 Timber 与 service_bind_debug.log */
+    /** 去掉 launcher 日志尾巴，全文已进 Timber 与 bind 日志 */
     fun shortCause(e: Throwable): String =
         e.message?.substringBefore(';')?.trim()?.takeIf { it.isNotEmpty() }?.take(SHORT_CAUSE_MAX)
             ?: e.javaClass.simpleName

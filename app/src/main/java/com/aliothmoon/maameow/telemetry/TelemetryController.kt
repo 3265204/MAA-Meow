@@ -184,7 +184,7 @@ class TelemetryController(
         // 没走到开跑，tag 还是上次刷的；取证要等半秒，赶得上
         scope.launch { runCatching { refreshRunTags() } }
         // 不动追踪状态：这时任务还没开跑，没有哪一轮可收
-        // 后端多半是没起来的根因，Shizuku 在本进程的来去一并带上
+        // 后端多半是根因
         val shizuku = RemoteAccessCoordinator.configuredBackend() == RemoteBackend.SHIZUKU
         guarded {
             if (!active) return@guarded

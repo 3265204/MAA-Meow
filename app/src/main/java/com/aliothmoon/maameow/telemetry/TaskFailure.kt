@@ -206,7 +206,7 @@ internal data class LaunchFailure(
     val logFile: String,
     override val tags: Map<String, String> = emptyMap(),
     val extras: Map<String, Long> = emptyMap(),
-    /** 再带上启动诊断日志的尾巴：提权服务连不上的根因在那里 */
+    /** 再带启动诊断日志尾巴，连不上的根因在那里 */
     val withBootLogs: Boolean = false,
 ) : Incident {
 
@@ -233,7 +233,7 @@ internal data class LaunchFailure(
     }
 }
 
-/** 有启用的定时而 Shizuku 没在跑，提醒用户时报一条，看它多常发生、多是开机后没起还是中途停了 */
+/** 看 Shizuku 未运行多常见、多是开机后没起还是中途停了 */
 internal data class ShizukuDown(
     val afterBoot: Boolean,
     val enabledSchedules: Int,
