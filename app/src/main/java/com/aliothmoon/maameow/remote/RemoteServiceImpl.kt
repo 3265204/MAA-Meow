@@ -421,7 +421,8 @@ class RemoteServiceImpl : RemoteService.Stub() {
         return ok
     }
 
-    override fun isAppAlive(packageName: String): Int = when (ProcessLiveness.pidof(packageName)) {
+    // pidof 单路会把跑在别名进程里的应用报成死的
+    override fun isAppAlive(packageName: String): Int = when (ProcessLiveness.probe(packageName)) {
         ProcessLiveness.ALIVE -> AppAliveStatus.ALIVE
         ProcessLiveness.DEAD -> AppAliveStatus.DEAD
         ProcessLiveness.UNKNOWN -> AppAliveStatus.UNKNOWN
