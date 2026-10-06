@@ -421,8 +421,8 @@ class RemoteServiceImpl : RemoteService.Stub() {
         return ok
     }
 
-    // pidof 单路会把跑在别名进程里的应用报成死的
-    override fun isAppAlive(packageName: String): Int = when (ProcessLiveness.probe(packageName)) {
+    // 只认游戏主进程：probe 会把常驻的 包名:pushcore 这类子进程算成活着，游戏崩了也判不出
+    override fun isAppAlive(packageName: String): Int = when (ProcessLiveness.pidof(packageName)) {
         ProcessLiveness.ALIVE -> AppAliveStatus.ALIVE
         ProcessLiveness.DEAD -> AppAliveStatus.DEAD
         ProcessLiveness.UNKNOWN -> AppAliveStatus.UNKNOWN
