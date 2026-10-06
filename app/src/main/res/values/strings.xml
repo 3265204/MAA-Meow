@@ -2010,6 +2010,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="schedule_log_received">收到启动请求: %1$s</string>
     <string name="schedule_log_skipped_busy">已有定时任务正在处理中</string>
     <string name="schedule_log_task_running_busy">有任务正在运行</string>
+    <string name="schedule_log_backend_connecting">连接提权服务…</string>
     <string name="schedule_log_force_stop_running">强制启动: 停止当前运行任务</string>
     <string name="schedule_log_wake_start">执行唤醒解锁…</string>
     <string name="schedule_log_wake_ok">唤醒解锁成功</string>
@@ -2468,6 +2469,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="runlog_service_connecting">服务正在启动中，请稍后再试</string>
     <string name="runlog_backend_unavailable">%1$s 不可用，已取消启动</string>
     <string name="runlog_backend_not_granted">%1$s 未授权，已取消启动</string>
+    <string name="runlog_backend_connect_failed">经 %1$s 启动提权服务失败，已取消启动（%2$s）</string>
     <string name="runlog_resource_load_failed">资源加载失败</string>
     <string name="runlog_portrait_orientation">当前为竖屏，无法在前台模式运行</string>
     <string name="runlog_invalid_aspect_ratio">当前分辨率 %1$dx%2$d 不是 16:9，无法在前台模式运行</string>

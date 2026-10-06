@@ -142,6 +142,7 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
+import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
@@ -253,7 +254,15 @@ val appModule = module {
                     !access.isGranted(backend) ->
                         uiTextOf(R.string.runlog_backend_not_granted, backend.display)
 
-                    else -> null
+                    // 解锁、拉起界面都要用它，先连上；否则拉起失败会被报成锁屏或拉起界面失败
+                    else -> RemoteServiceManager.awaitConnected()?.let {
+                        Timber.w(it, "launch: elevated service connect failed")
+                        uiTextOf(
+                            R.string.runlog_backend_connect_failed,
+                            backend.display,
+                            RemoteServiceManager.shortCause(it),
+                        )
+                    }
                 }
             },
         )

@@ -7,6 +7,7 @@ import com.aliothmoon.maameow.RemoteService
 import com.aliothmoon.maameow.data.config.MaaPathConfig
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.domain.models.RemoteBackend
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,6 +42,8 @@ object RemoteServiceManager {
 
     // 调用方默认等待须晚于兜底：先于连接器超时就只剩裸超时，launcher 日志尾部等根因全被截胡
     private const val CALLER_WAIT_MARGIN_MS = 1_000L
+
+    private const val SHORT_CAUSE_MAX = 120
 
     // 状态迁移（boundBackend / currentBinder / _state）统一在此锁内完成
     private val lock = Any()
@@ -363,4 +366,21 @@ object RemoteServiceManager {
         val service = getInstance(timeoutMs)
         action(service)
     }
+
+    /** 连上当前后端为止，等待按后端推算；连不上返回原因而不抛，调用方自己被取消照常抛 */
+    suspend fun awaitConnected(): Throwable? = try {
+        useRemoteService { }
+        null
+    } catch (e: TimeoutCancellationException) {
+        e
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        e
+    }
+
+    /** 一句话原因：launcher 日志尾巴等细节已进 Timber 与 service_bind_debug.log */
+    fun shortCause(e: Throwable): String =
+        e.message?.substringBefore(';')?.trim()?.takeIf { it.isNotEmpty() }?.take(SHORT_CAUSE_MAX)
+            ?: e.javaClass.simpleName
 }
