@@ -142,9 +142,10 @@ class MaaCompositionService(
         // startForeground 契约未履行直接杀进程（RemoteServiceException）。
         // 服务自身观察状态流，startForeground 后对 IDLE/ERROR 自行 stopSelf
         if (state != MaaExecutionState.STARTING) {
-            // 自然完成走回调直接置 IDLE，不经过 finishStop，统一在这里撤掉计时
+            // 自然完成走回调直接置 IDLE，不经过 finishStop，统一在这里撤掉计时和后台监视
             if (state == MaaExecutionState.IDLE || state == MaaExecutionState.ERROR) {
                 runDeadlineGuard.disarm()
+                stopBackgroundMonitors()
             }
             _state.value = state
             return
@@ -235,7 +236,6 @@ class MaaCompositionService(
         scope.launch {
             unifiedStateDispatcher.serviceDiedEvent.collect {
                 telemetry.onServiceDied(_state.value)
-                stopBackgroundMonitors()
                 setRunState(MaaExecutionState.ERROR)
                 sessionLogger.completeSessionAndWait(
                     "SERVICE_DIED",
@@ -597,15 +597,15 @@ class MaaCompositionService(
                 StartResult.StartError
             )
         }
-        // 先于 RUNNING 计时，秒完的回调置 IDLE 时才能撤掉
+        // 计时与后台监视都先于 RUNNING 起，秒完的回调置 IDLE 时才能撤掉
         if (limitRunDuration && appSettings.runDurationLimitEnabled.value) {
             val limitMinutes = appSettings.runDurationLimitMinutes.value
             runDeadlineGuard.arm(limitMinutes) { stopByRunDurationLimit(limitMinutes) }
         }
-        setRunState(MaaExecutionState.RUNNING)
         if (mode == RunMode.BACKGROUND) {
             startBackgroundMonitors()
         }
+        setRunState(MaaExecutionState.RUNNING)
         sessionLogger.appendAndWait(successMessage, LogLevel.SUCCESS)
         return StartResult.Success(maa.GetVersion())
     }
@@ -852,7 +852,6 @@ class MaaCompositionService(
     }
 
     private fun finishStop(result: StopResult): StopResult {
-        stopBackgroundMonitors()
         setRunState(MaaExecutionState.IDLE)
         val status = if (result is StopResult.Success) "STOPPED" else "STOP_FAILED"
         sessionLogger.append(
