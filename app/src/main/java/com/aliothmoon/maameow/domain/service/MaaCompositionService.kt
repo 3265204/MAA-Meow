@@ -251,18 +251,25 @@ class MaaCompositionService(
                 Timber.w("App watchdog detected app died: %s", packageName)
                 sessionLogger.appendAndWait(
                     context.getString(R.string.runlog_game_process_gone, packageName),
-                    LogLevel.WARNING
+                    LogLevel.ERROR
                 )
+                // 游戏没了剩下的任务链也是白跑，整轮中止
+                if (_state.value == MaaExecutionState.RUNNING) {
+                    notificationCenter.notifySubTaskFailure(
+                        context.getString(R.string.notification_game_gone_aborted),
+                        sendExternal = true,
+                    )
+                    requestStopFromCallback()
+                }
             }
         }
 
         scope.launch {
             appWatchdog.displayDriftEvent.collect { packageName ->
                 Timber.w("App watchdog detected display drift: %s", packageName)
-                sessionLogger.appendAndWait(
-                    context.getString(R.string.runlog_game_left_virtual_display, packageName),
-                    LogLevel.WARNING
-                )
+                val message = context.getString(R.string.runlog_game_left_virtual_display, packageName)
+                sessionLogger.appendAndWait(message, LogLevel.WARNING)
+                notificationCenter.notifySubTaskFailure(message)
             }
         }
     }

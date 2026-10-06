@@ -666,8 +666,6 @@
 
     <!-- background task: toast -->
     <string name="bg_toast_service_died">MaaService 异常关闭，请尝试重新启动</string>
-    <string name="bg_toast_app_died">游戏进程未启动或被异常关闭</string>
-    <string name="bg_toast_display_drift">游戏已离开虚拟显示器且自动拉回失败，可尝试开启「强制 FULLSCREEN 模式」</string>
 
     <!-- task action buttons -->
     <string name="task_btn_start">开始任务</string>
@@ -1715,6 +1713,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="notification_event_recruit_robot_tag">发现小车 Tag: %1$s</string>
     <string name="notification_event_recruit_high_rarity">发现 %1$d ★ 组合</string>
     <string name="notification_event_subtask_failure">子任务异常</string>
+    <string name="notification_game_gone_aborted">游戏进程已退出，已中止剩余任务</string>
     <string name="notification_test_title">测试通知</string>
     <string name="notification_test_message_full">这是一条来自 MaaMeow 的测试通知</string>
     <string name="notification_feedback_no_channel">请先启用至少一个通知渠道</string>

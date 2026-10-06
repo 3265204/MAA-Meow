@@ -121,7 +121,6 @@ import com.aliothmoon.maameow.constant.DefaultDisplayConfig
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.domain.models.RunDurationLimit
-import com.aliothmoon.maameow.domain.service.AppWatchdog
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
 import com.aliothmoon.maameow.domain.service.UnifiedStateDispatcher
 import com.aliothmoon.maameow.domain.state.MaaExecutionState
@@ -189,7 +188,6 @@ fun BackgroundTaskView(
     compositionService: MaaCompositionService = koinInject(),
     dispatcher: UnifiedStateDispatcher = koinInject(),
     screenSaverManager: ScreenSaverOverlayManager = koinInject(),
-    appWatchdog: AppWatchdog = koinInject(),
     appSettingsManager: AppSettingsManager = koinInject(),
     permissionManager: PermissionManager = koinInject(),
 ) {
@@ -278,8 +276,6 @@ fun BackgroundTaskView(
     }
     val context = LocalContext.current
     val serviceDiedMessage = stringResource(R.string.bg_toast_service_died)
-    val appDiedMessage = stringResource(R.string.bg_toast_app_died)
-    val displayDriftMessage = stringResource(R.string.bg_toast_display_drift)
 
     // pageReady 栅栏已移除：启动由 LaunchPipeline 驱动，无需等本页 Surface
 
@@ -287,22 +283,6 @@ fun BackgroundTaskView(
         dispatcher.serviceDiedEvent.collect {
             Toast.makeText(
                 context, serviceDiedMessage, Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        appWatchdog.appDiedEvent.collect {
-            Toast.makeText(
-                context, appDiedMessage, Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        appWatchdog.displayDriftEvent.collect {
-            Toast.makeText(
-                context, displayDriftMessage, Toast.LENGTH_LONG
             ).show()
         }
     }
