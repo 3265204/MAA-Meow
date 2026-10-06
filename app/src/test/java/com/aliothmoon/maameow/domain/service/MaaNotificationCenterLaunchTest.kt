@@ -3,6 +3,7 @@ package com.aliothmoon.maameow.domain.service
 import android.content.Context
 import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.data.notification.NotificationSettingsManager
+import com.aliothmoon.maameow.domain.notification.LiveAction
 import com.aliothmoon.maameow.domain.notification.LiveNotifyIds
 import com.aliothmoon.maameow.domain.notification.LiveSession
 import com.aliothmoon.maameow.domain.notification.LiveSessionCoordinator
@@ -100,5 +101,24 @@ class MaaNotificationCenterLaunchTest {
         every { live.publishStandalone(any()) } throws IllegalStateException("boom")
 
         center.notifyLaunchNotStarted("Daily", ExecutionResult.FAILED_START, uiTextDynamic("x"))
+    }
+
+    // 到点必失败的提前提醒：不设超时，带打开 Shizuku，不外推（真到点失败时才推）
+    @Test
+    fun shizukuDown_staysUntilWithdrawnAndOffersOpenShizuku() {
+        every { context.getString(R.string.notification_shizuku_down_title) } returns "down"
+        every { context.getString(R.string.notification_shizuku_down_after_boot) } returns "after boot"
+        val session = slot<LiveSession>()
+        every { live.publishStandalone(capture(session)) } returns Unit
+
+        center.notifyShizukuDown(afterBoot = true)
+        center.withdrawShizukuDown()
+
+        assertEquals(LiveNotifyIds.SHIZUKU_DOWN_SESSION, session.captured.sessionId)
+        assertEquals("after boot", session.captured.text)
+        assertNull(session.captured.timeoutSec)
+        assertEquals(listOf(LiveAction.OpenShizuku), session.captured.actions)
+        verify(exactly = 0) { external.send(any(), any()) }
+        verify { live.withdrawStandalone(LiveNotifyIds.SHIZUKU_DOWN_SESSION) }
     }
 }

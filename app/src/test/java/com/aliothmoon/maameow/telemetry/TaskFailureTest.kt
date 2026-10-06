@@ -215,6 +215,25 @@ class TaskFailureTest {
         assertEquals(LAUNCH_FAILURE_TRANSACTION, event.transaction)
     }
 
+    @Test
+    fun `Shizuku 未运行按开机后没起与中途停了分组，记为警告`() {
+        val event = ShizukuDown(
+            afterBoot = false,
+            enabledSchedules = 3,
+            tags = mapOf("shizuku.binder" to "dead"),
+            extras = mapOf("shizuku.dead_ago_s" to 60L),
+        ).toSentryEvent()
+
+        assertEquals("Shizuku not running with schedules enabled (stopped)", event.message?.formatted)
+        assertEquals(listOf("maameow-shizuku-down", "stopped"), event.fingerprints)
+        assertEquals(SentryLevel.WARNING, event.level)
+        assertEquals("dead", event.tags?.get("shizuku.binder"))
+        assertEquals("stopped", event.tags?.get("shizuku.down"))
+        assertEquals(3, event.extras?.get("schedules.enabled"))
+        assertEquals(60L, event.extras?.get("shizuku.dead_ago_s"))
+        assertEquals(SHIZUKU_DOWN_TRANSACTION, event.transaction)
+    }
+
     private fun evidenceExtras(evidence: Evidence): Map<String, Any?> =
         failure.toSentryEvent().apply { setEvidence(evidence) }.extras.orEmpty()
             .filterKeys { it.startsWith("logs.") || it.startsWith("attachment.") }

@@ -10,6 +10,7 @@ import com.aliothmoon.maameow.data.notification.NotificationSettingsManager
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.data.preferences.TaskChainState
 import com.aliothmoon.maameow.data.resource.MaaCoreVersion
+import com.aliothmoon.maameow.domain.models.RemoteBackend
 import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.domain.service.LaunchOutcome
 import com.aliothmoon.maameow.domain.service.RunKind
@@ -172,6 +173,8 @@ class TelemetryController(
         // 没走到开跑，tag 还是上次刷的；取证要等半秒，赶得上
         scope.launch { runCatching { refreshRunTags() } }
         // 不动追踪状态：这时任务还没开跑，没有哪一轮可收
+        // 后端多半是没起来的根因，Shizuku 在本进程的来去一并带上
+        val shizuku = RemoteAccessCoordinator.configuredBackend() == RemoteBackend.SHIZUKU
         guarded {
             if (!active) return@guarded
             reporter.report(
@@ -181,7 +184,26 @@ class TelemetryController(
                     message = outcome.message,
                     delayMs = outcome.delayMs,
                     logFile = outcome.logFile,
-                    tags = mapOf("run_mode" to outcome.runMode.lowercase()),
+                    tags = mapOf("run_mode" to outcome.runMode.lowercase()) +
+                            (if (shizuku) TelemetryShizuku.tags(context) else emptyMap()),
+                    extras = if (shizuku) TelemetryShizuku.extras() else emptyMap(),
+                    withBootLogs = outcome.result == ExecutionResult.FAILED_START,
+                )
+            )
+        }
+    }
+
+    override fun onShizukuDown(afterBoot: Boolean, enabledSchedules: Int) {
+        if (!active) return
+        scope.launch { runCatching { refreshRunTags() } }
+        guarded {
+            if (!active) return@guarded
+            reporter.report(
+                ShizukuDown(
+                    afterBoot = afterBoot,
+                    enabledSchedules = enabledSchedules,
+                    tags = TelemetryShizuku.tags(context),
+                    extras = TelemetryShizuku.extras(),
                 )
             )
         }

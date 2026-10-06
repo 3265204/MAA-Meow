@@ -4,6 +4,7 @@ import android.content.Context
 import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.data.notification.NotificationSettingsManager
 import com.aliothmoon.maameow.domain.models.NotificationImage
+import com.aliothmoon.maameow.domain.notification.LiveAction
 import com.aliothmoon.maameow.domain.notification.LiveCategory
 import com.aliothmoon.maameow.domain.notification.LiveNotifyIds
 import com.aliothmoon.maameow.domain.notification.LiveSession
@@ -98,6 +99,23 @@ class MaaNotificationCenter(
         // 服务可能在空闲期挂掉，不能占用本轮运行的一次性结果闸门
         liveCoordinator.publishEvent(resultSession(title, text, timeoutSec = 180, isError = true))
         pushExternal(settings.sendOnServiceDied, "服务异常", "MAA 服务意外终止")
+    }
+
+    /** 有启用的定时而 Shizuku 没在跑：到点必失败，提前说；不设超时，Shizuku 回来时撤 */
+    fun notifyShizukuDown(afterBoot: Boolean) {
+        val title = appContext.getString(R.string.notification_shizuku_down_title)
+        val text = appContext.getString(
+            if (afterBoot) R.string.notification_shizuku_down_after_boot
+            else R.string.notification_shizuku_down_stopped
+        )
+        liveCoordinator.publishStandalone(
+            resultSession(title, text, timeoutSec = null, isError = true, sessionId = LiveNotifyIds.SHIZUKU_DOWN_SESSION)
+                .copy(actions = listOf(LiveAction.OpenShizuku))
+        )
+    }
+
+    fun withdrawShizukuDown() {
+        liveCoordinator.withdrawStandalone(LiveNotifyIds.SHIZUKU_DOWN_SESSION)
     }
 
     /**

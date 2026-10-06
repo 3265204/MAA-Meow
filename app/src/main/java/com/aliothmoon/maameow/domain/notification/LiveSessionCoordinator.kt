@@ -138,6 +138,11 @@ class LiveSessionCoordinator(
         scheduleResultTimeout(styled)
     }
 
+    fun withdrawStandalone(sessionId: String) {
+        synchronized(lock) { cancelResultTimeoutLocked(sessionId) }
+        publisher.cancel(sessionId)
+    }
+
     /** 撤掉当前结果通知，如被定时启动结果取代的「任务出错」 */
     fun withdrawResult() {
         synchronized(lock) {

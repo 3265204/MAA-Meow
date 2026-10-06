@@ -1,6 +1,7 @@
 package com.aliothmoon.maameow.manager
 
 import android.content.pm.PackageManager
+import android.os.SystemClock
 import com.aliothmoon.maameow.domain.models.RemoteBackend
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
@@ -23,6 +24,20 @@ object ShizukuManager : RemoteAccessPermissionBackend {
 
     @Volatile
     var isSui: Boolean = false
+        private set
+
+    /** 本进程最近一次收到 / 失去 binder 的时刻（elapsedRealtime），排查 Shizuku 何时没的 */
+    @Volatile
+    var binderReceivedAt: Long? = null
+        private set
+
+    @Volatile
+    var binderDeadAt: Long? = null
+        private set
+
+    /** 最近一次连上时服务端的 uid，死后还能知道死的是 adb 还是 root 起的 */
+    @Volatile
+    var lastServerUid: Int? = null
         private set
 
     fun initSui(packageName: String) {
@@ -143,10 +158,13 @@ object ShizukuManager : RemoteAccessPermissionBackend {
         }
         Shizuku.addBinderReceivedListenerSticky {
             Timber.d("Shizuku binder received")
+            binderReceivedAt = SystemClock.elapsedRealtime()
+            lastServerUid = serverUid()
             notifyStateChanged()
         }
         Shizuku.addBinderDeadListener {
-            Timber.d("Shizuku binder dead")
+            Timber.i("Shizuku binder dead")
+            binderDeadAt = SystemClock.elapsedRealtime()
             notifyStateChanged()
         }
     }

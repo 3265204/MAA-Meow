@@ -55,9 +55,10 @@ data class LiveSession(
     val isError: Boolean = false,
     /** 结果通知是否走弹出通道，跟随内部通知级别 */
     val alert: Boolean = false,
+    val actions: List<LiveAction> = emptyList(),
 ) {
     fun fingerprint(): String =
-        "$sessionId|$title|$text|$capsuleText|$taskName|$progressCurrent|$progressMax|$progressLabel|$ongoing|$isError"
+        "$sessionId|$title|$text|$capsuleText|$taskName|$progressCurrent|$progressMax|$progressLabel|$ongoing|$isError|$actions"
 
     /** 正文去掉 "n/m · " 前缀后的状态行 */
     fun statusLine(): String = progressLabel?.let { text.removePrefix("$it · ") } ?: text
@@ -70,6 +71,11 @@ data class LiveSession(
     }
 }
 
+/** 通知上的按钮；PendingIntent 由数据层按类型构造 */
+sealed interface LiveAction {
+    data object OpenShizuku : LiveAction
+}
+
 object FocusSequence {
     fun next(last: Long, nowMs: Long): Long = maxOf(last + 1L, nowMs)
 }
@@ -79,6 +85,7 @@ object LiveNotifyIds {
     const val PROGRESS = 9003
     const val TEST = 9005
     const val LAUNCH = 9006
+    const val SHIZUKU_DOWN = 9007
 
     const val PROGRESS_SESSION = "maa:task-progress"
     const val RESULT_SESSION = "maa:task-result"
@@ -86,6 +93,9 @@ object LiveNotifyIds {
 
     /** 定时 / 外部触发没跑起来；与任务结果分开，免得互相顶掉 */
     const val LAUNCH_SESSION = "maa:launch-result"
+
+    /** 有启用的定时而 Shizuku 没在跑；Shizuku 回来就撤 */
+    const val SHIZUKU_DOWN_SESSION = "maa:shizuku-down"
 
     const val CHANNEL_PROGRESS = "task_execution_live"
 
@@ -106,6 +116,7 @@ object LiveNotifyIds {
         RESULT_SESSION -> RESULT
         TEST_SESSION -> TEST
         LAUNCH_SESSION -> LAUNCH
+        SHIZUKU_DOWN_SESSION -> SHIZUKU_DOWN
         else -> sessionId.hashCode() and Int.MAX_VALUE
     }
 }

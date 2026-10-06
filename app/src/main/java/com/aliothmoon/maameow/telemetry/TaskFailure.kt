@@ -203,6 +203,9 @@ internal data class LaunchFailure(
     /** 触发日志相对 debug 目录的路径，整份当证据带上 */
     val logFile: String,
     override val tags: Map<String, String> = emptyMap(),
+    val extras: Map<String, Long> = emptyMap(),
+    /** 再带上启动诊断日志的尾巴：提权服务连不上的根因在那里 */
+    val withBootLogs: Boolean = false,
 ) : Incident {
 
     override val runId: String? get() = null
@@ -224,6 +227,37 @@ internal data class LaunchFailure(
         )
         message?.let { event.setExtra("launch.message", it) }
         delayMs?.let { event.setExtra("launch.delay_ms", it) }
+        extras.forEach { (key, value) -> event.setExtra(key, value) }
+    }
+}
+
+/** 有启用的定时而 Shizuku 没在跑，提醒用户时报一条，看它多常发生、多是开机后没起还是中途停了 */
+internal data class ShizukuDown(
+    val afterBoot: Boolean,
+    val enabledSchedules: Int,
+    override val tags: Map<String, String>,
+    val extras: Map<String, Long>,
+) : Incident {
+
+    private val cause: String get() = if (afterBoot) "boot" else "stopped"
+
+    override val runId: String? get() = null
+
+    override val reason: String get() = "shizuku_down"
+
+    override val logAttributes: Map<String, String> get() = mapOf("shizuku.down" to cause)
+
+    override fun toSentryEvent(): SentryEvent = SentryEvent().also { event ->
+        event.level = SentryLevel.WARNING
+        event.logger = RUN_LOGGER
+        event.transaction = SHIZUKU_DOWN_TRANSACTION
+        event.message = Message().apply {
+            formatted = "Shizuku not running with schedules enabled ($cause)"
+        }
+        event.fingerprints = listOf(SHIZUKU_DOWN_FINGERPRINT, cause)
+        event.putTags(tags + mapOf("shizuku.down" to cause))
+        event.setExtra("schedules.enabled", enabledSchedules)
+        extras.forEach { (key, value) -> event.setExtra(key, value) }
     }
 }
 
@@ -278,12 +312,14 @@ internal const val TASK_FAILURE_TRANSACTION = "maameow.task.failure"
 internal const val START_FAILURE_TRANSACTION = "maameow.start.failure"
 internal const val SERVICE_DEATH_TRANSACTION = "maameow.service.died"
 internal const val LAUNCH_FAILURE_TRANSACTION = "maameow.launch.failure"
+internal const val SHIZUKU_DOWN_TRANSACTION = "maameow.shizuku.down"
 private const val TASK_LOGGER = "maameow.task"
 private const val RUN_LOGGER = "maameow.run"
 private const val TASK_FAILURE_FINGERPRINT = "maameow-task-failure"
 private const val START_FAILURE_FINGERPRINT = "maameow-start-failure"
 private const val SERVICE_DEATH_FINGERPRINT = "maameow-service-died"
 private const val LAUNCH_FAILURE_FINGERPRINT = "maameow-launch-failure"
+private const val SHIZUKU_DOWN_FINGERPRINT = "maameow-shizuku-down"
 
 /** 任务链没报过子任务错误就失败时的占位，与 MaaFwApp 同名 */
 internal const val UNOBSERVED_SUBTASK = "terminal_failure"

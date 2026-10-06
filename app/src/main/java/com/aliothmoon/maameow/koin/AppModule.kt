@@ -126,6 +126,7 @@ import com.aliothmoon.maameow.schedule.service.ScheduleAlarmManager
 import com.aliothmoon.maameow.schedule.service.ScheduleFailureReporter
 import com.aliothmoon.maameow.schedule.service.ScheduleTriggerHandler
 import com.aliothmoon.maameow.schedule.service.ScheduleTriggerLogger
+import com.aliothmoon.maameow.schedule.service.ShizukuDownMonitor
 import com.aliothmoon.maameow.telemetry.TelemetryController
 import com.aliothmoon.maameow.utils.CrashHandler
 import com.aliothmoon.maameow.utils.i18n.uiTextOf
@@ -188,6 +189,7 @@ val appModule = module {
     singleOf(::ScheduleTriggerLogger)
     singleOf(::ScheduleFailureReporter)
     singleOf(::ScheduleAlarmManager)
+    singleOf(::ShizukuDownMonitor)
     single { ScheduleTriggerHandler(get(), get(), get(), get(), get()) }
     singleOf(::LaunchMutex)
     singleOf(::StartTaskChainUseCase)

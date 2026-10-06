@@ -1949,6 +1949,10 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="notification_schedule_device_locked">Device is locked</string>
     <string name="notification_schedule_pin_required">Skipped: a device lock password is set. Configure a PIN or record an unlock gesture in "Schedule → Wake &amp; Unlock", or use "Tasks → Options → Screen Off" instead of the system lock screen</string>
     <string name="notification_schedule_detail">\"%1$s\": %2$s</string>
+    <string name="notification_action_open_shizuku">Open Shizuku</string>
+    <string name="notification_shizuku_down_title">Shizuku is not running</string>
+    <string name="notification_shizuku_down_after_boot">Shizuku must be started again after a reboot, or scheduled tasks can\'t run</string>
+    <string name="notification_shizuku_down_stopped">Shizuku has stopped; scheduled tasks can\'t run until it is started again</string>
 
     <!-- i18n: schedule trigger journal (pipeline) -->
     <string name="schedule_log_received">Launch request received: %1$s</string>
