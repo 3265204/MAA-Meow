@@ -67,6 +67,11 @@ object RemoteServiceManager {
     private var boundIdentity: Int? = null
     val state: StateFlow<ServiceState> = _state.asStateFlow()
 
+    /** 最近连上的提权进程 pid，死后不清 */
+    @Volatile
+    var lastServicePid: Int? = null
+        private set
+
     // 携带绑定时的 binder，迟到的死亡通知靠身份比对丢弃
     private class BindingDeathRecipient(val binder: IBinder) : IBinder.DeathRecipient {
         override fun binderDied() = onBinderDied(this)
@@ -105,6 +110,12 @@ object RemoteServiceManager {
             }
             runCatching { service.heartbeat(Process.myPid()) }
                 .onFailure { Timber.w(it, "heartbeat failed") }
+            runCatching { service.pid() }
+                .onSuccess {
+                    lastServicePid = it
+                    ServiceBootLogger.event("SERVICE_PID", "pid=$it")
+                }
+                .onFailure { Timber.w(it, "query service pid failed") }
         }
 
         override fun onDisconnected(backend: RemoteBackend) {

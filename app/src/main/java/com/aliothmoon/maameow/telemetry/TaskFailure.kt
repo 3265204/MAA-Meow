@@ -173,6 +173,8 @@ internal data class ServiceDeath(
     /** 当时在跑的任务链，还没开跑或已跑完为 null */
     val taskChain: String?,
     override val tags: Map<String, String>,
+    val servicePid: Int? = null,
+    val diedAtMs: Long = 0L,
 ) : Incident {
 
     override val reason: String get() = "service_died"
