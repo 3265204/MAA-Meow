@@ -352,6 +352,7 @@ class ScheduleEditViewModel(
                 wizardPending = ScheduleHealthLogic.wizardItems(
                     ScheduleHealthSnapshot(
                         backendGranted = permissions.remoteAccessGranted,
+                        backendAvailable = permissions.isStartupBackendAvailable(permissions.startupBackend),
                         batteryWhitelist = permissions.batteryWhitelist,
                         notification = permissions.notification,
                         exactAlarmAllowed = scheduleAlarmManager.canScheduleExact(),

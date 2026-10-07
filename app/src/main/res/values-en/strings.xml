@@ -1861,7 +1861,10 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="schedule_health_title">Scheduling environment check</string>
     <string name="schedule_health_fix">Fix</string>
     <string name="schedule_health_backend">%1$s not authorized</string>
-    <string name="schedule_health_backend_desc">Wake-up, UI launch and task execution of scheduled triggers all depend on it — start the service and grant access first</string>
+    <string name="schedule_health_backend_desc">Wake-up, UI launch and task execution of scheduled triggers all depend on it — grant access first</string>
+    <string name="schedule_health_backend_not_running">%1$s is not running</string>
+    <string name="schedule_health_backend_unavailable">%1$s is unavailable</string>
+    <string name="schedule_health_backend_down_desc">Wake-up, UI launch and task execution of scheduled triggers all depend on it — start the service first</string>
     <string name="schedule_health_battery">Battery optimization not ignored</string>
     <string name="schedule_health_battery_desc">Background triggers may be delayed or blocked by the system</string>
     <string name="schedule_health_notification">Notifications disabled</string>

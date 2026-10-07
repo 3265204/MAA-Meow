@@ -13,6 +13,7 @@ class ScheduleHealthLogicTest {
 
     private fun snapshot(
         backendGranted: Boolean = true,
+        backendAvailable: Boolean = true,
         batteryWhitelist: Boolean = true,
         notification: Boolean = true,
         exactAlarmAllowed: Boolean = true,
@@ -21,6 +22,7 @@ class ScheduleHealthLogicTest {
         unlockCredentialMissing: Boolean = false,
     ) = ScheduleHealthSnapshot(
         backendGranted = backendGranted,
+        backendAvailable = backendAvailable,
         batteryWhitelist = batteryWhitelist,
         notification = notification,
         exactAlarmAllowed = exactAlarmAllowed,
@@ -32,6 +34,18 @@ class ScheduleHealthLogicTest {
     @Test
     fun `all green - no issues`() {
         assertTrue(ScheduleHealthLogic.failingIssues(snapshot()).isEmpty())
+    }
+
+    // 没运行时授权也查不到，只报没运行，免得把「去启动」说成「去授权」
+    @Test
+    fun `backend down is reported instead of not granted`() {
+        assertEquals(
+            listOf(ScheduleHealthIssue.BACKEND_DOWN),
+            ScheduleHealthLogic.failingIssues(snapshot(backendAvailable = false, backendGranted = false)),
+        )
+        assertTrue(
+            ScheduleHealthLogic.wizardItems(snapshot(backendAvailable = false, backendGranted = false)).isEmpty()
+        )
     }
 
     @Test

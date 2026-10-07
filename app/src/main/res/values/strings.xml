@@ -773,8 +773,8 @@
     <string name="dialog_shizuku_install_confirm">快捷安装 Shizuku</string>
     <string name="dialog_shizuku_switch_to_root">切换至 Root 模式</string>
     <string name="dialog_shizuku_skip_check">跳过检查 (不推荐)</string>
-    <string name="dialog_shizuku_not_running_title">Shizuku 未启动</string>
-    <string name="dialog_shizuku_not_running_message">检测到 Shizuku 已安装但服务未启动，请打开 Shizuku 应用并启动服务。</string>
+    <string name="dialog_shizuku_not_running_title">Shizuku 未运行</string>
+    <string name="dialog_shizuku_not_running_message">检测到 Shizuku 已安装但未运行，请打开 Shizuku 应用并启动服务。</string>
     <string name="dialog_shizuku_open_app">打开 Shizuku</string>
     <string name="dialog_sui_detected_title">检测到 Sui</string>
     <string name="dialog_sui_detected_message">当前使用 Sui 提供 Shizuku 服务，Sui 以 Root 权限运行，MaaMeow 可能无法正常工作，请以实际测试为主</string>
@@ -1917,7 +1917,10 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="schedule_health_title">调度环境检查</string>
     <string name="schedule_health_fix">去修复</string>
     <string name="schedule_health_backend">%1$s未授权</string>
-    <string name="schedule_health_backend_desc">定时触发的唤醒、拉起界面与执行都依赖它，请先启动对应服务并完成授权</string>
+    <string name="schedule_health_backend_desc">定时触发的唤醒、拉起界面与执行都依赖它，请先完成授权</string>
+    <string name="schedule_health_backend_not_running">%1$s未运行</string>
+    <string name="schedule_health_backend_unavailable">%1$s不可用</string>
+    <string name="schedule_health_backend_down_desc">定时触发的唤醒、拉起界面与执行都依赖它，请先启动对应服务</string>
     <string name="schedule_health_battery">未忽略电池优化</string>
     <string name="schedule_health_battery_desc">后台触发可能被系统延迟或拦截</string>
     <string name="schedule_health_notification">通知权限未开启</string>

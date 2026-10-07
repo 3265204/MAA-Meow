@@ -126,6 +126,7 @@ fun ScheduleListView(
 
     fun fixHealthIssue(issue: ScheduleHealthIssue) {
         when (issue) {
+            ScheduleHealthIssue.BACKEND_DOWN,
             ScheduleHealthIssue.BACKEND -> backendFix.request()
             ScheduleHealthIssue.EXACT_ALARM -> openExactAlarmSettings()
             ScheduleHealthIssue.BATTERY ->
