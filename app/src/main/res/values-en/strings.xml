@@ -175,7 +175,7 @@
     <string name="oper_box_yituliu_write_only">Token lacks read access; use a read-only or read-write token</string>
     <string name="oper_box_yituliu_invalid">Token is invalid or expired; generate a new one</string>
     <string name="oper_box_yituliu_network_error">Network error, try again later</string>
-    <string name="oper_box_yituliu_local_data_missing">Local operator data is not loaded; connect the elevated service once</string>
+    <string name="oper_box_yituliu_local_data_missing">Local operator data is not loaded; connect the service once</string>
     <string name="oper_box_yituliu_busy">Already fetching, please wait</string>
     <string name="runlog_oper_box_yituliu_failed">Failed to fetch operator data from Yituliu: %1$s</string>
     <string name="report_http_failed">Failed to report, abort upload to Penguin Statistics</string>
@@ -2453,10 +2453,10 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="wake_result_no_keyguard">No lock screen set; unlocking is not needed</string>
     <string name="wake_result_unsupported">Not supported on this system</string>
     <string name="wake_result_lock_failed">Could not enter lock screen</string>
-    <string name="wake_result_ipc_failed">Elevated service not connected</string>
+    <string name="wake_result_ipc_failed">Service not connected</string>
     <string name="wake_result_task_running">A task is running. Stop it before testing or recording</string>
     <string name="wake_result_record_busy">The previous recording is still wrapping up. Try again in a moment</string>
-    <string name="wake_result_unknown">The elevated service returned an unrecognized result. Restart the elevated service and try again</string>
+    <string name="wake_result_unknown">The service returned an unrecognized result. Restart the service and try again</string>
     <string name="wake_result_gesture_empty">No unlock gesture recorded yet</string>
     <string name="wake_result_gesture_screen_mismatch">Screen orientation or resolution differs from the recording; please record again</string>
     <string name="wake_result_record_no_device">Cannot read the touchscreen input device on this system; use the Root backend or a PIN instead</string>

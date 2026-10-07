@@ -404,7 +404,7 @@
     <string name="oper_box_yituliu_write_only">Token 没有读取权限，请换只读或读写 Token</string>
     <string name="oper_box_yituliu_invalid">Token 无效或已失效，请重新生成</string>
     <string name="oper_box_yituliu_network_error">网络错误，请稍后重试</string>
-    <string name="oper_box_yituliu_local_data_missing">本地干员数据未装载，请先连接一次提权服务</string>
+    <string name="oper_box_yituliu_local_data_missing">本地干员数据未装载，请先连接一次服务</string>
     <string name="oper_box_yituliu_busy">正在拉取，请稍候</string>
     <string name="runlog_oper_box_yituliu_failed">从一图流获取干员数据失败：%1$s</string>
     <string name="report_http_failed">上报失败，放弃上传企鹅物流</string>
@@ -2510,10 +2510,10 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="wake_result_no_keyguard">未设置锁屏，无需解锁</string>
     <string name="wake_result_unsupported">当前系统不支持该操作</string>
     <string name="wake_result_lock_failed">无法进入锁屏</string>
-    <string name="wake_result_ipc_failed">提权服务未连接</string>
+    <string name="wake_result_ipc_failed">服务未连接</string>
     <string name="wake_result_task_running">任务运行中，请先停止任务再测试或录制</string>
     <string name="wake_result_record_busy">上一次录制还在收尾，请稍后再试</string>
-    <string name="wake_result_unknown">提权服务返回了无法识别的结果，请重启提权服务后再试</string>
+    <string name="wake_result_unknown">服务返回了无法识别的结果，请重启服务后再试</string>
     <string name="wake_result_gesture_empty">尚未录制解锁手势</string>
     <string name="wake_result_gesture_screen_mismatch">屏幕方向或分辨率与录制时不一致，请重新录制</string>
     <string name="wake_result_record_no_device">读不到触摸屏输入设备，当前系统不允许；可改用 Root 启动方式或 PIN</string>
