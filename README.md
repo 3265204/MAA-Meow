@@ -5,7 +5,7 @@
 
 **在 Android 设备上原生运行 [MAA](https://github.com/MaaAssistantArknights/MaaAssistantArknights)**
 
-基于图像识别技术，一键完成全部日常任务
+基于图像识别技术，一键完成全部日常任务！
 
 [![GitHub Release](https://img.shields.io/github/v/release/Aliothmoon/MAA-Meow?style=flat-square&label=Latest)](https://github.com/Aliothmoon/MAA-Meow/releases/latest)
 [![License](https://img.shields.io/github/license/Aliothmoon/MAA-Meow?style=flat-square)](LICENSE)
