@@ -1,10 +1,12 @@
 package com.aliothmoon.maameow.domain.service
 
+import android.os.RemoteException
 import com.aliothmoon.maameow.RemoteService
 import com.aliothmoon.maameow.data.model.WakeUpConfig
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.data.preferences.TaskChainState
 import com.aliothmoon.maameow.data.resource.ActivityManager
+import com.aliothmoon.maameow.domain.state.MaaExecutionState
 import com.aliothmoon.maameow.domain.state.ResourceInitState
 import com.aliothmoon.maameow.manager.PermissionManager
 import com.aliothmoon.maameow.manager.RemoteServiceManager
@@ -104,6 +106,9 @@ class UnifiedStateDispatcher(
                     if (serviceState is RemoteServiceManager.ServiceState.Connected
                         && initState is ResourceInitState.Ready
                     ) {
+                        if (resourceLoader.resetIfStale(serviceState.service)) {
+                            onServiceReplaced()
+                        }
                         val loaderState = resourceLoader.state.value
                         val shouldLoad = loaderState is MaaResourceLoader.State.NotLoaded
                                 || (loaderState is MaaResourceLoader.State.Failed && !loaderState.permanent)
@@ -147,14 +152,27 @@ class UnifiedStateDispatcher(
 
     suspend fun onServiceConnected(srv: RemoteService) {
         withContext(Dispatchers.IO) {
-            permissionManager.grantRequiredPermissions(srv)
-            val mode = appSettingsManager.runMode.value
-            srv.setVirtualDisplayMode(mode.displayMode)
+            try {
+                permissionManager.grantRequiredPermissions(srv)
+                val mode = appSettingsManager.runMode.value
+                srv.setVirtualDisplayMode(mode.displayMode)
+            } catch (e: RemoteException) {
+                // 刚连上就死了，下次连上会重做
+                Timber.w(e, "onServiceConnected: remote call failed")
+            }
         }
     }
 
     fun onServiceDied() {
         resourceLoader.reset()
+        _serviceDiedEvent.tryEmit(Unit)
+    }
+
+    /** 换进程不经过 Died，旧进程的死讯被当过期丢弃；任务在跑就补发，否则卡在 RUNNING */
+    private fun onServiceReplaced() {
+        val state = compositionService.state.value
+        if (state == MaaExecutionState.IDLE || state == MaaExecutionState.ERROR) return
+        Timber.w("Elevated service replaced while %s", state)
         _serviceDiedEvent.tryEmit(Unit)
     }
 

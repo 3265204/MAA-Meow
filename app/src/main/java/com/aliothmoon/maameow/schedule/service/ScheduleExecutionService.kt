@@ -85,7 +85,7 @@ class ScheduleExecutionService : Service() {
             } catch (e: Exception) {
                 currentCoroutineContext().ensureActive()
                 if (!startupReady) {
-                    scheduleAlarmManager.scheduleRetry(strategyId, scheduledTime, retryCount)
+                    val retrying = scheduleAlarmManager.scheduleRetry(strategyId, scheduledTime, retryCount)
                     // 应用未就绪，拿不到策略名
                     withContext(Dispatchers.IO) {
                         failureReporter.report(
@@ -97,6 +97,7 @@ class ScheduleExecutionService : Service() {
                                 R.string.schedule_log_app_init_failed,
                                 e.message ?: e.javaClass.simpleName,
                             ),
+                            notify = !retrying,
                         )
                     }
                 }

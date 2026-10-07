@@ -6,6 +6,7 @@ import com.aliothmoon.maameow.data.preferences.TaskChainState
 import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.domain.models.UnlockCredential
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
+import com.aliothmoon.maameow.domain.service.MaaNotificationCenter
 import com.aliothmoon.maameow.domain.service.ScreenSaverController
 import com.aliothmoon.maameow.domain.service.TaskEndRegistry
 import com.aliothmoon.maameow.domain.service.UnlockGestureReader
@@ -22,13 +23,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -56,17 +54,17 @@ class LaunchPipeline(
     private val countdownUI: CountdownUI,
     private val screenSaver: ScreenSaverController,
     private val taskEndRegistry: TaskEndRegistry,
+    private val notificationCenter: MaaNotificationCenter,
     private val keyguardLocked: () -> Boolean,
     /** 此刻要密码才能进桌面；不是 isDeviceSecure（只说明设过密码） */
     private val deviceLocked: () -> Boolean,
     private val screenInteractive: () -> Boolean,
     private val activityLauncher: suspend (LaunchRequest) -> Boolean,
+    /** 提权后端用不了的原因，null = 已连上；会申请授权、等连接 */
+    private val remoteAccessBlocker: suspend () -> BackendBlock?,
 ) {
     private val _session = MutableStateFlow<LaunchSession>(LaunchSession.Idle)
     val session: StateFlow<LaunchSession> = _session.asStateFlow()
-
-    private val _effects = Channel<LaunchEffect>(capacity = Channel.BUFFERED)
-    val effects: Flow<LaunchEffect> = _effects.receiveAsFlow()
 
     private val executeLock = Any()
     private val jobs = ConcurrentHashMap<String, Job>()
@@ -116,6 +114,11 @@ class LaunchPipeline(
 
         if (!mutex.tryAcquire(request.requestId)) {
             if (request.forceStart) {
+                // 后端用不了还抢占，只会把别人停了、自己也起不来
+                remoteAccessBlocker()?.let {
+                    finishWithoutHold(request, ExecutionResult.FAILED_START, it.reason)
+                    return
+                }
                 preemptInFlight(request)
                 mutex.forceAcquire(request.requestId)
             } else {
@@ -146,20 +149,30 @@ class LaunchPipeline(
             log.append(uiTextOf(R.string.schedule_log_received, request.displayName))
 
             val state = compositionService.state.value
-            if (state == MaaExecutionState.RUNNING
-                || state == MaaExecutionState.STARTING
-                || state == MaaExecutionState.STOPPING
-            ) {
-                if (request.forceStart) {
-                    log.append(uiTextOf(R.string.schedule_log_force_stop_running))
-                    takeOverFromPreviousRun()
-                    compositionService.stop()
-                    compositionService.stopVirtualDisplay()
-                } else {
-                    terminalResult = ExecutionResult.SKIPPED_BUSY
-                    terminalMessage = uiTextOf(R.string.schedule_log_task_running_busy)
-                    return
-                }
+            val busy = state == MaaExecutionState.RUNNING
+                    || state == MaaExecutionState.STARTING
+                    || state == MaaExecutionState.STOPPING
+            if (busy && !request.forceStart) {
+                terminalResult = ExecutionResult.SKIPPED_BUSY
+                terminalMessage = uiTextOf(R.string.schedule_log_task_running_busy)
+                return
+            }
+
+            // 解锁、拉起界面、跑任务都靠提权进程，后端没起来就别往下走，否则会被报成锁屏或拉起失败
+            // 强制启动也得先查，免得把在跑的停了、自己又起不来
+            log.append(uiTextOf(R.string.schedule_log_backend_connecting))
+            remoteAccessBlocker()?.let { block ->
+                block.detail?.let { log.append(uiTextOf(R.string.schedule_log_backend_connect_cause, it)) }
+                terminalResult = ExecutionResult.FAILED_START
+                terminalMessage = block.reason
+                return
+            }
+
+            if (busy) {
+                log.append(uiTextOf(R.string.schedule_log_force_stop_running))
+                takeOverFromPreviousRun()
+                compositionService.stop()
+                compositionService.stopVirtualDisplay()
             }
 
             // 须在唤醒前采样；无锁屏时熄屏也不上锁，亮屏与 keyguard 都看
@@ -308,6 +321,7 @@ class LaunchPipeline(
                 }
 
                 is StartTaskChainUseCase.Result.Failed -> {
+                    outcome.startFailureNotified = result.startFailureNotified
                     terminalResult = result.executionResult
                     terminalMessage = result.message
                     log.append(uiTextOf(R.string.schedule_log_start_failed, result.message))
@@ -358,14 +372,9 @@ class LaunchPipeline(
                 )
             }
             if (result != ExecutionResult.STARTED && result != ExecutionResult.CANCELLED) {
-                _effects.trySend(
-                    LaunchEffect.Feedback(
-                        uiTextOf(
-                            R.string.notification_schedule_detail,
-                            request.displayName,
-                            terminalMessage ?: uiTextOf(R.string.schedule_result_failed_start),
-                        ),
-                    ),
+                notificationCenter.notifyLaunchNotStarted(
+                    request.displayName, result, terminalMessage,
+                    replacesStartFailure = outcome.startFailureNotified,
                 )
             }
         } finally {
@@ -444,11 +453,7 @@ class LaunchPipeline(
                     message = triggerLogger.resolveMessage(message),
                 )
             }
-            _effects.trySend(
-                LaunchEffect.Feedback(
-                    uiTextOf(R.string.notification_schedule_detail, request.displayName, message),
-                ),
-            )
+            notificationCenter.notifyLaunchNotStarted(request.displayName, result, message)
             lastCompletedRequestId.set(request.requestId)
         }
     }
@@ -501,6 +506,7 @@ class LaunchPipeline(
         /** 启动采样：熄屏或锁屏 */
         var tookOverIdleDevice = false
         var screenSaverEngaged = false
+        var startFailureNotified = false
     }
 
     companion object {

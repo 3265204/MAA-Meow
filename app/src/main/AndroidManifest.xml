@@ -124,6 +124,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- ShizukuDownMonitor 排的检查闹钟，显式投递 -->
+        <receiver
+            android:name=".schedule.receiver.ShizukuCheckReceiver"
+            android:exported="false" />
+
 
         <!-- 定时任务执行服务 -->
         <service

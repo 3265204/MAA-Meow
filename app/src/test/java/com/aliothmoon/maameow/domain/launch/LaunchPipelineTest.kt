@@ -8,6 +8,7 @@ import com.aliothmoon.maameow.data.preferences.TaskChainState
 import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.domain.models.UnlockCredential
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
+import com.aliothmoon.maameow.domain.service.MaaNotificationCenter
 import com.aliothmoon.maameow.domain.service.ScreenSaverController
 import com.aliothmoon.maameow.domain.service.TaskEndRegistry
 import com.aliothmoon.maameow.domain.service.UnlockGestureReader
@@ -64,6 +65,7 @@ class LaunchPipelineTest {
     private lateinit var startTaskChain: StartTaskChainUseCase
     private lateinit var screenSaver: ScreenSaverController
     private lateinit var taskEndRegistry: TaskEndRegistry
+    private lateinit var notificationCenter: MaaNotificationCenter
 
     private val keyguardLocked = java.util.concurrent.atomic.AtomicBoolean(false)
     private val deviceLocked = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -71,6 +73,10 @@ class LaunchPipelineTest {
     private val startCalls = AtomicInteger(0)
     private val recorded = CopyOnWriteArrayList<ExecutionResult>()
     private val stopCalls = AtomicInteger(0)
+    private val uiLaunches = AtomicInteger(0)
+
+    @Volatile
+    private var remoteBlocker: BackendBlock? = null
 
     private val runMode = MutableStateFlow(RunMode.BACKGROUND)
     private val unlockType = MutableStateFlow("swipe")
@@ -121,6 +127,8 @@ class LaunchPipelineTest {
         mutex = LaunchMutex()
         startCalls.set(0)
         stopCalls.set(0)
+        uiLaunches.set(0)
+        remoteBlocker = null
         recorded.clear()
         keyguardLocked.set(false)
         deviceLocked.set(false)
@@ -191,6 +199,7 @@ class LaunchPipelineTest {
             every { resolveMessage(any()) } answers { firstArg<UiText?>()?.toString() }
         }
         repository = mockk(relaxed = true)
+        notificationCenter = mockk(relaxed = true)
         // B1: 真正挂起，确保 cancel 后仍能在 NonCancellable 下完成落库
         coEvery {
             repository.recordExecutionResult(any(), any(), any(), any())
@@ -232,10 +241,15 @@ class LaunchPipelineTest {
         countdownUI = countdown,
         screenSaver = screenSaver,
         taskEndRegistry = taskEndRegistry,
+        notificationCenter = notificationCenter,
         keyguardLocked = { keyguardLocked.get() },
         deviceLocked = { deviceLocked.get() },
         screenInteractive = { screenInteractive.get() },
-        activityLauncher = { true },
+        activityLauncher = {
+            uiLaunches.incrementAndGet()
+            true
+        },
+        remoteAccessBlocker = { remoteBlocker },
     )
 
     private fun givenWakeGate(
@@ -295,6 +309,104 @@ class LaunchPipelineTest {
         compositionState.value = MaaExecutionState.STOPPING
         delay(200)
         compositionState.value = MaaExecutionState.IDLE
+    }
+
+    // Shizuku 没起来时解锁注入必失败，以前被报成锁屏 / 拉起界面失败
+    @Test
+    fun remoteUnavailable_failsStartBeforeUnlock() = runBlocking<Unit> {
+        val reason = uiTextOf(R.string.runlog_backend_unavailable, "Shizuku")
+        remoteBlocker = BackendBlock(reason)
+        givenWakeGate(interactive = false, keyguard = true, locked = true)
+
+        pipeline().execute(scheduleRequest()).join()
+
+        assertEquals(listOf(ExecutionResult.FAILED_START), recorded.toList())
+        verify { logSession.end(ExecutionResult.FAILED_START, reason) }
+        coVerify(exactly = 0) { wake.unlock(any()) }
+        assertEquals(0, uiLaunches.get())
+        assertEquals(0, startCalls.get())
+        // 界面没拉起来，toast 没人看得到
+        verify(exactly = 1) {
+            notificationCenter.notifyLaunchNotStarted("Test", ExecutionResult.FAILED_START, reason)
+        }
+    }
+
+    // 技术原因只进触发日志，通知里不放英文串
+    @Test
+    fun connectFailure_detailOnlyInTriggerLog() = runBlocking<Unit> {
+        val reason = uiTextOf(R.string.runlog_backend_connect_failed, "Shizuku")
+        remoteBlocker = BackendBlock(reason, detail = "launcher exited early code=1")
+
+        pipeline().execute(scheduleRequest()).join()
+
+        verify { logSession.append(uiTextOf(R.string.schedule_log_backend_connect_cause, "launcher exited early code=1")) }
+        verify { logSession.end(ExecutionResult.FAILED_START, reason) }
+        verify(exactly = 1) {
+            notificationCenter.notifyLaunchNotStarted("Test", ExecutionResult.FAILED_START, reason)
+        }
+    }
+
+    // 强制启动若先停在跑的再查后端，后端挂了就两头落空
+    @Test
+    fun forceStart_remoteUnavailable_keepsRunningTask() = runBlocking<Unit> {
+        compositionState.value = MaaExecutionState.RUNNING
+        remoteBlocker = BackendBlock(uiTextOf(R.string.runlog_backend_unavailable, "Shizuku"))
+
+        pipeline().execute(scheduleRequest(force = true)).join()
+
+        assertEquals(listOf(ExecutionResult.FAILED_START), recorded.toList())
+        assertEquals(0, stopCalls.get())
+        assertEquals(MaaExecutionState.RUNNING, compositionState.value)
+    }
+
+    @Test
+    fun forcePreempt_remoteUnavailable_keepsInFlightLaunch() = runBlocking<Unit> {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val p = pipeline(countdown = gatedCountdown(entered, release))
+        val first = p.execute(scheduleRequest("a"))
+        withTimeout(5_000) { entered.await() }
+
+        remoteBlocker = BackendBlock(uiTextOf(R.string.runlog_backend_unavailable, "Shizuku"))
+        p.execute(scheduleRequest("b", force = true)).join()
+        assertEquals(listOf(ExecutionResult.FAILED_START), recorded.toList())
+
+        // 第一个没被抢占，照常跑完
+        remoteBlocker = null
+        release.complete(Unit)
+        first.join()
+        assertEquals(listOf(ExecutionResult.FAILED_START, ExecutionResult.STARTED), recorded.toList())
+    }
+
+    // Core 启动阶段已发过不带策略名的「任务出错」，只留带策略名的这条
+    @Test
+    fun coreStartFailure_replacesStartFailureNotification() = runBlocking<Unit> {
+        val reason = uiTextOf(R.string.task_start_error_start_failed)
+        coEvery {
+            startTaskChain.invoke(chain = any(), context = any(), scheduleLabel = any())
+        } returns StartTaskChainUseCase.Result.Failed(
+            executionResult = ExecutionResult.FAILED_START,
+            message = reason,
+            startFailureNotified = true,
+        )
+
+        pipeline().execute(scheduleRequest()).join()
+
+        verify(exactly = 1) {
+            notificationCenter.notifyLaunchNotStarted(
+                "Test", ExecutionResult.FAILED_START, reason, replacesStartFailure = true,
+            )
+        }
+    }
+
+    @Test
+    fun remoteAvailable_launchesUiAndStarts() = runBlocking<Unit> {
+        pipeline().execute(scheduleRequest()).join()
+
+        assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
+        assertEquals(1, uiLaunches.get())
+        assertEquals(1, startCalls.get())
+        verify(exactly = 0) { notificationCenter.notifyLaunchNotStarted(any(), any(), any()) }
     }
 
     @Test

@@ -141,7 +141,9 @@ fun ScheduleEditView(
                 ScheduleHealthIssue.NOTIFICATION -> permissionManager.requestNotification(context)
                 ScheduleHealthIssue.OVERLAY -> permissionManager.requestOverlay(context)
                 // 进不了向导，由健康卡负责
-                ScheduleHealthIssue.BACKEND, ScheduleHealthIssue.UNLOCK_CREDENTIAL -> Unit
+                ScheduleHealthIssue.BACKEND_DOWN,
+                ScheduleHealthIssue.BACKEND,
+                ScheduleHealthIssue.UNLOCK_CREDENTIAL -> Unit
             }
             viewModel.refreshPermissionChecks()
         }

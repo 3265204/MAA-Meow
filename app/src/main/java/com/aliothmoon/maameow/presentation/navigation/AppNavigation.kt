@@ -32,7 +32,6 @@ import com.aliothmoon.maameow.announcement.AnnouncementManager
 import com.aliothmoon.maameow.constant.Routes
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.data.resource.BackgroundImageStore
-import com.aliothmoon.maameow.domain.launch.LaunchEffect
 import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.domain.service.AchievementReporter
 import com.aliothmoon.maameow.domain.service.ExternalNotificationService
@@ -151,19 +150,6 @@ fun AppNavigation(
     // 主界面分页偏移，供背景层做切 Tab 视差
     val backgroundParallax = remember { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(backgroundTaskViewModel) {
-        backgroundTaskViewModel.launchEffects.collect { effect ->
-            when (effect) {
-                is LaunchEffect.Feedback -> {
-                    Toast.makeText(
-                        context,
-                        effect.message.resolve(context),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-                }
-            }
-        }
-    }
     // 后台倒计时 Overlay 由 CountdownUIImpl 写入；前台无倒计时不触碰
     LaunchedEffect(backgroundTaskViewModel) {
         overlayController.onCountdownClick = {

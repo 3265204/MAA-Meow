@@ -30,6 +30,9 @@ data class LaunchRequest(
     }
 }
 
+/** 提权后端拦下启动：[reason] 进通知与终局文案，[detail] 是技术原因，只进触发日志 */
+data class BackendBlock(val reason: UiText, val detail: String? = null)
+
 sealed interface LaunchSession {
     data object Idle : LaunchSession
 
@@ -54,10 +57,6 @@ sealed interface LaunchSession {
 sealed interface LaunchUserEvent {
     data object Cancel : LaunchUserEvent
     data object StartNow : LaunchUserEvent
-}
-
-sealed interface LaunchEffect {
-    data class Feedback(val message: UiText) : LaunchEffect
 }
 
 fun LaunchSession.toCountdownState(): CountdownState {

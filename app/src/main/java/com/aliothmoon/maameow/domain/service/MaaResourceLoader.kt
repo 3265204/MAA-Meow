@@ -1,7 +1,9 @@
 package com.aliothmoon.maameow.domain.service
 
+import android.os.IBinder
 import android.os.Process
 import com.aliothmoon.maameow.MaaCoreService
+import com.aliothmoon.maameow.RemoteService
 import com.aliothmoon.maameow.data.config.MaaPathConfig
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.data.preferences.TaskChainState
@@ -50,6 +52,10 @@ class MaaResourceLoader(
     /** 当前提权进程已加载资源的客户端，null = 该进程还没被任何资源档污染 */
     @Volatile
     private var loadedClientType: String? = null
+
+    /** Ready 对应的提权进程；Shizuku 重启后的重绑不经过 Died/Disconnected，只能靠它识别换了进程 */
+    @Volatile
+    private var loadedBinder: IBinder? = null
 
     sealed class State {
         data object NotLoaded : State()
@@ -170,6 +176,7 @@ class MaaResourceLoader(
                     loadResIfExists(maa, pathConfig.overridesDir)
                 }
 
+                loadedBinder = srv.asBinder()
                 _state.value = State.Ready
                 Result.success(Unit)
             }
@@ -233,7 +240,12 @@ class MaaResourceLoader(
     /** 资源档与已加载的不一致时重新加载，必要时连带重启进程 */
     suspend fun ensureLoaded(clientType: String = chainState.clientType): Result<Unit> {
         return when (val s = _state.value) {
-            is State.Ready -> ensureProfile(clientType)
+            is State.Ready -> {
+                val current = RemoteServiceManager.getInstanceOrNull()
+                if (current != null && resetIfStale(current)) load(clientType)
+                else ensureProfile(clientType)
+            }
+
             is State.Failed -> if (s.permanent) {
                 // 资源文件缺失，重试无意义
                 Result.failure(Exception(s.message))
@@ -269,7 +281,18 @@ class MaaResourceLoader(
             return
         }
         loadedClientType = null
+        loadedBinder = null
         _state.value = State.NotLoaded
+    }
+
+    /** 已连上的不是加载资源的那个进程时作废 Ready，返回是否作废了 */
+    fun resetIfStale(service: RemoteService): Boolean {
+        if (_state.value !is State.Ready) return false
+        val loaded = loadedBinder
+        if (loaded == null || loaded === service.asBinder()) return false
+        Timber.w("Elevated service replaced since resources were loaded, dropping Ready")
+        reset()
+        return true
     }
 
     /**

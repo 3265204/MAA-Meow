@@ -404,7 +404,7 @@
     <string name="oper_box_yituliu_write_only">Token 没有读取权限，请换只读或读写 Token</string>
     <string name="oper_box_yituliu_invalid">Token 无效或已失效，请重新生成</string>
     <string name="oper_box_yituliu_network_error">网络错误，请稍后重试</string>
-    <string name="oper_box_yituliu_local_data_missing">本地干员数据未装载，请先连接一次提权服务</string>
+    <string name="oper_box_yituliu_local_data_missing">本地干员数据未装载，请先连接一次服务</string>
     <string name="oper_box_yituliu_busy">正在拉取，请稍候</string>
     <string name="runlog_oper_box_yituliu_failed">从一图流获取干员数据失败：%1$s</string>
     <string name="report_http_failed">上报失败，放弃上传企鹅物流</string>
@@ -666,8 +666,6 @@
 
     <!-- background task: toast -->
     <string name="bg_toast_service_died">MaaService 异常关闭，请尝试重新启动</string>
-    <string name="bg_toast_app_died">游戏进程未启动或被异常关闭</string>
-    <string name="bg_toast_display_drift">游戏已离开虚拟显示器且自动拉回失败，可尝试开启「强制 FULLSCREEN 模式」</string>
 
     <!-- task action buttons -->
     <string name="task_btn_start">开始任务</string>
@@ -775,8 +773,8 @@
     <string name="dialog_shizuku_install_confirm">快捷安装 Shizuku</string>
     <string name="dialog_shizuku_switch_to_root">切换至 Root 模式</string>
     <string name="dialog_shizuku_skip_check">跳过检查 (不推荐)</string>
-    <string name="dialog_shizuku_not_running_title">Shizuku 未启动</string>
-    <string name="dialog_shizuku_not_running_message">检测到 Shizuku 已安装但服务未启动，请打开 Shizuku 应用并启动服务。</string>
+    <string name="dialog_shizuku_not_running_title">Shizuku 未运行</string>
+    <string name="dialog_shizuku_not_running_message">检测到 Shizuku 已安装但未运行，请打开 Shizuku 应用并启动服务。</string>
     <string name="dialog_shizuku_open_app">打开 Shizuku</string>
     <string name="dialog_sui_detected_title">检测到 Sui</string>
     <string name="dialog_sui_detected_message">当前使用 Sui 提供 Shizuku 服务，Sui 以 Root 权限运行，MaaMeow 可能无法正常工作，请以实际测试为主</string>
@@ -1708,6 +1706,8 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="notification_event_task_error">任务出错</string>
     <string name="notification_event_task_stopped">任务已停止</string>
     <string name="notification_event_task_stopped_text">任务已手动停止</string>
+    <string name="notification_event_task_aborted_text">任务因异常中止，原因见上一条通知或运行日志</string>
+    <string name="notification_event_task_time_limit_text">已达到单次运行时长上限，任务已停止</string>
     <string name="notification_event_service_died">服务异常</string>
     <string name="notification_event_service_died_text">MAA 服务意外终止</string>
     <string name="notification_event_recruit_tip">招募提示</string>
@@ -1715,6 +1715,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="notification_event_recruit_robot_tag">发现小车 Tag: %1$s</string>
     <string name="notification_event_recruit_high_rarity">发现 %1$d ★ 组合</string>
     <string name="notification_event_subtask_failure">子任务异常</string>
+    <string name="notification_game_gone_aborted">游戏进程已退出，已中止剩余任务</string>
     <string name="notification_test_title">测试通知</string>
     <string name="notification_test_message_full">这是一条来自 MaaMeow 的测试通知</string>
     <string name="notification_feedback_no_channel">请先启用至少一个通知渠道</string>
@@ -1916,7 +1917,10 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="schedule_health_title">调度环境检查</string>
     <string name="schedule_health_fix">去修复</string>
     <string name="schedule_health_backend">%1$s未授权</string>
-    <string name="schedule_health_backend_desc">定时触发的唤醒、拉起界面与执行都依赖它，请先启动对应服务并完成授权</string>
+    <string name="schedule_health_backend_desc">定时触发的唤醒、拉起界面与执行都依赖它，请先完成授权</string>
+    <string name="schedule_health_backend_not_running">%1$s未运行</string>
+    <string name="schedule_health_backend_unavailable">%1$s不可用</string>
+    <string name="schedule_health_backend_down_desc">定时触发的唤醒、拉起界面与执行都依赖它，请先启动对应服务</string>
     <string name="schedule_health_battery">未忽略电池优化</string>
     <string name="schedule_health_battery_desc">后台触发可能被系统延迟或拦截</string>
     <string name="schedule_health_notification">通知权限未开启</string>
@@ -1998,15 +2002,23 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="notification_channel_schedule">定时任务</string>
     <string name="notification_channel_schedule_desc">定时任务执行与结果通知</string>
     <string name="notification_schedule_title">定时任务</string>
+    <string name="notification_schedule_skipped">定时任务已跳过</string>
+    <string name="notification_schedule_failed">定时任务未能启动</string>
     <string name="notification_schedule_preparing">正在准备拉起界面…</string>
     <string name="notification_schedule_device_locked">设备处于锁屏状态</string>
     <string name="notification_schedule_pin_required">已跳过：设备有锁屏密码。请在「定时 → 唤醒解锁」中配置 PIN 或录制解锁手势，或用「任务 → 快捷选项 → 熄屏挂机」代替系统锁屏</string>
     <string name="notification_schedule_detail">「%1$s」: %2$s</string>
+    <string name="notification_action_open_shizuku">打开 Shizuku</string>
+    <string name="notification_shizuku_down_title">Shizuku 未运行</string>
+    <string name="notification_shizuku_down_after_boot">手机重启后需要重新启动 Shizuku，否则定时任务无法执行</string>
+    <string name="notification_shizuku_down_stopped">Shizuku 已停止，重新启动前定时任务无法执行</string>
 
     <!-- i18n: schedule trigger journal (pipeline) -->
     <string name="schedule_log_received">收到启动请求: %1$s</string>
     <string name="schedule_log_skipped_busy">已有定时任务正在处理中</string>
     <string name="schedule_log_task_running_busy">有任务正在运行</string>
+    <string name="schedule_log_backend_connecting">连接服务…</string>
+    <string name="schedule_log_backend_connect_cause">服务启动失败原因: %1$s</string>
     <string name="schedule_log_force_stop_running">强制启动: 停止当前运行任务</string>
     <string name="schedule_log_wake_start">执行唤醒解锁…</string>
     <string name="schedule_log_wake_ok">唤醒解锁成功</string>
@@ -2465,6 +2477,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="runlog_service_connecting">服务正在启动中，请稍后再试</string>
     <string name="runlog_backend_unavailable">%1$s 不可用，已取消启动</string>
     <string name="runlog_backend_not_granted">%1$s 未授权，已取消启动</string>
+    <string name="runlog_backend_connect_failed">经 %1$s 启动服务失败，已取消启动</string>
     <string name="runlog_resource_load_failed">资源加载失败</string>
     <string name="runlog_portrait_orientation">当前为竖屏，无法在前台模式运行</string>
     <string name="runlog_invalid_aspect_ratio">当前分辨率 %1$dx%2$d 不是 16:9，无法在前台模式运行</string>
@@ -2500,10 +2513,10 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="wake_result_no_keyguard">未设置锁屏，无需解锁</string>
     <string name="wake_result_unsupported">当前系统不支持该操作</string>
     <string name="wake_result_lock_failed">无法进入锁屏</string>
-    <string name="wake_result_ipc_failed">提权服务未连接</string>
+    <string name="wake_result_ipc_failed">服务未连接</string>
     <string name="wake_result_task_running">任务运行中，请先停止任务再测试或录制</string>
     <string name="wake_result_record_busy">上一次录制还在收尾，请稍后再试</string>
-    <string name="wake_result_unknown">提权服务返回了无法识别的结果，请重启提权服务后再试</string>
+    <string name="wake_result_unknown">服务返回了无法识别的结果，请重启服务后再试</string>
     <string name="wake_result_gesture_empty">尚未录制解锁手势</string>
     <string name="wake_result_gesture_screen_mismatch">屏幕方向或分辨率与录制时不一致，请重新录制</string>
     <string name="wake_result_record_no_device">读不到触摸屏输入设备，当前系统不允许；可改用 Root 启动方式或 PIN</string>

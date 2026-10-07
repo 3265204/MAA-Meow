@@ -11,13 +11,16 @@ The setting is **Settings → Third-party services → Help improve this project
 | Run statistics | Every run | Name, duration and result of each task chain, plus the parameter summary described below |
 | Task failure | A task chain fails | The failing subtask and the recognition node it was stuck on; the logs of that task; in background mode, also the game screenshot MaaCore saved on failure: downscaled before upload, sent only once per run for the same failure, and on stable releases attached to only about one failure in five |
 | Start failure | Resource loading, instance creation, virtual display or connection fails | The failing stage; the logs of that run |
-| Service death | The Shizuku / Root process exits unexpectedly during a run | The task chain that was running; the logs of that run and MaaCore's `crash.log` |
-| Scheduled launch failure | A scheduled or externally triggered launch never reaches the tasks: validation fails, the UI cannot be brought up, the device cannot be unlocked, or the start fails | The result and reason, how late the trigger fired, and the trigger log of that attempt |
+| Service death | The Shizuku / Root process exits unexpectedly during a run | The task chain that was running; the logs of that run and MaaCore's `crash.log`; the next time the service connects, the system log (logcat) lines that mention that process (by pid or process name) from one minute before to 15 seconds after its death; other kill records in that window are reported only as a count, without other apps' names |
+| Scheduled launch failure | A scheduled or externally triggered launch never reaches the tasks: validation fails, the UI cannot be brought up, the device cannot be unlocked, or the start fails | The result and reason, how late the trigger fired, and the trigger log of that attempt; with Shizuku as the backend, also the Shizuku state described below; when the start fails, also the latest part of the service connection diagnostics |
+| Shizuku not running | Schedules are enabled but Shizuku is still not running a few minutes after boot, or a minute after it stopped, and the app shows a reminder | Whether it never started after boot or stopped later, how many schedules are enabled, and the Shizuku state described below; no logs |
 | App crash | Uncaught Java exception | Stack trace |
 | App not responding | The system reports an ANR because the main thread is blocked | Stack traces of the app's threads |
 | Activity | App goes to foreground or background | Session start and end, used for daily active users and crash rate |
 
 "Logs" means the MaaCore log (`asst.log`), the run log of that run and the app error log, plus the service connection diagnostics for start failures and service deaths. Only the part written around the incident is taken, with a little preceding context, 1 MiB in total at most.
+
+"Shizuku state" means whether the current app process ever got a Shizuku connection, how long ago it was lost, whether Shizuku last ran as root or adb, whether the official Shizuku app or Sui is installed, and how long the device has been up.
 
 Every record carries:
 

@@ -175,7 +175,7 @@
     <string name="oper_box_yituliu_write_only">Token lacks read access; use a read-only or read-write token</string>
     <string name="oper_box_yituliu_invalid">Token is invalid or expired; generate a new one</string>
     <string name="oper_box_yituliu_network_error">Network error, try again later</string>
-    <string name="oper_box_yituliu_local_data_missing">Local operator data is not loaded; connect the elevated service once</string>
+    <string name="oper_box_yituliu_local_data_missing">Local operator data is not loaded; connect the service once</string>
     <string name="oper_box_yituliu_busy">Already fetching, please wait</string>
     <string name="runlog_oper_box_yituliu_failed">Failed to fetch operator data from Yituliu: %1$s</string>
     <string name="report_http_failed">Failed to report, abort upload to Penguin Statistics</string>
@@ -431,8 +431,6 @@
 
     <!-- background task: toast -->
     <string name="bg_toast_service_died">MaaService terminated unexpectedly. Please try restarting</string>
-    <string name="bg_toast_app_died">Game process is not running or was killed unexpectedly</string>
-    <string name="bg_toast_display_drift">Game left the virtual display and could not be moved back. Try enabling \"Force FULLSCREEN mode\"</string>
 
     <!-- task action buttons -->
     <string name="task_btn_start">Start Task</string>
@@ -1652,6 +1650,8 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="notification_event_task_error">Task Error</string>
     <string name="notification_event_task_stopped">Task stopped</string>
     <string name="notification_event_task_stopped_text">The task was stopped</string>
+    <string name="notification_event_task_aborted_text">Tasks were aborted due to an error; see the previous notification or the run log</string>
+    <string name="notification_event_task_time_limit_text">Reached the per-run time limit; tasks were stopped</string>
     <string name="notification_event_service_died">Service error</string>
     <string name="notification_event_service_died_text">The MAA service terminated unexpectedly</string>
     <string name="notification_event_recruit_tip">Recruitment Tip</string>
@@ -1659,6 +1659,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="notification_event_recruit_robot_tag">Robot tag found: %1$s</string>
     <string name="notification_event_recruit_high_rarity">Found a %1$d-star combination</string>
     <string name="notification_event_subtask_failure">Subtask Error</string>
+    <string name="notification_game_gone_aborted">The game process exited; remaining tasks were aborted</string>
     <string name="notification_test_title">Test Notification</string>
     <string name="notification_test_message_full">This is a test notification from MaaMeow</string>
     <string name="notification_feedback_no_channel">Enable at least one notification channel first</string>
@@ -1860,7 +1861,10 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="schedule_health_title">Scheduling environment check</string>
     <string name="schedule_health_fix">Fix</string>
     <string name="schedule_health_backend">%1$s not authorized</string>
-    <string name="schedule_health_backend_desc">Wake-up, UI launch and task execution of scheduled triggers all depend on it — start the service and grant access first</string>
+    <string name="schedule_health_backend_desc">Wake-up, UI launch and task execution of scheduled triggers all depend on it — grant access first</string>
+    <string name="schedule_health_backend_not_running">%1$s is not running</string>
+    <string name="schedule_health_backend_unavailable">%1$s is unavailable</string>
+    <string name="schedule_health_backend_down_desc">Wake-up, UI launch and task execution of scheduled triggers all depend on it — start the service first</string>
     <string name="schedule_health_battery">Battery optimization not ignored</string>
     <string name="schedule_health_battery_desc">Background triggers may be delayed or blocked by the system</string>
     <string name="schedule_health_notification">Notifications disabled</string>
@@ -1942,15 +1946,23 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="notification_channel_schedule">Scheduled Tasks</string>
     <string name="notification_channel_schedule_desc">Scheduled task execution and result notifications</string>
     <string name="notification_schedule_title">Scheduled Task</string>
+    <string name="notification_schedule_skipped">Scheduled task skipped</string>
+    <string name="notification_schedule_failed">Scheduled task failed to start</string>
     <string name="notification_schedule_preparing">Preparing to launch…</string>
     <string name="notification_schedule_device_locked">Device is locked</string>
     <string name="notification_schedule_pin_required">Skipped: a device lock password is set. Configure a PIN or record an unlock gesture in "Schedule → Wake &amp; Unlock", or use "Tasks → Options → Screen Off" instead of the system lock screen</string>
     <string name="notification_schedule_detail">\"%1$s\": %2$s</string>
+    <string name="notification_action_open_shizuku">Open Shizuku</string>
+    <string name="notification_shizuku_down_title">Shizuku is not running</string>
+    <string name="notification_shizuku_down_after_boot">Shizuku must be started again after a reboot, or scheduled tasks can\'t run</string>
+    <string name="notification_shizuku_down_stopped">Shizuku has stopped; scheduled tasks can\'t run until it is started again</string>
 
     <!-- i18n: schedule trigger journal (pipeline) -->
     <string name="schedule_log_received">Launch request received: %1$s</string>
     <string name="schedule_log_skipped_busy">Another scheduled launch is already in progress</string>
     <string name="schedule_log_task_running_busy">A task is already running</string>
+    <string name="schedule_log_backend_connecting">Connecting to the service…</string>
+    <string name="schedule_log_backend_connect_cause">Service failed to start: %1$s</string>
     <string name="schedule_log_force_stop_running">Force start: stopping the running task</string>
     <string name="schedule_log_wake_start">Waking and unlocking…</string>
     <string name="schedule_log_wake_ok">Wake and unlock succeeded</string>
@@ -2408,6 +2420,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="runlog_service_connecting">Service is starting, please try again later</string>
     <string name="runlog_backend_unavailable">%1$s is unavailable; start canceled</string>
     <string name="runlog_backend_not_granted">%1$s is not authorized; start canceled</string>
+    <string name="runlog_backend_connect_failed">Failed to start the service via %1$s; start canceled</string>
     <string name="runlog_resource_load_failed">Failed to load resources</string>
     <string name="runlog_portrait_orientation">Currently in portrait mode; foreground mode requires landscape</string>
     <string name="runlog_invalid_aspect_ratio">Current resolution %1$dx%2$d is not 16:9; cannot run in foreground mode</string>
@@ -2443,10 +2456,10 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="wake_result_no_keyguard">No lock screen set; unlocking is not needed</string>
     <string name="wake_result_unsupported">Not supported on this system</string>
     <string name="wake_result_lock_failed">Could not enter lock screen</string>
-    <string name="wake_result_ipc_failed">Elevated service not connected</string>
+    <string name="wake_result_ipc_failed">Service not connected</string>
     <string name="wake_result_task_running">A task is running. Stop it before testing or recording</string>
     <string name="wake_result_record_busy">The previous recording is still wrapping up. Try again in a moment</string>
-    <string name="wake_result_unknown">The elevated service returned an unrecognized result. Restart the elevated service and try again</string>
+    <string name="wake_result_unknown">The service returned an unrecognized result. Restart the service and try again</string>
     <string name="wake_result_gesture_empty">No unlock gesture recorded yet</string>
     <string name="wake_result_gesture_screen_mismatch">Screen orientation or resolution differs from the recording; please record again</string>
     <string name="wake_result_record_no_device">Cannot read the touchscreen input device on this system; use the Root backend or a PIN instead</string>

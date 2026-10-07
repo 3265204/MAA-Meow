@@ -1,5 +1,6 @@
 package com.aliothmoon.maameow.telemetry
 
+import android.app.KeyguardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -10,6 +11,7 @@ import com.aliothmoon.maameow.data.notification.NotificationSettingsManager
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.data.preferences.TaskChainState
 import com.aliothmoon.maameow.data.resource.MaaCoreVersion
+import com.aliothmoon.maameow.domain.models.RemoteBackend
 import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.domain.service.LaunchOutcome
 import com.aliothmoon.maameow.domain.service.RunKind
@@ -33,6 +35,7 @@ import io.sentry.protocol.User
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -89,6 +92,8 @@ class TelemetryController(
         )
     }
 
+    private val forensics by lazy { ServiceDeathForensics(ServiceDeathForensics.PrefsStore(context)) }
+
     /** 取值不随开关变，重新初始化不必再查一遍 ActivityManager */
     private val hardware by lazy { TelemetryHardware.collect(context) }
     private val rom by lazy { TelemetryRom.detect() }
@@ -103,6 +108,11 @@ class TelemetryController(
             // 开关关着也记：用户反馈问题时可凭这行在后台按 user.id 定位
             Timber.i("[telemetry] 匿名设备 ID (Sentry user.id) = %s", TelemetryUserId.get(context))
             settings.telemetryEnabled.collect(::reconfigure)
+        }
+        scope.launch {
+            RemoteServiceManager.state
+                .filterIsInstance<RemoteServiceManager.ServiceState.Connected>()
+                .collect { collectDeathForensics() }
         }
     }
 
@@ -163,6 +173,9 @@ class TelemetryController(
                 backend = RemoteAccessCoordinator.configuredBackend().name.lowercase(),
                 taskChain = tracer.currentTaskChain,
                 tags = tracer.tags,
+                // 进程被替换也会走到这，那时它没死
+                servicePid = RemoteServiceManager.lastServicePid.takeIf { serviceState == "died" },
+                diedAtMs = System.currentTimeMillis(),
             )
         }
     }
@@ -172,6 +185,9 @@ class TelemetryController(
         // 没走到开跑，tag 还是上次刷的；取证要等半秒，赶得上
         scope.launch { runCatching { refreshRunTags() } }
         // 不动追踪状态：这时任务还没开跑，没有哪一轮可收
+        // 后端多半是根因
+        val shizuku = RemoteAccessCoordinator.configuredBackend() == RemoteBackend.SHIZUKU
+        val locked = outcome.result == ExecutionResult.SKIPPED_LOCKED
         guarded {
             if (!active) return@guarded
             reporter.report(
@@ -181,7 +197,33 @@ class TelemetryController(
                     message = outcome.message,
                     delayMs = outcome.delayMs,
                     logFile = outcome.logFile,
-                    tags = mapOf("run_mode" to outcome.runMode.lowercase()),
+                    tags = mapOf("run_mode" to outcome.runMode.lowercase()) +
+                            (if (shizuku) TelemetryShizuku.tags(context) else emptyMap()) +
+                            (if (locked) unlockTags() else emptyMap()),
+                    extras = if (shizuku) TelemetryShizuku.extras() else emptyMap(),
+                    withBootLogs = outcome.result == ExecutionResult.FAILED_START,
+                )
+            )
+        }
+    }
+
+    private fun unlockTags(): Map<String, String> = buildMap {
+        put("unlock.type", settings.wakeUnlockType.value)
+        runCatching { context.getSystemService(KeyguardManager::class.java).isDeviceSecure }
+            .onSuccess { put("keyguard.secure", it.toString()) }
+    }
+
+    override fun onShizukuDown(afterBoot: Boolean, enabledSchedules: Int) {
+        if (!active) return
+        scope.launch { runCatching { refreshRunTags() } }
+        guarded {
+            if (!active) return@guarded
+            reporter.report(
+                ShizukuDown(
+                    afterBoot = afterBoot,
+                    enabledSchedules = enabledSchedules,
+                    tags = TelemetryShizuku.tags(context),
+                    extras = TelemetryShizuku.extras(),
                 )
             )
         }
@@ -210,17 +252,8 @@ class TelemetryController(
     /** 由 [reporter] 在后台取完证之后调用，不在锁里 */
     private fun send(incident: Incident, evidence: Evidence) {
         val event = incident.toSentryEvent().apply { setEvidence(evidence) }
-        evidence.logs?.let { logs ->
-            val logContext = event.diagnosticLogContext(incident)
-            logs.entries.asSequence().flatMap { it.toRecords(logContext) }.forEach { record ->
-                // 不传 args：日志正文里的 % 不能被当成格式串
-                Sentry.logger().log(
-                    record.level,
-                    SentryLogParameters.create(SentryAttributes.fromMap(record.attributes)),
-                    record.body,
-                )
-            }
-        }
+        val logContext = event.diagnosticLogContext(incident)
+        evidence.logs?.let { emitLogs(it.entries, logContext) }
         val attachments = (evidence.attachment as? AttachmentOutcome.Attached)?.images.orEmpty()
             .map { Attachment(it.bytes, it.filename, JPEG_CONTENT_TYPE) }
         val eventId = if (attachments.isEmpty()) {
@@ -229,6 +262,50 @@ class TelemetryController(
             Sentry.captureEvent(event, Hint.withAttachments(attachments))
         }
         Timber.i("[telemetry] %s event_id=%s run_id=%s", incident.reason, eventId, incident.runId)
+        if (incident is ServiceDeath && incident.servicePid != null) {
+            forensics.remember(
+                ServiceDeathForensics.Pending(
+                    eventId = logContext.eventId,
+                    reason = logContext.reason,
+                    runId = logContext.runId,
+                    attributes = logContext.attributes,
+                    traceId = logContext.traceId,
+                    spanId = logContext.spanId,
+                    diedAtMs = incident.diedAtMs,
+                    pid = incident.servicePid,
+                )
+            )
+            // 这时多半已重连上，不必等下次连接
+            collectDeathForensics()
+        }
+    }
+
+    private fun emitLogs(entries: List<DiagnosticLog>, logContext: DiagnosticLogContext) {
+        entries.asSequence().flatMap { it.toRecords(logContext) }.forEach { record ->
+            // 不传 args：日志正文里的 % 不能被当成格式串
+            Sentry.logger().log(
+                record.level,
+                SentryLogParameters.create(SentryAttributes.fromMap(record.attributes)),
+                record.body,
+            )
+        }
+    }
+
+    private fun collectDeathForensics() {
+        val service = RemoteServiceManager.getInstanceOrNull() ?: return
+        scope.launch {
+            if (!active) return@launch
+            val pending = forensics.take(runCatching { service.pid() }.getOrNull()) ?: return@launch
+            val content = runCatching {
+                service.dumpSystemLog(pending.sinceMs, pending.untilMs, pending.pid, "${context.packageName}:")
+            }.getOrElse { "# dump failed: $it" }
+            val redacted = SecretRedaction.redact(content, SecretRedaction.redactable(secrets()))
+            emitLogs(
+                listOf(DiagnosticLog(SYSTEM_LOG_SOURCE, kind = "system", redacted, content.encodeToByteArray().size.toLong())),
+                pending.logContext(delayMs = System.currentTimeMillis() - pending.diedAtMs),
+            )
+            Timber.i("[telemetry] service death forensics sent, event_id=%s", pending.eventId)
+        }
     }
 
     /**
@@ -250,7 +327,11 @@ class TelemetryController(
         if (!enabled) return
         runCatching { init() }
             .onFailure { Timber.w(it, "[telemetry] 初始化失败") }
-            .onSuccess { synchronized(lock) { active = true } }
+            .onSuccess {
+                synchronized(lock) { active = true }
+                // 冷启动时提权进程常先于遥测连上
+                collectDeathForensics()
+            }
     }
 
     private fun init() {
@@ -334,6 +415,8 @@ class TelemetryController(
         /** 只按构建类型分；alpha / beta / 正式版靠 release 筛，不再跟用户的更新渠道设置走 */
         val ENVIRONMENT = if (BuildConfig.DEBUG) "dev" else "stable"
         const val JPEG_CONTENT_TYPE = "image/jpeg"
+
+        const val SYSTEM_LOG_SOURCE = "logcat/system"
         const val JPEG_QUALITY = 60
 
         /** 一轮一条事务、每条任务链一条 Span，量不大，全采 */

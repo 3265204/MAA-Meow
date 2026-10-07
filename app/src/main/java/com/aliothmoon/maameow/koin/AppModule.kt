@@ -3,6 +3,7 @@ package com.aliothmoon.maameow.koin
 import android.app.KeyguardManager
 import android.content.Context
 import android.os.PowerManager
+import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.announcement.AnnouncementManager
 import com.aliothmoon.maameow.data.achievement.AchievementRepository
 import com.aliothmoon.maameow.data.achievement.PallasDrunkState
@@ -58,6 +59,7 @@ import com.aliothmoon.maameow.data.resource.ItemIconLoader
 import com.aliothmoon.maameow.data.resource.OperAvatarLoader
 import com.aliothmoon.maameow.data.resource.ResourceDataManager
 import com.aliothmoon.maameow.data.resource.StageApCostHelper
+import com.aliothmoon.maameow.domain.launch.BackendBlock
 import com.aliothmoon.maameow.domain.launch.CountdownUI
 import com.aliothmoon.maameow.domain.launch.LaunchMutex
 import com.aliothmoon.maameow.domain.launch.LaunchPipeline
@@ -108,6 +110,7 @@ import com.aliothmoon.maameow.maa.callback.TaskChainHandler
 import com.aliothmoon.maameow.maa.callback.TaskChainStatusTracker
 import com.aliothmoon.maameow.maa.callback.ToolboxResultCollector
 import com.aliothmoon.maameow.manager.PermissionManager
+import com.aliothmoon.maameow.manager.RemoteAccessCoordinator
 import com.aliothmoon.maameow.manager.RemoteGameAudioAdapter
 import com.aliothmoon.maameow.manager.RemoteServiceManager
 import com.aliothmoon.maameow.manager.ShizukuReadinessProvider
@@ -124,8 +127,10 @@ import com.aliothmoon.maameow.schedule.service.ScheduleAlarmManager
 import com.aliothmoon.maameow.schedule.service.ScheduleFailureReporter
 import com.aliothmoon.maameow.schedule.service.ScheduleTriggerHandler
 import com.aliothmoon.maameow.schedule.service.ScheduleTriggerLogger
+import com.aliothmoon.maameow.schedule.service.ShizukuDownMonitor
 import com.aliothmoon.maameow.telemetry.TelemetryController
 import com.aliothmoon.maameow.utils.CrashHandler
+import com.aliothmoon.maameow.utils.i18n.uiTextOf
 import com.aliothmoon.maameow.utils.log.LogTreeHolder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -139,6 +144,7 @@ import org.koin.core.module.dsl.singleOf
 import org.koin.core.qualifier.named
 import org.koin.dsl.bind
 import org.koin.dsl.module
+import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
@@ -184,6 +190,7 @@ val appModule = module {
     singleOf(::ScheduleTriggerLogger)
     singleOf(::ScheduleFailureReporter)
     singleOf(::ScheduleAlarmManager)
+    singleOf(::ShizukuDownMonitor)
     single { ScheduleTriggerHandler(get(), get(), get(), get(), get()) }
     singleOf(::LaunchMutex)
     singleOf(::StartTaskChainUseCase)
@@ -212,6 +219,7 @@ val appModule = module {
             countdownUI = get(),
             screenSaver = get(),
             taskEndRegistry = get(),
+            notificationCenter = get(),
             keyguardLocked = {
                 val km = appContext.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
                 km.isKeyguardLocked
@@ -232,6 +240,32 @@ val appModule = module {
                         }
                     }.getOrDefault(false)
                 } ?: false
+            },
+            // 与 MaaCompositionService 启动前检查同口径，免得倒计时走完才被拒
+            remoteAccessBlocker = {
+                var access = RemoteAccessCoordinator.refresh()
+                val backend = access.configuredBackend
+                // 冷启动时 Root shell 还在异步申请，快照会误报未授权；和 useRemoteService 一样先申请一次
+                if (access.isAvailable(backend) && !access.isGranted(backend)) {
+                    RemoteAccessCoordinator.request(backend)
+                    access = RemoteAccessCoordinator.refresh()
+                }
+                when {
+                    !access.isAvailable(backend) ->
+                        BackendBlock(uiTextOf(R.string.runlog_backend_unavailable, backend.display))
+
+                    !access.isGranted(backend) ->
+                        BackendBlock(uiTextOf(R.string.runlog_backend_not_granted, backend.display))
+
+                    // 先连上，否则拉起失败会被报成锁屏或拉起界面失败
+                    else -> RemoteServiceManager.awaitConnected()?.let {
+                        Timber.w(it, "launch: elevated service connect failed")
+                        BackendBlock(
+                            reason = uiTextOf(R.string.runlog_backend_connect_failed, backend.display),
+                            detail = RemoteServiceManager.shortCause(it),
+                        )
+                    }
+                }
             },
         )
     }

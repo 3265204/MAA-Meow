@@ -24,6 +24,9 @@ interface RunTelemetry {
 
     /** 定时或外部触发的一次启动收尾，成功与否都调；哪些结果算故障由实现筛 */
     fun onLaunchFinished(outcome: LaunchOutcome)
+
+    /** 发出 Shizuku 未运行提醒时调 */
+    fun onShizukuDown(afterBoot: Boolean, enabledSchedules: Int)
 }
 
 data class LaunchOutcome(

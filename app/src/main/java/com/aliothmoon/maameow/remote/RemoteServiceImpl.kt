@@ -28,6 +28,7 @@ import com.aliothmoon.maameow.remote.internal.ProcessLiveness
 import com.aliothmoon.maameow.remote.internal.RemoteUtils
 import com.aliothmoon.maameow.remote.internal.ScreenManager
 import com.aliothmoon.maameow.remote.internal.StaleFrameGuard
+import com.aliothmoon.maameow.remote.internal.SystemLogDump
 import com.aliothmoon.maameow.remote.internal.UserDirProbe
 import com.aliothmoon.maameow.remote.internal.VirtualDisplayManager
 import com.aliothmoon.maameow.remote.internal.WakeUnlockController
@@ -422,6 +423,7 @@ class RemoteServiceImpl : RemoteService.Stub() {
         return ok
     }
 
+    // 只认游戏主进程：probe 会把常驻的 包名:pushcore 这类子进程算成活着，游戏崩了也判不出
     override fun isAppAlive(packageName: String): Int = when (ProcessLiveness.pidof(packageName)) {
         ProcessLiveness.ALIVE -> AppAliveStatus.ALIVE
         ProcessLiveness.DEAD -> AppAliveStatus.DEAD
@@ -486,6 +488,12 @@ class RemoteServiceImpl : RemoteService.Stub() {
             Ln.w("$TAG: isPackageInstalled: $packageName not found", e)
             false
         }
+    }
+
+    override fun dumpSystemLog(sinceMs: Long, untilMs: Long, pid: Int, processPrefix: String?): String {
+        // 空前缀行行命中，会把整份系统日志带出设备
+        if (processPrefix.isNullOrEmpty()) return "# missing process prefix"
+        return SystemLogDump.dump(sinceMs, untilMs, pid, processPrefix)
     }
 
     override fun isSmartResolutionEnabled(): Boolean {

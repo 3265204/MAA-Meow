@@ -120,4 +120,7 @@ interface RemoteService {
     byte[] captureFrameJpeg(int quality) = 51;
 
     boolean isSmartResolutionEnabled() = 52;
+
+    // 替被杀的上一个提权进程翻系统日志
+    String dumpSystemLog(long sinceMs, long untilMs, int pid, String processPrefix) = 53;
 }

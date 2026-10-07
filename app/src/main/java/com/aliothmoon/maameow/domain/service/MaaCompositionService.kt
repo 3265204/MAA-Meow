@@ -1,6 +1,7 @@
 package com.aliothmoon.maameow.domain.service
 
 import android.content.Context
+import android.os.RemoteException
 import com.alibaba.fastjson2.JSON
 import com.aliothmoon.maameow.MaaCoreCallback
 import com.aliothmoon.maameow.MaaCoreService
@@ -44,6 +45,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -140,9 +142,10 @@ class MaaCompositionService(
         // startForeground 契约未履行直接杀进程（RemoteServiceException）。
         // 服务自身观察状态流，startForeground 后对 IDLE/ERROR 自行 stopSelf
         if (state != MaaExecutionState.STARTING) {
-            // 自然完成走回调直接置 IDLE，不经过 finishStop，统一在这里撤掉计时
+            // 自然完成走回调直接置 IDLE，不经过 finishStop，统一在这里撤掉计时和后台监视
             if (state == MaaExecutionState.IDLE || state == MaaExecutionState.ERROR) {
                 runDeadlineGuard.disarm()
+                stopBackgroundMonitors()
             }
             _state.value = state
             return
@@ -233,7 +236,6 @@ class MaaCompositionService(
         scope.launch {
             unifiedStateDispatcher.serviceDiedEvent.collect {
                 telemetry.onServiceDied(_state.value)
-                stopBackgroundMonitors()
                 setRunState(MaaExecutionState.ERROR)
                 sessionLogger.completeSessionAndWait(
                     "SERVICE_DIED",
@@ -249,18 +251,25 @@ class MaaCompositionService(
                 Timber.w("App watchdog detected app died: %s", packageName)
                 sessionLogger.appendAndWait(
                     context.getString(R.string.runlog_game_process_gone, packageName),
-                    LogLevel.WARNING
+                    LogLevel.ERROR
                 )
+                // 游戏没了剩下的任务链也是白跑，整轮中止
+                if (_state.value == MaaExecutionState.RUNNING) {
+                    notificationCenter.notifySubTaskFailure(
+                        context.getString(R.string.notification_game_gone_aborted),
+                        sendExternal = true,
+                    )
+                    requestStopFromCallback()
+                }
             }
         }
 
         scope.launch {
             appWatchdog.displayDriftEvent.collect { packageName ->
                 Timber.w("App watchdog detected display drift: %s", packageName)
-                sessionLogger.appendAndWait(
-                    context.getString(R.string.runlog_game_left_virtual_display, packageName),
-                    LogLevel.WARNING
-                )
+                val message = context.getString(R.string.runlog_game_left_virtual_display, packageName)
+                sessionLogger.appendAndWait(message, LogLevel.WARNING)
+                notificationCenter.notifySubTaskFailure(message)
             }
         }
     }
@@ -595,15 +604,15 @@ class MaaCompositionService(
                 StartResult.StartError
             )
         }
-        // 先于 RUNNING 计时，秒完的回调置 IDLE 时才能撤掉
+        // 计时与后台监视都先于 RUNNING 起，秒完的回调置 IDLE 时才能撤掉
         if (limitRunDuration && appSettings.runDurationLimitEnabled.value) {
             val limitMinutes = appSettings.runDurationLimitMinutes.value
             runDeadlineGuard.arm(limitMinutes) { stopByRunDurationLimit(limitMinutes) }
         }
-        setRunState(MaaExecutionState.RUNNING)
         if (mode == RunMode.BACKGROUND) {
             startBackgroundMonitors()
         }
+        setRunState(MaaExecutionState.RUNNING)
         sessionLogger.appendAndWait(successMessage, LogLevel.SUCCESS)
         return StartResult.Success(maa.GetVersion())
     }
@@ -801,28 +810,39 @@ class MaaCompositionService(
         sessionLogger.appendAndWait(context.getString(R.string.runlog_task_stopping), LogLevel.INFO)
 
         return withContext(Dispatchers.IO) {
-            useRemoteService { service ->
-                val maa = service.maaCoreService
-                if (!maa.Running()) {
-                    return@useRemoteService finishStop(StopResult.Success)
-                }
+            try {
+                useRemoteService { service ->
+                    val maa = service.maaCoreService
+                    if (!maa.Running()) {
+                        return@useRemoteService finishStop(StopResult.Success)
+                    }
 
-                if (!maa.Stop()) {
-                    return@useRemoteService finishStop(StopResult.Failed)
-                }
+                    if (!maa.Stop()) {
+                        return@useRemoteService finishStop(StopResult.Failed)
+                    }
 
-                // 轮询等待 Core 真正停止，60 秒超时
-                var elapsed = 0
-                while (maa.Running() && elapsed < 60_000) {
-                    delay(100)
-                    elapsed += 100
-                }
+                    // 轮询等待 Core 真正停止，60 秒超时
+                    var elapsed = 0
+                    while (maa.Running() && elapsed < 60_000) {
+                        delay(100)
+                        elapsed += 100
+                    }
 
-                if (maa.Running()) {
-                    finishStop(StopResult.Failed)
-                } else {
-                    finishStop(StopResult.Success)
+                    if (maa.Running()) {
+                        finishStop(StopResult.Failed)
+                    } else {
+                        finishStop(StopResult.Success)
+                    }
                 }
+            } catch (e: RemoteException) {
+                // 进程已死，Core 随之没了；不收尾会卡在 STOPPING
+                Timber.w(e, "performStop: elevated service gone")
+                finishStop(StopResult.Success)
+            } catch (e: Exception) {
+                // 真取消照抛；等连接超时、未授权、连接出错时 Core 停没停不确定
+                if (e is CancellationException && e !is TimeoutCancellationException) throw e
+                Timber.w(e, "performStop: remote service unavailable")
+                finishStop(StopResult.Failed)
             }
         }
     }
@@ -839,7 +859,6 @@ class MaaCompositionService(
     }
 
     private fun finishStop(result: StopResult): StopResult {
-        stopBackgroundMonitors()
         setRunState(MaaExecutionState.IDLE)
         val status = if (result is StopResult.Success) "STOPPED" else "STOP_FAILED"
         sessionLogger.append(
@@ -847,7 +866,7 @@ class MaaCompositionService(
             if (result is StopResult.Success) LogLevel.INFO else LogLevel.ERROR
         )
         sessionLogger.endSession(status)
-        notificationCenter.notifyTaskStopped()
+        notificationCenter.notifyTaskStopped(lastStopOrigin)
         return result
     }
 
@@ -858,7 +877,12 @@ class MaaCompositionService(
             withContext(Dispatchers.IO) {
                 val service = RemoteServiceManager.getInstanceOrNull()
                     ?: return@withContext
-                service.stopVirtualDisplay()
+                try {
+                    service.stopVirtualDisplay()
+                } catch (e: RemoteException) {
+                    // 进程已死，虚拟屏随之销毁
+                    Timber.w(e, "stopVirtualDisplay: elevated service gone")
+                }
             }
         } finally {
             withContext(NonCancellable) {

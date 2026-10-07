@@ -76,7 +76,6 @@ class BackgroundTaskViewModel(
 ) : ViewModel() {
 
     val launchSession: StateFlow<LaunchSession> = launchPipeline.session
-    val launchEffects = launchPipeline.effects
     val countdownState: StateFlow<CountdownState> = launchPipeline.session
         .map { it.toCountdownState() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, CountdownState.Idle)

@@ -19,6 +19,7 @@ import com.aliothmoon.maameow.manager.RemoteServiceManager
 import com.aliothmoon.maameow.overlay.OverlayController
 import com.aliothmoon.maameow.schedule.data.ScheduleStrategyRepository
 import com.aliothmoon.maameow.schedule.service.ScheduleAlarmManager
+import com.aliothmoon.maameow.schedule.service.ShizukuDownMonitor
 import com.aliothmoon.maameow.telemetry.TelemetryController
 import com.aliothmoon.maameow.utils.CrashHandler
 import com.aliothmoon.maameow.utils.NightModeBootstrap
@@ -95,6 +96,7 @@ class MaaApplication : Application() {
         depotRepository.start()
         operBoxRepository.start()
         cleanCachedUpdateApks()
+        get<ShizukuDownMonitor>().start(applicationScope)
         applicationScope.launch {
             crashHandler.cleanOldCrashLogs()
             get<MaaSessionLogger>().cleanupOldLogs()

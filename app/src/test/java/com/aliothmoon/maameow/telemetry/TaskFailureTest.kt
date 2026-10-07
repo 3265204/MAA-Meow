@@ -213,6 +213,46 @@ class TaskFailureTest {
         assertEquals("启动异常：boom", event.extras?.get("launch.message"))
         assertEquals(1_500L, event.extras?.get("launch.delay_ms"))
         assertEquals(LAUNCH_FAILURE_TRANSACTION, event.transaction)
+        assertEquals(SentryLevel.ERROR, event.level)
+    }
+
+    @Test
+    fun `锁屏跳过不论文案都归一组，记为警告，原因留在标签里`() {
+        fun skipped(reason: String) = LaunchFailure(
+            result = "skipped_locked",
+            launchReason = reason,
+            message = null,
+            delayMs = 0,
+            logFile = "schedule/trigger_20261002_110000_000.log",
+        ).toSentryEvent()
+
+        val pinRequired = skipped("Skipped: a device lock password is set")
+        val locked = skipped("Device is locked")
+
+        assertEquals(pinRequired.fingerprints, locked.fingerprints)
+        assertEquals(listOf("maameow-launch-failure", "skipped_locked"), locked.fingerprints)
+        assertEquals("Maa launch skipped: skipped_locked", locked.message?.formatted)
+        assertEquals(SentryLevel.WARNING, locked.level)
+        assertEquals("Device is locked", locked.tags?.get("launch.reason"))
+    }
+
+    @Test
+    fun `Shizuku 未运行按开机后没起与中途停了分组，记为警告`() {
+        val event = ShizukuDown(
+            afterBoot = false,
+            enabledSchedules = 3,
+            tags = mapOf("shizuku.binder" to "dead"),
+            extras = mapOf("shizuku.dead_ago_s" to 60L),
+        ).toSentryEvent()
+
+        assertEquals("Shizuku not running with schedules enabled (stopped)", event.message?.formatted)
+        assertEquals(listOf("maameow-shizuku-down", "stopped"), event.fingerprints)
+        assertEquals(SentryLevel.WARNING, event.level)
+        assertEquals("dead", event.tags?.get("shizuku.binder"))
+        assertEquals("stopped", event.tags?.get("shizuku.down"))
+        assertEquals(3, event.extras?.get("schedules.enabled"))
+        assertEquals(60L, event.extras?.get("shizuku.dead_ago_s"))
+        assertEquals(SHIZUKU_DOWN_TRANSACTION, event.transaction)
     }
 
     private fun evidenceExtras(evidence: Evidence): Map<String, Any?> =
