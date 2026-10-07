@@ -213,6 +213,27 @@ class TaskFailureTest {
         assertEquals("启动异常：boom", event.extras?.get("launch.message"))
         assertEquals(1_500L, event.extras?.get("launch.delay_ms"))
         assertEquals(LAUNCH_FAILURE_TRANSACTION, event.transaction)
+        assertEquals(SentryLevel.ERROR, event.level)
+    }
+
+    @Test
+    fun `锁屏跳过不论文案都归一组，记为警告，原因留在标签里`() {
+        fun skipped(reason: String) = LaunchFailure(
+            result = "skipped_locked",
+            launchReason = reason,
+            message = null,
+            delayMs = 0,
+            logFile = "schedule/trigger_20261002_110000_000.log",
+        ).toSentryEvent()
+
+        val pinRequired = skipped("Skipped: a device lock password is set")
+        val locked = skipped("Device is locked")
+
+        assertEquals(pinRequired.fingerprints, locked.fingerprints)
+        assertEquals(listOf("maameow-launch-failure", "skipped_locked"), locked.fingerprints)
+        assertEquals("Maa launch skipped: skipped_locked", locked.message?.formatted)
+        assertEquals(SentryLevel.WARNING, locked.level)
+        assertEquals("Device is locked", locked.tags?.get("launch.reason"))
     }
 
     @Test

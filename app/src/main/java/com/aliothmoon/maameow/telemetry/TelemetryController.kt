@@ -1,5 +1,6 @@
 package com.aliothmoon.maameow.telemetry
 
+import android.app.KeyguardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -186,6 +187,7 @@ class TelemetryController(
         // 不动追踪状态：这时任务还没开跑，没有哪一轮可收
         // 后端多半是根因
         val shizuku = RemoteAccessCoordinator.configuredBackend() == RemoteBackend.SHIZUKU
+        val locked = outcome.result == ExecutionResult.SKIPPED_LOCKED
         guarded {
             if (!active) return@guarded
             reporter.report(
@@ -196,12 +198,19 @@ class TelemetryController(
                     delayMs = outcome.delayMs,
                     logFile = outcome.logFile,
                     tags = mapOf("run_mode" to outcome.runMode.lowercase()) +
-                            (if (shizuku) TelemetryShizuku.tags(context) else emptyMap()),
+                            (if (shizuku) TelemetryShizuku.tags(context) else emptyMap()) +
+                            (if (locked) unlockTags() else emptyMap()),
                     extras = if (shizuku) TelemetryShizuku.extras() else emptyMap(),
                     withBootLogs = outcome.result == ExecutionResult.FAILED_START,
                 )
             )
         }
+    }
+
+    private fun unlockTags(): Map<String, String> = buildMap {
+        put("unlock.type", settings.wakeUnlockType.value)
+        runCatching { context.getSystemService(KeyguardManager::class.java).isDeviceSecure }
+            .onSuccess { put("keyguard.secure", it.toString()) }
     }
 
     override fun onShizukuDown(afterBoot: Boolean, enabledSchedules: Int) {

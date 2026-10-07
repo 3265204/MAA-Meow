@@ -216,14 +216,25 @@ internal data class LaunchFailure(
 
     override val logAttributes: Map<String, String> get() = mapOf("launch.result" to result)
 
+    /** 跳过多在预期内：不按文案拆组，降为警告 */
+    private val skipped: Boolean get() = result.startsWith(SKIPPED_PREFIX)
+
     override fun toSentryEvent(): SentryEvent = SentryEvent().also { event ->
-        event.level = SentryLevel.ERROR
+        event.level = if (skipped) SentryLevel.WARNING else SentryLevel.ERROR
         event.logger = RUN_LOGGER
         event.transaction = LAUNCH_FAILURE_TRANSACTION
         event.message = Message().apply {
-            formatted = "Maa launch failed: $result" + (launchReason?.let { " ($it)" } ?: "")
+            formatted = if (skipped) {
+                "Maa launch skipped: $result"
+            } else {
+                "Maa launch failed: $result" + (launchReason?.let { " ($it)" } ?: "")
+            }
         }
-        event.fingerprints = listOf(LAUNCH_FAILURE_FINGERPRINT, result, launchReason.orEmpty())
+        event.fingerprints = if (skipped) {
+            listOf(LAUNCH_FAILURE_FINGERPRINT, result)
+        } else {
+            listOf(LAUNCH_FAILURE_FINGERPRINT, result, launchReason.orEmpty())
+        }
         event.putTags(
             tags + mapOf("launch.result" to result, "launch.reason" to launchReason.orEmpty(), "result" to "failure")
         )
@@ -321,6 +332,7 @@ private const val TASK_FAILURE_FINGERPRINT = "maameow-task-failure"
 private const val START_FAILURE_FINGERPRINT = "maameow-start-failure"
 private const val SERVICE_DEATH_FINGERPRINT = "maameow-service-died"
 private const val LAUNCH_FAILURE_FINGERPRINT = "maameow-launch-failure"
+private const val SKIPPED_PREFIX = "skipped_"
 private const val SHIZUKU_DOWN_FINGERPRINT = "maameow-shizuku-down"
 
 /** 任务链没报过子任务错误就失败时的占位，与 MaaFwApp 同名 */
