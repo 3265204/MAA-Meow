@@ -47,6 +47,7 @@ internal fun scheduleExecutionResultLabel(result: ExecutionResult): String = whe
     ExecutionResult.FAILED_UI_LAUNCH -> stringResource(R.string.schedule_result_failed_ui_launch)
     ExecutionResult.SKIPPED_BUSY -> stringResource(R.string.schedule_result_skipped_busy)
     ExecutionResult.SKIPPED_LOCKED -> stringResource(R.string.schedule_result_skipped_locked)
+    ExecutionResult.SKIPPED_BLACKLIST -> stringResource(R.string.schedule_result_skipped_blacklist)
     ExecutionResult.CANCELLED -> stringResource(R.string.schedule_result_cancelled)
 }
 

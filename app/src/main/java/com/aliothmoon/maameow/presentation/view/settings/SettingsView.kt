@@ -1,7 +1,5 @@
 package com.aliothmoon.maameow.presentation.view.settings
 
-import android.content.Context
-import android.content.Intent
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -130,6 +128,7 @@ import com.aliothmoon.maameow.presentation.viewmodel.SettingsViewModel
 import com.aliothmoon.maameow.theme.LocalReduceMotion
 import com.aliothmoon.maameow.theme.MaaAnimatedVisibility
 import com.aliothmoon.maameow.theme.MaaDesignTokens
+import com.aliothmoon.maameow.utils.LauncherApps
 import com.aliothmoon.maameow.utils.Misc
 import com.aliothmoon.maameow.utils.UiScale
 import com.aliothmoon.maameow.utils.i18n.LocaleBootstrap.resolveSelectedLanguage
@@ -284,7 +283,7 @@ fun SettingsView(
     var showShizukuAppPicker by remember { mutableStateOf(false) }
     var shizukuAppPickerLoadKey by remember { mutableIntStateOf(0) }
     var shizukuAppSearch by remember { mutableStateOf("") }
-    var shizukuAppOptions by remember { mutableStateOf<List<ShizukuLaunchAppOption>?>(null) }
+    var shizukuAppOptions by remember { mutableStateOf<List<LauncherApps.App>?>(null) }
     var shizukuAppLoadFailed by remember { mutableStateOf(false) }
 
     LaunchedEffect(showShizukuAppPicker, shizukuAppPickerLoadKey) {
@@ -294,7 +293,7 @@ fun SettingsView(
         shizukuAppOptions = null
         shizukuAppOptions = try {
             withContext(Dispatchers.IO) {
-                loadShizukuLaunchApps(context.applicationContext)
+                LauncherApps.load(context.applicationContext)
             }
         } catch (e: CancellationException) {
             throw e
@@ -1880,26 +1879,3 @@ private fun CoreDataLocation.labelRes(): Int = when (this) {
     CoreDataLocation.LOCAL_TMP -> R.string.settings_core_data_location_local_tmp
 }
 
-private data class ShizukuLaunchAppOption(
-    val label: String,
-    val packageName: String
-)
-
-private fun loadShizukuLaunchApps(context: Context): List<ShizukuLaunchAppOption> {
-    val packageManager = context.packageManager
-    val launcherIntent = Intent(Intent.ACTION_MAIN).apply {
-        addCategory(Intent.CATEGORY_LAUNCHER)
-    }
-
-    // 应用列表查询较慢，调用方应在 IO 线程执行。
-    return packageManager.queryIntentActivities(launcherIntent, 0)
-        .mapNotNull { resolveInfo ->
-            val packageName = resolveInfo.activityInfo?.packageName ?: return@mapNotNull null
-            val label = resolveInfo.loadLabel(packageManager).toString()
-                .takeIf { it.isNotBlank() }
-                ?: packageName
-            ShizukuLaunchAppOption(label = label, packageName = packageName)
-        }
-        .distinctBy { it.packageName }
-        .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.label })
-}

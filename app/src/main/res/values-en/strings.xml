@@ -35,6 +35,7 @@
     <string name="search_keywords_resolution">resolution virtual display 1080 720 quality</string>
     <string name="search_keywords_pip">picture in picture pip floating window</string>
     <string name="search_keywords_wake_unlock">lock screen unlock wake password pin gesture schedule</string>
+    <string name="search_keywords_app_blacklist">blacklist block skip foreground game interrupt schedule</string>
     <string name="search_keywords_mute">mute sound audio volume</string>
     <string name="search_keywords_run_duration">duration time limit timeout runtime</string>
     <string name="search_keywords_screen_off">screen off black display lock battery</string>
@@ -1787,6 +1788,10 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="schedule_trigger_log_title">Trigger log</string>
     <string name="schedule_wake_unlock_title">Wake &amp; Unlock</string>
     <string name="schedule_wake_unlock_desc">When a scheduled task fires while the device is locked, it unlocks using the method below. Manually started tasks are not affected.</string>
+    <string name="schedule_app_blacklist_title">App Blacklist</string>
+    <string name="schedule_app_blacklist_desc">Background mode only. If a checked app is in use when a schedule fires, that run is skipped and you are notified</string>
+    <string name="schedule_app_blacklist_foreground_inactive">Run mode is foreground, so the blacklist does nothing</string>
+    <string name="schedule_app_blacklist_selected">Selected (%1$d)</string>
     <string name="schedule_create_strategy">New schedule</string>
     <string name="schedule_empty_state">No schedules yet</string>
     <string name="schedule_empty_hint_add">Tap the button in the upper-right corner to add one</string>
@@ -1833,6 +1838,11 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="schedule_force_start_tip">Stop the current task, restart the game, and start the new tasks</string>
     <string name="schedule_auto_screen_saver">Enable screen saver while running</string>
     <string name="schedule_auto_screen_saver_tip">Background mode only. Enables a dark screen saver at minimum brightness before the countdown starts, and turns it off when the task ends. It is skipped if you are already using the device (screen on and unlocked) at trigger time</string>
+    <string name="schedule_silent_start">Silent start</string>
+    <string name="schedule_silent_start_tip">Background mode only. If you are using the phone (screen on and unlocked) at trigger time, no window pops up and the countdown moves to the notification; when the device is idle the window still opens. MaaMeow cannot keep the screen on while it is not in the foreground, so an auto-lock mid-run will interrupt the task</string>
+    <string name="schedule_silent_start_risk_title">Enable silent start?</string>
+    <string name="schedule_silent_start_risk_body">If you are using the phone (screen on and unlocked) when this schedule fires, MaaMeow will not open its window. The countdown only shows in the notification, where you can cancel or start right away. When the device is idle the window still opens as usual\n\nBefore enabling, note:\n• MaaMeow can only keep the screen on while it is in the foreground. If the phone auto-locks mid-run, the lock screen takes over the background virtual display and the task stops or misrecognizes\n• The game runs alongside the app you are using, which may cause lag, heat and extra battery drain\n• There is no popup. The countdown is only in the notification shade and is easy to miss, and with notifications disabled you cannot cancel it\n\nConsider a longer auto-lock timeout. If you need to put the phone down mid-run, open MaaMeow to keep the screen on</string>
+    <string name="schedule_silent_start_risk_confirm">Got it, enable</string>
     <string name="schedule_auto_sleep_after_task">Auto sleep after task</string>
     <string name="schedule_auto_sleep_tip">Automatically turn off the screen after the scheduled task completes to save battery</string>
     <string name="schedule_skip_auto_sleep_if_awake">Skip if screen was already on</string>
@@ -1919,6 +1929,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="schedule_result_failed_ui_launch">UI launch failed</string>
     <string name="schedule_result_skipped_busy">System busy</string>
     <string name="schedule_result_skipped_locked">Skipped while locked</string>
+    <string name="schedule_result_skipped_blacklist">Skipped by blacklist</string>
     <string name="schedule_result_cancelled">Cancelled</string>
     <string name="schedule_interval_every_days_hours">Every %1$d day(s) %2$d hour(s)</string>
     <string name="schedule_interval_every_days">Every %1$d day(s)</string>
@@ -1948,6 +1959,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="notification_schedule_title">Scheduled Task</string>
     <string name="notification_schedule_skipped">Scheduled task skipped</string>
     <string name="notification_schedule_failed">Scheduled task failed to start</string>
+    <string name="notification_schedule_silent_countdown">\"%1$s\" will start silently in the background. Cancel or start now here</string>
     <string name="notification_schedule_preparing">Preparing to launch…</string>
     <string name="notification_schedule_device_locked">Device is locked</string>
     <string name="notification_schedule_pin_required">Skipped: a device lock password is set. Configure a PIN or record an unlock gesture in "Schedule → Wake &amp; Unlock", or use "Tasks → Options → Screen Off" instead of the system lock screen</string>
@@ -1960,6 +1972,9 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <!-- i18n: schedule trigger journal (pipeline) -->
     <string name="schedule_log_received">Launch request received: %1$s</string>
     <string name="schedule_log_skipped_busy">Another scheduled launch is already in progress</string>
+    <string name="schedule_log_silent_start">Phone in use; starting silently with the countdown in the notification instead of opening the app</string>
+    <string name="schedule_log_blacklist_hit">Foreground app \"%1$s\" is blacklisted; skipped</string>
+    <string name="schedule_log_blacklist_unknown">Could not detect the foreground app; blacklist not applied</string>
     <string name="schedule_log_task_running_busy">A task is already running</string>
     <string name="schedule_log_backend_connecting">Connecting to the service…</string>
     <string name="schedule_log_backend_connect_cause">Service failed to start: %1$s</string>

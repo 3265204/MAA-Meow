@@ -123,4 +123,7 @@ interface RemoteService {
 
     // 替被杀的上一个提权进程翻系统日志
     String dumpSystemLog(long sinceMs, long untilMs, int pid, String processPrefix) = 53;
+
+    // displayId 上顶层任务的包名，判不出返回 null
+    String getTopPackage(int displayId) = 54;
 }

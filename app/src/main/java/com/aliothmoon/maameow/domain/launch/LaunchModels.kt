@@ -18,6 +18,8 @@ data class LaunchRequest(
     val forceStart: Boolean = false,
     /** 运行期间屏保；仅后台且待机接管时生效 */
     val autoScreenSaver: Boolean = false,
+    /** 在用手机时不拉界面，改通知倒计时；仅后台定时 */
+    val silentStartWhenInUse: Boolean = false,
     val autoSleepAfterTask: Boolean = false,
     /** 启动时已亮屏未锁屏则不熄屏 */
     val skipAutoSleepIfAwake: Boolean = false,
@@ -39,11 +41,7 @@ sealed interface LaunchSession {
     data class InFlight(
         val request: LaunchRequest,
         val phase: Phase,
-        /**
-         * 是否导航/展示倒计时 UI
-         * 前台无倒计时为 false；后台 Dialog 倒计时为 true
-         */
-        val presentUi: Boolean = true,
+        val presentation: LaunchPresentation = LaunchPresentation.DIALOG,
     ) : LaunchSession
 
     sealed interface Phase {
@@ -52,6 +50,17 @@ sealed interface LaunchSession {
         data object Preparing : Phase
         data object Starting : Phase
     }
+}
+
+enum class LaunchPresentation {
+    /** 前台模式，无倒计时 */
+    NONE,
+
+    /** 后台，界面里弹 Dialog 倒计时 */
+    DIALOG,
+
+    /** 后台静默启动，不拉界面，定时服务的通知里倒计时 */
+    NOTIFICATION,
 }
 
 sealed interface LaunchUserEvent {

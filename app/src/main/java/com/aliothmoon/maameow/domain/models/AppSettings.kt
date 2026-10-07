@@ -212,6 +212,10 @@ data class AppSettings(
     @PrefKey(default = "")
     val wakeCredential: String = "",
 
+    /** 定时黑名单，包名逗号分隔 */
+    @PrefKey(default = "")
+    val scheduleAppBlacklist: String = "",
+
     @PrefKey(default = "true")
     val reportToPenguin: String = "true",
 

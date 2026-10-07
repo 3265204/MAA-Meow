@@ -258,6 +258,7 @@
     <string name="search_keywords_resolution">分辨率 虚拟屏 虚拟显示器 1080 720 画质</string>
     <string name="search_keywords_pip">画中画 小窗 悬浮 PiP</string>
     <string name="search_keywords_wake_unlock">锁屏 解锁 唤醒 密码 PIN 手势 定时</string>
+    <string name="search_keywords_app_blacklist">黑名单 屏蔽 跳过 前台 游戏 打扰 定时</string>
     <string name="search_keywords_mute">静音 声音 音量</string>
     <string name="search_keywords_run_duration">时长 限时 超时 运行时间</string>
     <string name="search_keywords_screen_off">熄屏 息屏 黑屏 关屏 锁屏 省电</string>
@@ -1843,6 +1844,10 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="schedule_trigger_log_title">触发日志</string>
     <string name="schedule_wake_unlock_title">唤醒解锁</string>
     <string name="schedule_wake_unlock_desc">定时任务触发时若设备已锁屏，会按下面的方式自动解锁；手动启动的任务不受影响</string>
+    <string name="schedule_app_blacklist_title">应用黑名单</string>
+    <string name="schedule_app_blacklist_desc">仅后台模式生效。定时触发时正在使用勾选的应用，则跳过本次执行并通知</string>
+    <string name="schedule_app_blacklist_foreground_inactive">当前运行模式为前台，黑名单不生效</string>
+    <string name="schedule_app_blacklist_selected">已选（%1$d）</string>
     <string name="schedule_create_strategy">新建策略</string>
     <string name="schedule_empty_state">暂无定时策略</string>
     <string name="schedule_empty_hint_add">点击右上角添加</string>
@@ -1889,6 +1894,11 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="schedule_force_start_tip">强制启动任务，会中断正在运行的游戏和任务</string>
     <string name="schedule_auto_screen_saver">运行期间启用屏保</string>
     <string name="schedule_auto_screen_saver_tip">仅后台模式生效。倒计时开始前就启用屏保遮住画面并把亮度压到最低，任务结束后自动关闭。触发时你正在用手机（已亮屏且已解锁）则不启用</string>
+    <string name="schedule_silent_start">静默启动</string>
+    <string name="schedule_silent_start_tip">仅后台模式生效。触发时你正在用手机（已亮屏且已解锁）则不弹出界面，改在通知栏倒计时；设备待机时仍照常拉起界面。MaaMeow 不在前台时无法保持亮屏，运行中自动锁屏会中断任务</string>
+    <string name="schedule_silent_start_risk_title">开启静默启动？</string>
+    <string name="schedule_silent_start_risk_body">触发时若你正在用手机（已亮屏且已解锁），本策略不再弹出 MaaMeow 界面，只在通知栏倒计时，可在通知里取消或立即开始。设备待机时仍照常拉起界面\n\n开启前请了解：\n• 只有 MaaMeow 在前台时才能保持屏幕常亮。任务运行中手机若自动熄屏锁屏，锁屏会占住后台虚拟显示器，任务会中断或识别出错\n• 游戏会和你正在用的应用同时运行，可能卡顿、发热、耗电增加\n• 没有弹窗提醒，倒计时只在通知栏，容易错过；关闭通知权限后无法在倒计时内取消\n\n建议调长系统自动锁屏时间；中途要放下手机时，打开 MaaMeow 即可保持亮屏</string>
+    <string name="schedule_silent_start_risk_confirm">我已了解，开启</string>
     <string name="schedule_auto_sleep_after_task">任务结束后自动熄屏</string>
     <string name="schedule_auto_sleep_tip">定时任务执行完成后自动熄屏，节省电量</string>
     <string name="schedule_skip_auto_sleep_if_awake">启动时已亮屏则不熄屏</string>
@@ -1975,6 +1985,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="schedule_result_failed_ui_launch">拉起界面失败</string>
     <string name="schedule_result_skipped_busy">系统繁忙</string>
     <string name="schedule_result_skipped_locked">锁屏跳过</string>
+    <string name="schedule_result_skipped_blacklist">黑名单跳过</string>
     <string name="schedule_result_cancelled">已取消</string>
     <string name="schedule_interval_every_days_hours">每 %1$d 天 %2$d 小时</string>
     <string name="schedule_interval_every_days">每 %1$d 天</string>
@@ -2004,6 +2015,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="notification_schedule_title">定时任务</string>
     <string name="notification_schedule_skipped">定时任务已跳过</string>
     <string name="notification_schedule_failed">定时任务未能启动</string>
+    <string name="notification_schedule_silent_countdown">「%1$s」即将在后台静默启动，可在此取消或立即开始</string>
     <string name="notification_schedule_preparing">正在准备拉起界面…</string>
     <string name="notification_schedule_device_locked">设备处于锁屏状态</string>
     <string name="notification_schedule_pin_required">已跳过：设备有锁屏密码。请在「定时 → 唤醒解锁」中配置 PIN 或录制解锁手势，或用「任务 → 快捷选项 → 熄屏挂机」代替系统锁屏</string>
@@ -2016,6 +2028,9 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <!-- i18n: schedule trigger journal (pipeline) -->
     <string name="schedule_log_received">收到启动请求: %1$s</string>
     <string name="schedule_log_skipped_busy">已有定时任务正在处理中</string>
+    <string name="schedule_log_silent_start">正在使用手机，静默启动：不拉起界面，改在通知栏倒计时</string>
+    <string name="schedule_log_blacklist_hit">前台应用「%1$s」在黑名单中，已跳过</string>
+    <string name="schedule_log_blacklist_unknown">无法判断前台应用，黑名单未生效</string>
     <string name="schedule_log_task_running_busy">有任务正在运行</string>
     <string name="schedule_log_backend_connecting">连接服务…</string>
     <string name="schedule_log_backend_connect_cause">服务启动失败原因: %1$s</string>

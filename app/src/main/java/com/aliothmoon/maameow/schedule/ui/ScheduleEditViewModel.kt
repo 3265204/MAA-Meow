@@ -49,6 +49,7 @@ data class ScheduleEditUiState(
     val selectedProfileId: String? = null,
     val forceStart: Boolean = false,
     val autoScreenSaver: Boolean = false,
+    val silentStartWhenInUse: Boolean = false,
     val autoSleepAfterTask: Boolean = false,
     val skipAutoSleepIfAwake: Boolean = false,
     val closeGameAfterTask: Boolean = false,
@@ -92,6 +93,8 @@ class ScheduleEditViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CloseGameEffect.Inactive)
 
+    val runMode: StateFlow<RunMode> = appSettings.runMode
+
     private var strategyId: String? = null
     private var existingStrategy: ScheduleStrategy? = null
     private var loadStarted = false
@@ -128,6 +131,7 @@ class ScheduleEditViewModel(
                         selectedProfileId = strategy.profileId,
                         forceStart = strategy.forceStart,
                         autoScreenSaver = strategy.autoScreenSaver,
+                        silentStartWhenInUse = strategy.silentStartWhenInUse,
                         autoSleepAfterTask = strategy.autoSleepAfterTask,
                         skipAutoSleepIfAwake = strategy.skipAutoSleepIfAwake,
                         closeGameAfterTask = strategy.closeGameAfterTask,
@@ -216,6 +220,10 @@ class ScheduleEditViewModel(
         _state.update { it.copy(autoScreenSaver = value) }
     }
 
+    fun onSilentStartWhenInUseChanged(value: Boolean) {
+        _state.update { it.copy(silentStartWhenInUse = value) }
+    }
+
     fun onAutoSleepAfterTaskChanged(value: Boolean) {
         _state.update { it.copy(autoSleepAfterTask = value) }
     }
@@ -290,6 +298,7 @@ class ScheduleEditViewModel(
                     profileId = current.selectedProfileId,
                     forceStart = current.forceStart,
                     autoScreenSaver = current.autoScreenSaver,
+                    silentStartWhenInUse = current.silentStartWhenInUse,
                     autoSleepAfterTask = current.autoSleepAfterTask,
                     skipAutoSleepIfAwake = current.skipAutoSleepIfAwake,
                     closeGameAfterTask = current.closeGameAfterTask,
@@ -305,6 +314,7 @@ class ScheduleEditViewModel(
                     profileId = current.selectedProfileId,
                     forceStart = current.forceStart,
                     autoScreenSaver = current.autoScreenSaver,
+                    silentStartWhenInUse = current.silentStartWhenInUse,
                     autoSleepAfterTask = current.autoSleepAfterTask,
                     skipAutoSleepIfAwake = current.skipAutoSleepIfAwake,
                     closeGameAfterTask = current.closeGameAfterTask,

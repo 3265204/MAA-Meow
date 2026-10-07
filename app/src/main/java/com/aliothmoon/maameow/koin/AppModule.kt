@@ -3,6 +3,7 @@ package com.aliothmoon.maameow.koin
 import android.app.KeyguardManager
 import android.content.Context
 import android.os.PowerManager
+import android.view.Display
 import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.announcement.AnnouncementManager
 import com.aliothmoon.maameow.data.achievement.AchievementRepository
@@ -130,6 +131,7 @@ import com.aliothmoon.maameow.schedule.service.ScheduleTriggerLogger
 import com.aliothmoon.maameow.schedule.service.ShizukuDownMonitor
 import com.aliothmoon.maameow.telemetry.TelemetryController
 import com.aliothmoon.maameow.utils.CrashHandler
+import com.aliothmoon.maameow.utils.LauncherApps
 import com.aliothmoon.maameow.utils.i18n.uiTextOf
 import com.aliothmoon.maameow.utils.log.LogTreeHolder
 import kotlinx.coroutines.CoroutineScope
@@ -267,6 +269,12 @@ val appModule = module {
                     }
                 }
             },
+            foregroundPackage = {
+                RemoteServiceManager.useRemoteService(timeoutMs = 3_000L) {
+                    it.getTopPackage(Display.DEFAULT_DISPLAY)
+                }
+            },
+            appLabel = { LauncherApps.label(appContext, it) ?: it },
         )
     }
     singleOf(::TaskChainState)
@@ -351,7 +359,13 @@ val appModule = module {
 
     singleOf(::UnifiedStateDispatcher)
     // scope 走构造默认值，singleOf 会试图解析它
-    single { TaskEndRegistry(compositionService = get()) }
+    single {
+        val settings = get<AppSettingsManager>()
+        TaskEndRegistry(
+            compositionService = get(),
+            closeGameOnEnd = { settings.closeAppOnTaskEnd.value },
+        )
+    }
     singleOf(::LogExportService)
     singleOf(::ToolboxExportService)
 
