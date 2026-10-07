@@ -61,7 +61,7 @@ class LaunchPipeline(
     private val screenInteractive: () -> Boolean,
     private val activityLauncher: suspend (LaunchRequest) -> Boolean,
     /** 提权后端用不了的原因，null = 已连上；会申请授权、等连接 */
-    private val remoteAccessBlocker: suspend () -> UiText?,
+    private val remoteAccessBlocker: suspend () -> BackendBlock?,
 ) {
     private val _session = MutableStateFlow<LaunchSession>(LaunchSession.Idle)
     val session: StateFlow<LaunchSession> = _session.asStateFlow()
@@ -116,7 +116,7 @@ class LaunchPipeline(
             if (request.forceStart) {
                 // 后端用不了还抢占，只会把别人停了、自己也起不来
                 remoteAccessBlocker()?.let {
-                    finishWithoutHold(request, ExecutionResult.FAILED_START, it)
+                    finishWithoutHold(request, ExecutionResult.FAILED_START, it.reason)
                     return
                 }
                 preemptInFlight(request)
@@ -161,9 +161,10 @@ class LaunchPipeline(
             // 解锁、拉起界面、跑任务都靠提权进程，后端没起来就别往下走，否则会被报成锁屏或拉起失败
             // 强制启动也得先查，免得把在跑的停了、自己又起不来
             log.append(uiTextOf(R.string.schedule_log_backend_connecting))
-            remoteAccessBlocker()?.let {
+            remoteAccessBlocker()?.let { block ->
+                block.detail?.let { log.append(uiTextOf(R.string.schedule_log_backend_connect_cause, it)) }
                 terminalResult = ExecutionResult.FAILED_START
-                terminalMessage = it
+                terminalMessage = block.reason
                 return
             }
 

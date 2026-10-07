@@ -76,7 +76,7 @@ class LaunchPipelineTest {
     private val uiLaunches = AtomicInteger(0)
 
     @Volatile
-    private var remoteBlocker: UiText? = null
+    private var remoteBlocker: BackendBlock? = null
 
     private val runMode = MutableStateFlow(RunMode.BACKGROUND)
     private val unlockType = MutableStateFlow("swipe")
@@ -315,7 +315,7 @@ class LaunchPipelineTest {
     @Test
     fun remoteUnavailable_failsStartBeforeUnlock() = runBlocking<Unit> {
         val reason = uiTextOf(R.string.runlog_backend_unavailable, "Shizuku")
-        remoteBlocker = reason
+        remoteBlocker = BackendBlock(reason)
         givenWakeGate(interactive = false, keyguard = true, locked = true)
 
         pipeline().execute(scheduleRequest()).join()
@@ -331,11 +331,26 @@ class LaunchPipelineTest {
         }
     }
 
+    // 技术原因只进触发日志，通知里不放英文串
+    @Test
+    fun connectFailure_detailOnlyInTriggerLog() = runBlocking<Unit> {
+        val reason = uiTextOf(R.string.runlog_backend_connect_failed, "Shizuku")
+        remoteBlocker = BackendBlock(reason, detail = "launcher exited early code=1")
+
+        pipeline().execute(scheduleRequest()).join()
+
+        verify { logSession.append(uiTextOf(R.string.schedule_log_backend_connect_cause, "launcher exited early code=1")) }
+        verify { logSession.end(ExecutionResult.FAILED_START, reason) }
+        verify(exactly = 1) {
+            notificationCenter.notifyLaunchNotStarted("Test", ExecutionResult.FAILED_START, reason)
+        }
+    }
+
     // 强制启动若先停在跑的再查后端，后端挂了就两头落空
     @Test
     fun forceStart_remoteUnavailable_keepsRunningTask() = runBlocking<Unit> {
         compositionState.value = MaaExecutionState.RUNNING
-        remoteBlocker = uiTextOf(R.string.runlog_backend_unavailable, "Shizuku")
+        remoteBlocker = BackendBlock(uiTextOf(R.string.runlog_backend_unavailable, "Shizuku"))
 
         pipeline().execute(scheduleRequest(force = true)).join()
 
@@ -352,7 +367,7 @@ class LaunchPipelineTest {
         val first = p.execute(scheduleRequest("a"))
         withTimeout(5_000) { entered.await() }
 
-        remoteBlocker = uiTextOf(R.string.runlog_backend_unavailable, "Shizuku")
+        remoteBlocker = BackendBlock(uiTextOf(R.string.runlog_backend_unavailable, "Shizuku"))
         p.execute(scheduleRequest("b", force = true)).join()
         assertEquals(listOf(ExecutionResult.FAILED_START), recorded.toList())
 

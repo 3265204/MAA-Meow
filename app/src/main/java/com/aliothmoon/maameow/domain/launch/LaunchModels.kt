@@ -1,6 +1,7 @@
 package com.aliothmoon.maameow.domain.launch
 
 import com.aliothmoon.maameow.schedule.model.CountdownState
+import com.aliothmoon.maameow.utils.i18n.UiText
 import java.util.UUID
 
 enum class LaunchSource {
@@ -28,6 +29,9 @@ data class LaunchRequest(
         const val DEFAULT_COUNTDOWN_SECONDS = 30
     }
 }
+
+/** 提权后端拦下启动：[reason] 进通知与终局文案，[detail] 是技术原因，只进触发日志 */
+data class BackendBlock(val reason: UiText, val detail: String? = null)
 
 sealed interface LaunchSession {
     data object Idle : LaunchSession

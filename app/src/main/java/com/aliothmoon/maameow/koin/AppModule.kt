@@ -59,6 +59,7 @@ import com.aliothmoon.maameow.data.resource.ItemIconLoader
 import com.aliothmoon.maameow.data.resource.OperAvatarLoader
 import com.aliothmoon.maameow.data.resource.ResourceDataManager
 import com.aliothmoon.maameow.data.resource.StageApCostHelper
+import com.aliothmoon.maameow.domain.launch.BackendBlock
 import com.aliothmoon.maameow.domain.launch.CountdownUI
 import com.aliothmoon.maameow.domain.launch.LaunchMutex
 import com.aliothmoon.maameow.domain.launch.LaunchPipeline
@@ -251,18 +252,17 @@ val appModule = module {
                 }
                 when {
                     !access.isAvailable(backend) ->
-                        uiTextOf(R.string.runlog_backend_unavailable, backend.display)
+                        BackendBlock(uiTextOf(R.string.runlog_backend_unavailable, backend.display))
 
                     !access.isGranted(backend) ->
-                        uiTextOf(R.string.runlog_backend_not_granted, backend.display)
+                        BackendBlock(uiTextOf(R.string.runlog_backend_not_granted, backend.display))
 
                     // 先连上，否则拉起失败会被报成锁屏或拉起界面失败
                     else -> RemoteServiceManager.awaitConnected()?.let {
                         Timber.w(it, "launch: elevated service connect failed")
-                        uiTextOf(
-                            R.string.runlog_backend_connect_failed,
-                            backend.display,
-                            RemoteServiceManager.shortCause(it),
+                        BackendBlock(
+                            reason = uiTextOf(R.string.runlog_backend_connect_failed, backend.display),
+                            detail = RemoteServiceManager.shortCause(it),
                         )
                     }
                 }
