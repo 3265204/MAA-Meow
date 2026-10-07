@@ -81,6 +81,7 @@ class MaaCompositionService(
     private val toolboxResultCollector: ToolboxResultCollector,
     private val coreDataPusher: CoreDataPusher,
     private val telemetry: RunTelemetry,
+    private val screenGate: ForegroundScreenGate,
 ) : MaaExecutionStateHolder {
 
     private val _state = MutableStateFlow(MaaExecutionState.IDLE)
@@ -596,6 +597,9 @@ class MaaCompositionService(
             logAppendFailed(t.logName?.resolve(context) ?: t.type.value)
             val slot = t.slot ?: return@forEach
             fallbacks[slot]?.let { appendFallbacks(maa, slot, it) }
+        }
+        if (mode == RunMode.FOREGROUND) {
+            screenGate.awaitClear()
         }
         if (!maa.Start()) {
             return failStart(

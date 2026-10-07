@@ -76,6 +76,7 @@ import com.aliothmoon.maameow.domain.service.CopilotManager
 import com.aliothmoon.maameow.domain.service.CoreDataPusher
 import com.aliothmoon.maameow.domain.service.ExternalNotificationService
 import com.aliothmoon.maameow.domain.service.FightDropsRefresher
+import com.aliothmoon.maameow.domain.service.ForegroundScreenGate
 import com.aliothmoon.maameow.domain.service.FrameSnapshotter
 import com.aliothmoon.maameow.domain.service.GameDataReporter
 import com.aliothmoon.maameow.domain.service.GameFpsReader
@@ -348,6 +349,8 @@ val appModule = module {
     single<GameFpsReader> { RemoteGameFpsReader() }
     single { GameFpsWatcher(reader = get(), sessionLogger = get(), context = androidApplication()) }
     singleOf(::TelemetryController) { bind<RunTelemetry>() }
+    // 调用时才取 OverlayController：它依赖 MaaCompositionService，构造期取会成环
+    single<ForegroundScreenGate> { ForegroundScreenGate { get<OverlayController>().awaitPanelCleared() } }
     singleOf(::MaaCompositionService)
     single<MaaExecutionStateHolder> { get<MaaCompositionService>() }
     single { GameMuteCoordinator(get(), RemoteGameAudioAdapter) }
