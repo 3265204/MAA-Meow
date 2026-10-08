@@ -273,7 +273,8 @@ class CopilotViewModel(
                 lastFilePath = filePath
                 lastJson = fixed.json
 
-                if (files.size > 1 || _state.value.listModeActive) {
+                // 单文件留到循环后先展示再入列表，与神秘代码读取一致
+                if (files.size > 1) {
                     autoAddLoadedCopilotToListIfNeeded(
                         data = fixed.data,
                         filePath = filePath,
@@ -293,13 +294,19 @@ class CopilotViewModel(
                 return@launch
             }
 
-            if (files.size == 1 && !_state.value.listModeActive) {
+            if (files.size == 1) {
                 applyLoadedCopilot(
                     data = lastData!!,
                     json = lastJson,
                     filePath = lastFilePath,
                     copilotId = 0,
                     fromWeb = false
+                )
+                autoAddLoadedCopilotToListIfNeeded(
+                    data = lastData,
+                    filePath = lastFilePath,
+                    copilotId = 0,
+                    source = "local"
                 )
             } else {
                 _state.update {
@@ -1024,6 +1031,10 @@ class CopilotViewModel(
                         base.copy(
                             currentCopilot = data,
                             currentTaskType = inferTaskType(data),
+                            videoUrl = copilotManager.extractVideoUrl(data.doc.details),
+                            operatorSummary = copilotManager.getOperatorSummary(data),
+                            // 列表文件已校正过，清掉上一份的提示
+                            requirementWarnings = emptyList(),
                             copilotId = item.copilotId,
                             canLike = item.copilotId > 0,
                             isDataFromWeb = item.source == "web",
