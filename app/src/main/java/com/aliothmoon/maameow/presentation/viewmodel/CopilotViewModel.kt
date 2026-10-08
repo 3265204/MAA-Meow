@@ -418,11 +418,12 @@ class CopilotViewModel(
             onSuccess = { (id, data, json) ->
                 val fixed = correctRequirements(data, json, id)
                 val filePath = repository.saveCopilotJson(id, fixed.json)
+                // 对齐 WPF：单作业校正后仍用原 id
                 applyLoadedCopilot(
                     data = fixed.data,
                     json = fixed.json,
                     filePath = filePath,
-                    copilotId = fixed.copilotId,
+                    copilotId = id,
                     fromWeb = true
                 )
                 autoAddLoadedCopilotToListIfNeeded(
@@ -598,7 +599,7 @@ class CopilotViewModel(
 
     /**
      * 落盘前统一做一次干员需求与动作字段校正
-     * 改动过的作业不再带原作业 id，免得把改后的跑法算到原作者头上
+     * 改动过的作业返回 id 为 0，自动入列表的条目据此不点赞（WPF is_corrected）
      */
     private fun correctRequirements(
         data: CopilotTaskData,
