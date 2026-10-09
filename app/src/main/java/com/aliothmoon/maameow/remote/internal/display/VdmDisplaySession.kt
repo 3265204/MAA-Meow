@@ -1,8 +1,6 @@
 package com.aliothmoon.maameow.remote.internal.display
 
 import android.hardware.display.VirtualDisplay
-import android.os.SystemClock
-import android.view.Display
 import android.view.Surface
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -14,22 +12,10 @@ internal class VdmDisplaySession internal constructor(
 ) : AutoCloseable {
     private val closed = AtomicBoolean(false)
 
-    /** 候选显示通过结构检查后，再挂载采集 Surface。 */
-    fun attachSurface(surface: Surface) {
+    /** Surface 已在创建交易中挂载；此处只等待显示进入可用状态。 */
+    fun awaitReady() {
         check(!closed.get()) { "Independent display is already closed" }
-        display.setSurface(surface)
-
-        val deadline = SystemClock.elapsedRealtime() + DISPLAY_READY_TIMEOUT_MS
-        do {
-            if (display.display.state == Display.STATE_ON) return
-            SystemClock.sleep(DISPLAY_READY_POLL_MS)
-        } while (SystemClock.elapsedRealtime() < deadline)
-
-        display.setSurface(null)
-        throw IllegalStateException(
-            "VDM display ${display.display.displayId} did not reach STATE_ON " +
-                "(state=${display.display.state})"
-        )
+        VdmDiagnostics.awaitDisplayOn(display.display)
     }
 
     fun detachSurface() {
@@ -46,18 +32,30 @@ internal class VdmDisplaySession internal constructor(
 
         var failure: Throwable? = null
         try {
-            try {
-                display.setSurface(null)
-                display.release()
-            } finally {
-                // 关闭 VirtualDevice 时保持 root 身份，避免再次扩大 Binder 身份切换窗口。
-                virtualDevice.close()
-            }
+            BinderIdentityRunner.onOwnerThread(
+                action = {
+                    BinderIdentityRunner.withShellIdentity {
+                        try {
+                            display.setSurface(null)
+                            display.release()
+                        } finally {
+                            virtualDevice.close()
+                        }
+                    }
+                },
+                onAbandoned = {
+                    if (removeAssociation) CompanionAssociation.remove(address)
+                },
+                onAbandonedFailure = {
+                    if (removeAssociation) CompanionAssociation.remove(address)
+                },
+            )
         } catch (t: Throwable) {
             failure = t
         }
 
-        if (removeAssociation) {
+        // A timed-out owner task still needs the association until its delayed cleanup runs.
+        if (removeAssociation && failure !is OwnerThreadAbandonedException) {
             try {
                 CompanionAssociation.remove(address)
             } catch (cleanupFailure: Throwable) {
@@ -70,10 +68,5 @@ internal class VdmDisplaySession internal constructor(
         }
 
         failure?.let { throw it }
-    }
-
-    private companion object {
-        private const val DISPLAY_READY_TIMEOUT_MS = 1_000L
-        private const val DISPLAY_READY_POLL_MS = 20L
     }
 }

@@ -5,6 +5,7 @@ import android.content.Context
 import android.hardware.display.VirtualDisplay
 import android.hardware.display.VirtualDisplayConfig
 import android.os.IBinder
+import android.view.Surface
 import com.aliothmoon.maameow.third.FakeContext
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.Executor
@@ -54,18 +55,20 @@ internal object AndroidVirtualDeviceApi {
         width: Int,
         height: Int,
         dpi: Int,
+        surface: Surface,
     ): VirtualDisplay {
         val config = VirtualDisplayConfig.Builder(name, width, height, dpi)
+            // 保持拆分前的初始化顺序；显示服务可能在无 Surface 时延后注册 display group。
+            .setSurface(surface)
             .setFlags(
                 VIRTUAL_DISPLAY_FLAG_TRUSTED or
                     VIRTUAL_DISPLAY_FLAG_SUPPORTS_TOUCH or
                     VIRTUAL_DISPLAY_FLAG_OWN_FOCUS or
                     VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED
             )
-            // 候选显示通过所有检查之前，刻意保持 Surface 未挂载。
             .build()
-        val virtualDeviceClass = Class.forName("android.companion.virtual.VirtualDevice")
-        val createDisplay = virtualDeviceClass.getMethod(
+        // 从服务返回对象的运行时类查找，兼容不同系统版本的实现类层级。
+        val createDisplay = device.delegate.javaClass.getMethod(
             "createVirtualDisplay",
             VirtualDisplayConfig::class.java,
             Executor::class.java,
@@ -74,7 +77,7 @@ internal object AndroidVirtualDeviceApi {
         return createDisplay.invokeUnwrapped(
             device.delegate,
             config,
-            Executor(Runnable::run),
+            null,
             null,
         ) as? VirtualDisplay ?: throw IllegalStateException("VDM returned no display")
     }

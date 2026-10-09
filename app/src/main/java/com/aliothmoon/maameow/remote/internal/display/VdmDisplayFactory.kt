@@ -3,13 +3,19 @@ package com.aliothmoon.maameow.remote.internal.display
 import android.hardware.display.VirtualDisplay
 import android.os.Build
 import android.os.Process
+import android.view.Surface
 import androidx.annotation.RequiresApi
-import com.aliothmoon.maameow.third.wrappers.ServiceManager
 
 /** 创建 VDM 独立显示，并协调关联、身份切换和失败清理。 */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 internal object VdmDisplayFactory {
-    fun prepare(name: String, width: Int, height: Int, dpi: Int): VdmDisplaySession {
+    fun create(
+        name: String,
+        width: Int,
+        height: Int,
+        dpi: Int,
+        surface: Surface,
+    ): VdmDisplaySession {
         check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             "VDM requires Android 14"
         }
@@ -19,7 +25,9 @@ internal object VdmDisplayFactory {
 
         val address = CompanionAssociation.address()
         try {
-            val association = CompanionAssociation.ensure(address)
+            val association = VdmDiagnostics.stage("association") {
+                CompanionAssociation.ensure(address)
+            }
             return createForAssociation(
                 address = address,
                 associationId = association.id,
@@ -27,6 +35,7 @@ internal object VdmDisplayFactory {
                 width = width,
                 height = height,
                 dpi = dpi,
+                surface = surface,
             )
         } catch (failure: IdentityRestoreError) {
             // 进程已请求终止，不能在有效身份未知时继续执行 Binder 或 shell 清理。
@@ -51,64 +60,66 @@ internal object VdmDisplayFactory {
         width: Int,
         height: Int,
         dpi: Int,
+        surface: Surface,
     ): VdmDisplaySession {
         val resources = BinderIdentityRunner.onOwnerThread(
             action = {
-                var createdDevice: VirtualDeviceHandle? = null
-                try {
-                    BinderIdentityRunner.withShellIdentity {
-                        val device = AndroidVirtualDeviceApi.createVirtualDevice(associationId)
+                BinderIdentityRunner.withShellIdentity {
+                    var createdDevice: VirtualDeviceHandle? = null
+                    var createdDisplay: VirtualDisplay? = null
+                    try {
+                        val device = VdmDiagnostics.stage("create_device") {
+                            AndroidVirtualDeviceApi.createVirtualDevice(associationId)
+                        }
                         createdDevice = device
-                        val display = AndroidVirtualDeviceApi.createVirtualDisplay(
-                            device = device,
-                            name = name,
-                            width = width,
-                            height = height,
-                            dpi = dpi,
-                        )
+                        val display = VdmDiagnostics.stage("create_display") {
+                            AndroidVirtualDeviceApi.createVirtualDisplay(
+                                device = device,
+                                name = name,
+                                width = width,
+                                height = height,
+                                dpi = dpi,
+                                surface = surface,
+                            )
+                        }
+                        createdDisplay = display
+                        VdmDiagnostics.awaitIndependentGroup(display.display)
                         CreatedDisplay(device, display)
-                    }
-                } catch (failure: IdentityRestoreError) {
-                    throw failure
-                } catch (failure: Throwable) {
-                    createdDevice?.let { device ->
+                    } catch (failure: Throwable) {
                         try {
-                            device.close()
+                            createdDisplay?.let { display ->
+                                display.setSurface(null)
+                                display.release()
+                            }
                         } catch (cleanupFailure: Throwable) {
                             failure.addSuppressed(cleanupFailure)
                         }
+                        createdDevice?.let { device ->
+                            try {
+                                device.close()
+                            } catch (cleanupFailure: Throwable) {
+                                failure.addSuppressed(cleanupFailure)
+                            }
+                        }
+                        throw failure
                     }
-                    throw failure
                 }
             },
             onAbandoned = { abandoned ->
-                releaseCreatedDisplay(abandoned)
+                BinderIdentityRunner.withShellIdentity {
+                    releaseCreatedDisplay(abandoned)
+                }
                 CompanionAssociation.remove(address)
             },
             onAbandonedFailure = {
                 CompanionAssociation.remove(address)
             },
         )
-
-        try {
-            val displayId = resources.display.display.displayId
-            val groupId = ServiceManager.getDisplayManager().getDisplayGroupId(displayId)
-            check(groupId > 0) {
-                "VDM display remained in group $groupId"
-            }
-            return VdmDisplaySession(
-                address = address,
-                virtualDevice = resources.virtualDevice,
-                display = resources.display,
-            )
-        } catch (failure: Throwable) {
-            try {
-                releaseCreatedDisplay(resources)
-            } catch (cleanupFailure: Throwable) {
-                failure.addSuppressed(cleanupFailure)
-            }
-            throw failure
-        }
+        return VdmDisplaySession(
+            address = address,
+            virtualDevice = resources.virtualDevice,
+            display = resources.display,
+        )
     }
 
     private data class CreatedDisplay(

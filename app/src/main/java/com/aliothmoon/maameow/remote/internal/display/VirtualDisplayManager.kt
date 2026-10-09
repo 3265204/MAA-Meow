@@ -212,7 +212,8 @@ object VirtualDisplayManager {
 
     /**
      * 在 Android 14+ 的 VDM 候选显示通过结构及电源状态检查前，保留未挂载 Surface 的
-     * 旧虚拟显示。这样回退时只需挂载 Surface，不需要销毁并重新创建显示。
+     * 旧虚拟显示。VDM 保持拆分前的创建顺序，在创建交易中直接绑定
+     * Surface；若检查失败，再把 Surface 交给保留的旧显示。
      */
     private fun selectDisplay(
         surface: Surface,
@@ -243,42 +244,43 @@ object VirtualDisplayManager {
         }
 
         var independent: VdmDisplaySession? = null
+        val legacyId = legacy.display.displayId
         try {
-            val legacyId = legacy.display.displayId
-            independent = VdmDisplayFactory.prepare(
+            independent = VdmDisplayFactory.create(
                 VD_NAME,
                 cfg.width,
                 cfg.height,
                 cfg.dpi,
+                surface,
             )
-            independent.attachSurface(surface)
+            independent.awaitReady()
 
             // VDM 默认让可信显示使用本地输入法，这与旧 VD 不同；正式采用候选显示前，
             // 恢复为旧路径使用的回退显示输入法策略。
             val independentId = independent.display.display.displayId
             val windowManager = ServiceManager.getWindowManager()
-            windowManager.setDisplayImePolicy(
-                independentId,
-                WindowManager.DISPLAY_IME_POLICY_FALLBACK_DISPLAY,
-            )
-            check(
-                windowManager.getDisplayImePolicy(independentId) ==
-                    WindowManager.DISPLAY_IME_POLICY_FALLBACK_DISPLAY
-            ) {
-                "VDM display kept an incompatible local IME policy"
+            val imePolicy = runCatching {
+                windowManager.setDisplayImePolicy(
+                    independentId,
+                    WindowManager.DISPLAY_IME_POLICY_FALLBACK_DISPLAY,
+                )
+                check(
+                    windowManager.getDisplayImePolicy(independentId) ==
+                        WindowManager.DISPLAY_IME_POLICY_FALLBACK_DISPLAY
+                )
+                "fallback"
+            }.getOrElse { failure ->
+                "warning-${failure.javaClass.simpleName}"
             }
 
             // 仅在 VDM 显示进入独立显示组且状态为 STATE_ON 后，才正式切换。
             legacy.release()
-            Ln.i(
-                "Using checked VDM-backed display: id=$independentId, " +
-                    "legacyId=$legacyId"
-            )
+            VdmDiagnostics.reportSuccess(independent.display.display, legacyId, imePolicy)
             return DisplaySelection(independent.display, independent)
         } catch (failure: Exception) {
-            Ln.e("Independent display check failed; keeping legacy virtual display", failure)
+            VdmDiagnostics.reportFallback(failure, independent?.display?.display, legacyId)
         } catch (failure: LinkageError) {
-            Ln.e("Independent display API unavailable; keeping legacy virtual display", failure)
+            VdmDiagnostics.reportFallback(failure, independent?.display?.display, legacyId)
         }
 
         independent?.let { candidate ->

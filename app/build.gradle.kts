@@ -72,7 +72,7 @@ println("[Java Version] ${System.getProperty("java.version")}")
 
 android {
     namespace = "com.aliothmoon.maameow"
-    compileSdk = 36
+    compileSdk = 37
 
 
     defaultConfig {
@@ -154,7 +154,6 @@ android {
             }
         }
     }
-
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
