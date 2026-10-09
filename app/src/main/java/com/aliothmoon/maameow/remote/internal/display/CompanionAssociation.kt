@@ -3,8 +3,10 @@ package com.aliothmoon.maameow.remote.internal.display
 import android.companion.AssociationInfo
 import android.companion.CompanionDeviceManager
 import android.content.Context
+import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
+import androidx.annotation.RequiresApi
 import com.aliothmoon.maameow.BuildConfig
 import com.aliothmoon.maameow.third.FakeContext
 import com.aliothmoon.maameow.third.Ln
@@ -15,6 +17,7 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /** VDM 使用的临时 Companion Device 关联及其角色授权。 */
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 internal object CompanionAssociation {
     private const val SHELL_PACKAGE = "com.android.shell"
     private const val STREAMING_PROFILE = "android.app.role.COMPANION_DEVICE_APP_STREAMING"

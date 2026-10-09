@@ -1,10 +1,13 @@
 package com.aliothmoon.maameow.remote.internal.display
 
 import android.hardware.display.VirtualDisplay
+import android.os.Build
 import android.view.Surface
+import androidx.annotation.RequiresApi
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** 一个已经创建并校验过的 VDM VirtualDevice/VirtualDisplay 资源会话。 */
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 internal class VdmDisplaySession internal constructor(
     private val address: String,
     private val virtualDevice: VirtualDeviceHandle,

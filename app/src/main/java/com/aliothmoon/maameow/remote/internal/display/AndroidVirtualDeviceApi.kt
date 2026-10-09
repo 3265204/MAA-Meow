@@ -4,13 +4,16 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.hardware.display.VirtualDisplay
 import android.hardware.display.VirtualDisplayConfig
+import android.os.Build
 import android.os.IBinder
 import android.view.Surface
+import androidx.annotation.RequiresApi
 import com.aliothmoon.maameow.third.FakeContext
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.Executor
 
 /** Android 14+ VirtualDeviceManager 隐藏 API 的唯一反射边界。 */
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 internal object AndroidVirtualDeviceApi {
     private const val LOCK_STATE_ALWAYS_UNLOCKED = 1
 

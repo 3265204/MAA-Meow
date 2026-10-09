@@ -137,7 +137,10 @@ object VirtualDisplayManager {
     private fun releaseResources(removeAssociation: Boolean) {
         val vd = virtualDisplay.getAndSet(null)
         val session = vdmSession.getAndSet(null)
-        if (session != null) {
+        if (
+            Build.VERSION.SDK_INT >= AndroidVersions.API_34_ANDROID_14 &&
+            session != null
+        ) {
             try {
                 if (removeAssociation) session.close() else session.closeForRestart()
             } catch (failure: Exception) {
