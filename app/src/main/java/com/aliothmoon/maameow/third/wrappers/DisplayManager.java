@@ -124,7 +124,7 @@ public final class DisplayManager {
         }
     }
 
-    /** Returns the actual group assigned by DisplayManagerService, not the requested flag. */
+    /** 返回 DisplayManagerService 实际分配的显示组，而不是调用方请求的标志。 */
     public int getDisplayGroupId(int displayId) throws ReflectiveOperationException {
         Object info = getGetDisplayInfoMethod().invoke(manager, displayId);
         if (info == null) {
