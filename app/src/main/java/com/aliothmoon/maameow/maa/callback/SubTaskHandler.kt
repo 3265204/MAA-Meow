@@ -158,17 +158,19 @@ class SubTaskHandler(
                         "subtask" to subtask
                     }
                 }
+                // what 与 details 同级，details 里只有附加字段
                 val innerDetails = details.getJSONObject("details")
-                val what = innerDetails?.getString("what")
-                if (what == "UserAdditionalOperInvalid") {
-                    val name = innerDetails.getString("name") ?: ""
-                    append(str("CopilotUserAdditionalNameInvalid", name), LogLevel.ERROR)
+                when (details.getString("what")) {
+                    "UserAdditionalOperInvalid" -> {
+                        val name = innerDetails?.getString("name") ?: ""
+                        append(str("CopilotUserAdditionalNameInvalid", name), LogLevel.ERROR)
+                    }
                 }
             }
 
             "InfrastInfoTask" -> {
                 // 常规模式下布局识别失败会中止整个基建任务
-                val what = details.getJSONObject("details")?.getString("what")
+                val what = details.getString("what")
                 if (what == "FacilityLayoutRecognitionFailed") {
                     append(str("InfrastFacilityLayoutRecognitionFailed"), LogLevel.ERROR)
                 }

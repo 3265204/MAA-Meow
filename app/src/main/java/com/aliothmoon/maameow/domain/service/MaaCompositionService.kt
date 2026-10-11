@@ -598,6 +598,16 @@ class MaaCompositionService(
             val slot = t.slot ?: return@forEach
             fallbacks[slot]?.let { appendFallbacks(maa, slot, it) }
         }
+        // 全被拒时不能空队列 Start：core 不发任何回调，状态会一直停在 RUNNING
+        if (taskChainStatusTracker.tasks.value.isEmpty()) {
+            // 拒收原因经 oneway 回调异步到达，稍等再收尾，免得落到会话结束之后被丢掉
+            delay(300)
+            return failStart(
+                context.getString(R.string.runlog_no_task_appended),
+                "APPEND_ERROR",
+                StartResult.StartError
+            )
+        }
         if (mode == RunMode.FOREGROUND) {
             screenGate.awaitClear()
         }

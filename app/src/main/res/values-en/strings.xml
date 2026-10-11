@@ -401,6 +401,7 @@
     <string name="copilot_file_read_error">Failed to read file!</string>
     <string name="copilot_file_read_error_with_detail">Failed to read file: %1$s</string>
     <string name="copilot_status_started">Copilot started</string>
+    <string name="copilot_start_failed">Copilot failed to start</string>
     <string name="copilot_empty_load_first">Copilot is empty. Load a homework first</string>
     <string name="copilot_type_mismatch">The selected Copilot job does not match the current tab</string>
     <string name="copilot_empty_list">Using ｢Multi-Job mode｣, but no tasks have been added</string>
@@ -2683,6 +2684,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="panel_depot_only_first_insufficient_plan">Only run the first insufficient plan</string>
     <string name="panel_depot_only_first_insufficient_plan_tip">Use the inventory saved at startup to select the first plan with insufficient stock and an available stage. Later plans are considered on the next run.</string>
     <string name="runlog_append_task_failed">Failed to add task to the queue: %1$s</string>
+    <string name="runlog_no_task_appended">No task was added to the queue; start cancelled</string>
     <string name="runlog_task_with_detail">%1$s (%2$s)</string>
     <string name="task_type_switch_theme">Switch Theme</string>
     <string name="panel_task_type_switch_theme">Switch Theme</string>

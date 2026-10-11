@@ -636,6 +636,7 @@
     <string name="copilot_file_read_error">读取文件失败！</string>
     <string name="copilot_file_read_error_with_detail">读取文件失败：%1$s</string>
     <string name="copilot_status_started">自动战斗已启动</string>
+    <string name="copilot_start_failed">自动战斗启动失败</string>
     <string name="copilot_empty_load_first">作业为空，请先读取作业</string>
     <string name="copilot_type_mismatch">当前选择的作业与页签不匹配</string>
     <string name="copilot_empty_list">正在使用 ｢多作业模式｣, 但未添加任何作业</string>
@@ -2740,6 +2741,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="panel_depot_only_first_insufficient_plan">仅执行第一个库存不足的计划</string>
     <string name="panel_depot_only_first_insufficient_plan_tip">按启动时已有库存，选择第一个库存不足且关卡开放的计划。本次只执行此计划，后续计划留到下次运行。</string>
     <string name="runlog_append_task_failed">任务加入队列失败：%1$s</string>
+    <string name="runlog_no_task_appended">没有任务成功加入队列，已取消启动</string>
     <string name="runlog_task_with_detail">%1$s（%2$s）</string>
     <string name="task_type_switch_theme">更换主题</string>
     <string name="panel_task_type_switch_theme">更换主题</string>

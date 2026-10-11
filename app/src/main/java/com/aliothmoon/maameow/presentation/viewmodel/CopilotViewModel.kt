@@ -191,7 +191,8 @@ class CopilotViewModel(
     private fun formatStartStatus(result: MaaCompositionService.StartResult): UiText {
         return when (result) {
             is MaaCompositionService.StartResult.Success -> text(R.string.copilot_status_started)
-            is MaaCompositionService.StartResult.StartError -> text(R.string.copilot_file_read_error)
+            // 具体原因由 core 回调写进日志，这里只给结论
+            is MaaCompositionService.StartResult.StartError -> text(R.string.copilot_start_failed)
             else -> appContext.resolveTaskStartFailureMessage(result)
                 ?: text(R.string.copilot_status_started)
         }
