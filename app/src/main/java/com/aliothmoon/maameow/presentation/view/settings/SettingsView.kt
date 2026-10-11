@@ -1440,6 +1440,10 @@ private fun SettingYituliuTokenSection(
             } else {
                 Spacer(modifier = Modifier.weight(1f))
             }
+            val context = LocalContext.current
+            TextButton(onClick = { Misc.openUriSafely(context, MaaApi.YITULIU_ACCOUNT_HOME) }) {
+                Text(stringResource(R.string.settings_yituliu_get_token))
+            }
             TextButton(onClick = onVerify, enabled = !verifying) {
                 Text(stringResource(R.string.settings_yituliu_token_verify))
             }

@@ -393,6 +393,7 @@
     <string name="settings_yituliu_open_api_token">OpenAPI Token</string>
     <string name="settings_yituliu_open_api_token_hint">一图流个人中心生成，建议只给读取权限</string>
     <string name="settings_yituliu_token_verify">验证</string>
+    <string name="settings_yituliu_get_token">获取 Token</string>
     <string name="settings_yituliu_token_empty">请先填写 Token</string>
     <string name="settings_yituliu_token_valid">Token 有效，共 %1$d 名干员</string>
     <string name="settings_yituliu_token_valid_no_data">Token 有效，但账号暂无干员练度数据</string>

@@ -159,6 +159,7 @@
     <string name="settings_yituliu_open_api_token">OpenAPI token</string>
     <string name="settings_yituliu_open_api_token_hint">Generated in your Yituliu account; read-only is enough</string>
     <string name="settings_yituliu_token_verify">Verify</string>
+    <string name="settings_yituliu_get_token">Get token</string>
     <string name="settings_yituliu_token_empty">Enter a token first</string>
     <string name="settings_yituliu_token_valid">Token is valid, %1$d operators</string>
     <string name="settings_yituliu_token_valid_no_data">Token is valid, but the account has no operator data</string>
