@@ -1359,7 +1359,7 @@
 
     <!-- panel: depot maintain -->
     <string name="panel_depot_update_before_start">任务开始前更新库存数据</string>
-    <string name="panel_depot_update_before_start_tip">任务开始时先执行一次仓库识别刷新库存数据；每条计划开始时都会按最新库存重算缺口，本次识别结果立即生效</string>
+    <string name="panel_depot_update_before_start_tip">任务开始时先执行一次仓库识别刷新库存数据，已加入队列的计划开始时按最新库存重算缺口。开跑前就判定已充足的计划不会加入队列，识别后若实际不足只在日志提示，重新运行即可刷取</string>
     <string name="panel_depot_use_auto_series">AUTO 代理倍率</string>
     <string name="panel_depot_use_auto_series_tip">未勾选时以 1 倍代理；勾选后按当前理智允许的最大倍率代理，单次掉落可能超过目标库存上限。</string>
     <string name="panel_depot_skip_during_activity">活动期间跳过</string>
@@ -2508,6 +2508,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="runlog_fight_stage_unavailable">%1$s：无今日开放的关卡（首选 %2$s），已跳过理智作战</string>
     <string name="runlog_depot_set_params_failed">%1$s：更新任务参数失败，将按原参数执行</string>
     <string name="runlog_depot_plan_sanity_insufficient">%1$s：理智不足（预估 %2$d，低于关卡消耗 %3$d），已跳过</string>
+    <string name="runlog_depot_plan_stale_skipped">%1$s #%2$d：%3$s 实际 %4$d/%5$d 不足，预检时已跳过的计划无法在运行中补上，重新运行即可刷取</string>
     <string name="runlog_depot_skipped_activity">当前有活动进行中，已跳过库存保持</string>
     <string name="runlog_depot_skipped_resource">当前处于资源收集限时全天开放期间，已跳过库存保持</string>
     <string name="runlog_copilot_start">开始执行自动战斗</string>

@@ -1304,7 +1304,7 @@
     <string name="panel_userdata_profile_tip">Operator and depot inventory are saved per configuration. If toolbox data looks wrong, check whether you switched configurations.</string>
 
     <string name="panel_depot_update_before_start">Update inventory before starting</string>
-    <string name="panel_depot_update_before_start_tip">Runs depot recognition first to refresh inventory data; each plan recomputes its deficit from the latest inventory when it starts, so this recognition takes effect immediately</string>
+    <string name="panel_depot_update_before_start_tip">Runs depot recognition first to refresh inventory data; queued plans recompute their deficit from the latest inventory when they start. Plans judged sufficient before the run aren\'t queued; if recognition shows they\'re actually short, it\'s only logged, and running again farms them</string>
     <string name="panel_depot_use_auto_series">Auto Series</string>
     <string name="panel_depot_use_auto_series_tip">When unchecked, runs at 1×; when checked, runs at the highest series multiplier allowed by current sanity, so drops from a single run may exceed the target inventory limit.</string>
     <string name="panel_depot_skip_during_activity">Skip during event</string>
@@ -2451,6 +2451,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="runlog_fight_stage_unavailable">%1$s: no stage open today (primary %2$s), fight task skipped</string>
     <string name="runlog_depot_set_params_failed">%1$s: failed to update task params; original params will be used</string>
     <string name="runlog_depot_plan_sanity_insufficient">%1$s: not enough sanity (estimated %2$d, stage costs %3$d), skipped</string>
+    <string name="runlog_depot_plan_stale_skipped">%1$s #%2$d: %3$s is actually %4$d/%5$d, insufficient. Plans skipped at the pre-check can\'t be added mid-run; run again to farm it</string>
     <string name="runlog_depot_skipped_activity">An event is in progress; Depot Maintain skipped</string>
     <string name="runlog_depot_skipped_resource">The resource collection event is active; Depot Maintain skipped</string>
     <string name="runlog_copilot_start">Starting auto-battle</string>

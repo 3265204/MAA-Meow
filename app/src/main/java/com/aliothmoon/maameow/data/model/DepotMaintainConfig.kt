@@ -3,6 +3,7 @@ package com.aliothmoon.maameow.data.model
 import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.data.model.DepotMaintainConfig.Companion.EXPIRING_MEDICINE_DAYS
 import com.aliothmoon.maameow.domain.models.DropTarget
+import com.aliothmoon.maameow.domain.models.SkippedDepotPlans
 import com.aliothmoon.maameow.domain.models.TaskCandidate
 import com.aliothmoon.maameow.domain.models.TaskFallbackChain
 import com.aliothmoon.maameow.maa.task.MaaTaskParams
@@ -126,6 +127,7 @@ data class DepotMaintainConfig(
         }
 
         val chosen = if (onlyFirstInsufficientPlan) runnable.take(1) else runnable
+        stageSkippedPlans(ctx, decisions, chosenIndex = chosen.firstOrNull()?.index)
         for (d in chosen) {
             val listIndex = params.size
             val target = d.target(ctx)
@@ -141,6 +143,30 @@ data class DepotMaintainConfig(
         }
 
         return params
+    }
+
+    /**
+     * 登记预检时已充足的计划，本轮仓库识别后复查
+     *
+     * 仅首个模式只看主计划之前的：之后的本来就不会跑，实际不足也不算漏刷
+     */
+    private fun stageSkippedPlans(
+        ctx: TaskParamContext,
+        decisions: List<PlanDecision>,
+        chosenIndex: Int?,
+    ) {
+        val plans = decisions
+            .filter { d ->
+                d.outcome == DepotPlanOutcome.Enough &&
+                        (!onlyFirstInsufficientPlan || chosenIndex == null || d.index < chosenIndex) &&
+                        // 当作库存为 0 再判一次，关卡缺失或今天不开放的不收
+                        depotPlanOutcome(d.plan, 0) { ctx.activityManager.isStageOpen(it) } ==
+                        DepotPlanOutcome.Runnable
+            }
+            .map { SkippedDepotPlans.Plan(no = it.no, dropId = it.plan.dropId, dropCount = it.plan.dropCount) }
+        ctx.dropsRefresher.stageSkipped(
+            SkippedDepotPlans(ctx.node.name, plans, firstOnly = onlyFirstInsufficientPlan)
+        )
     }
 
     /** 后备候选携带其前方的跳过原因，尾部日志留到全部失败后输出 */

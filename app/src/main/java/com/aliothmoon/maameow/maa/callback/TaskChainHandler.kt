@@ -180,6 +180,19 @@ class TaskChainHandler(
             .orEmpty()
         sessionLogger.append("${str("CompleteTask")}$taskName$taskTime", LogLevel.SUCCESS)
 
+        // 任一仓库识别（库存保持自带的或独立的数据更新）都会纠正缓存，复查预检时跳过的计划
+        if (taskchain == "Depot") {
+            dropsRefresher.reviewSkippedPlans().forEach {
+                sessionLogger.append(
+                    appContext.getString(
+                        R.string.runlog_depot_plan_stale_skipped,
+                        it.taskName, it.no, it.dropName, it.current, it.target,
+                    ),
+                    LogLevel.WARNING,
+                )
+            }
+        }
+
         if (taskchain == "Infrast") {
             val nodeId = statusTracker.getNodeId(taskId)
             if (nodeId != null) {
