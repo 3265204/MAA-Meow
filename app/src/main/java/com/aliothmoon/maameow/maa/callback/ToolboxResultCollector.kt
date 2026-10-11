@@ -165,9 +165,8 @@ class ToolboxResultCollector(
             achievementRepository.report {
                 event = AchievementEvents.TOOLBOX_RESULT
                 "tool" to "OperBox"
-                "hasPallas" to ownOpers.any {
-                    it.name == "帕拉斯" || it.name.equals("Pallas", ignoreCase = true)
-                }
+                // 按 ID 判，名字随客户端和显示语言变
+                "hasPallas" to ownOpers.any { it.isPallas }
             }
         }
     }
