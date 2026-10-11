@@ -11,6 +11,8 @@ import com.aliothmoon.maameow.data.achievement.AchievementEvents
 import com.aliothmoon.maameow.data.achievement.AchievementRepository
 import com.aliothmoon.maameow.data.model.InfrastConfig
 import com.aliothmoon.maameow.data.model.MallConfig
+import com.aliothmoon.maameow.data.model.OperProgressConfig
+import com.aliothmoon.maameow.data.model.OperProgressResult
 import com.aliothmoon.maameow.data.model.RecruitConfig
 import com.aliothmoon.maameow.data.model.TaskChainNode
 import com.aliothmoon.maameow.data.model.TaskParamProvider
@@ -311,6 +313,21 @@ class TaskChainState(
 
     suspend fun recordVisitFriendsCompleted(nodeId: String, date: String) {
         updateMallCompletion(nodeId) { it.copy(visitFriendsLastDate = date) }
+    }
+
+    suspend fun recordOperProgress(
+        nodeId: String,
+        results: List<OperProgressResult>,
+        removeFinished: Boolean = false,
+    ) {
+        val update = { node: TaskChainNode ->
+            val config = node.config
+            if (node.id == nodeId && config is OperProgressConfig) {
+                node.copy(config = config.applyResults(results, removeFinished))
+            } else node
+        }
+        // 回调按原节点写回，切换配置也能保留培养进度
+        mutate(others = { chain -> chain.map(update) }) { current -> current.replaceAll { update(it) } }
     }
 
     private suspend fun updateMallCompletion(nodeId: String, transform: (MallConfig) -> MallConfig) {

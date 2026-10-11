@@ -48,6 +48,8 @@ class SubTaskHandler(
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val resources = applicationContext.resources
     private val packageName = applicationContext.packageName
+    private val operProgressHandler: OperProgressHandler
+            by inject(OperProgressHandler::class.java)
 
     // 懒取：实现方 MaaCompositionService 反过来依赖本类，构造注入会成环
     private val executionStateHolder: MaaExecutionStateHolder
@@ -540,6 +542,13 @@ class SubTaskHandler(
             "OperBox" -> {
                 toolboxResultCollector.onOperBoxResult(subDetails)
                 return
+            }
+
+            "OperProgress" -> {
+                if (details.getString("what") in setOf("OperProgressDetail", "OperProgressSummary")) {
+                    operProgressHandler.onExtraInfo(details)
+                    return
+                }
             }
         }
 
