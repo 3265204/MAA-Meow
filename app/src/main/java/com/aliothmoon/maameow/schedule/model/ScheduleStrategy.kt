@@ -71,6 +71,8 @@ data class ScheduleStrategy(
     val forceStart: Boolean = false,
     /** 运行期间屏保；仅后台，在用时不盖 */
     val autoScreenSaver: Boolean = false,
+    /** 在用手机时不拉界面，改通知倒计时；仅后台 */
+    val silentStartWhenInUse: Boolean = false,
     /** 任务结束后自动熄屏 */
     val autoSleepAfterTask: Boolean = false,
     /** 启动时已亮屏未锁屏则不熄屏 */

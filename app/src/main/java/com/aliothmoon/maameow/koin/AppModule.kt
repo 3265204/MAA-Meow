@@ -3,6 +3,7 @@ package com.aliothmoon.maameow.koin
 import android.app.KeyguardManager
 import android.content.Context
 import android.os.PowerManager
+import android.view.Display
 import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.announcement.AnnouncementManager
 import com.aliothmoon.maameow.data.achievement.AchievementRepository
@@ -72,9 +73,11 @@ import com.aliothmoon.maameow.domain.service.AchievementReporter
 import com.aliothmoon.maameow.domain.service.AppAliveChecker
 import com.aliothmoon.maameow.domain.service.AppWatchdog
 import com.aliothmoon.maameow.domain.service.CopilotManager
+import com.aliothmoon.maameow.domain.service.CopilotOperBoxAssist
 import com.aliothmoon.maameow.domain.service.CoreDataPusher
 import com.aliothmoon.maameow.domain.service.ExternalNotificationService
 import com.aliothmoon.maameow.domain.service.FightDropsRefresher
+import com.aliothmoon.maameow.domain.service.ForegroundScreenGate
 import com.aliothmoon.maameow.domain.service.FrameSnapshotter
 import com.aliothmoon.maameow.domain.service.GameDataReporter
 import com.aliothmoon.maameow.domain.service.GameFpsReader
@@ -105,6 +108,7 @@ import com.aliothmoon.maameow.maa.callback.ConnectionInfoHandler
 import com.aliothmoon.maameow.maa.callback.CopilotRuntimeStateStore
 import com.aliothmoon.maameow.maa.callback.MaaCallbackDispatcher
 import com.aliothmoon.maameow.maa.callback.MaaExecutionStateHolder
+import com.aliothmoon.maameow.maa.callback.SetParamsErrorSignal
 import com.aliothmoon.maameow.maa.callback.SubTaskHandler
 import com.aliothmoon.maameow.maa.callback.TaskChainHandler
 import com.aliothmoon.maameow.maa.callback.TaskChainStatusTracker
@@ -130,6 +134,7 @@ import com.aliothmoon.maameow.schedule.service.ScheduleTriggerLogger
 import com.aliothmoon.maameow.schedule.service.ShizukuDownMonitor
 import com.aliothmoon.maameow.telemetry.TelemetryController
 import com.aliothmoon.maameow.utils.CrashHandler
+import com.aliothmoon.maameow.utils.LauncherApps
 import com.aliothmoon.maameow.utils.i18n.uiTextOf
 import com.aliothmoon.maameow.utils.log.LogTreeHolder
 import kotlinx.coroutines.CoroutineScope
@@ -267,6 +272,12 @@ val appModule = module {
                     }
                 }
             },
+            foregroundPackage = {
+                RemoteServiceManager.useRemoteService(timeoutMs = 3_000L) {
+                    it.getTopPackage(Display.DEFAULT_DISPLAY)
+                }
+            },
+            appLabel = { LauncherApps.label(appContext, it) ?: it },
         )
     }
     singleOf(::TaskChainState)
@@ -330,6 +341,7 @@ val appModule = module {
     singleOf(::CopilotRuntimeStateStore)
     singleOf(::ToolboxResultCollector)
     singleOf(::OperBoxYituliuSync)
+    singleOf(::CopilotOperBoxAssist)
     single { PlanSideTaskRunner(androidContext(), get(), get()) }
     singleOf(::TaskChainStatusTracker)
     singleOf(::FightDropsRefresher)
@@ -340,18 +352,27 @@ val appModule = module {
     single<GameFpsReader> { RemoteGameFpsReader() }
     single { GameFpsWatcher(reader = get(), sessionLogger = get(), context = androidApplication()) }
     singleOf(::TelemetryController) { bind<RunTelemetry>() }
+    // 调用时才取 OverlayController：它依赖 MaaCompositionService，构造期取会成环
+    single<ForegroundScreenGate> { ForegroundScreenGate { get<OverlayController>().awaitPanelCleared() } }
     singleOf(::MaaCompositionService)
     single<MaaExecutionStateHolder> { get<MaaCompositionService>() }
     single { GameMuteCoordinator(get(), RemoteGameAudioAdapter) }
     single<FrameSnapshotter> { RemoteFrameSnapshotter() }
     singleOf(::MaaCallbackDispatcher)
+    singleOf(::SetParamsErrorSignal)
 
     // 定时唤醒 + 解锁
     singleOf(::WakeUnlockEngine)
 
     singleOf(::UnifiedStateDispatcher)
     // scope 走构造默认值，singleOf 会试图解析它
-    single { TaskEndRegistry(compositionService = get()) }
+    single {
+        val settings = get<AppSettingsManager>()
+        TaskEndRegistry(
+            compositionService = get(),
+            closeGameOnEnd = { settings.closeAppOnTaskEnd.value },
+        )
+    }
     singleOf(::LogExportService)
     singleOf(::ToolboxExportService)
 

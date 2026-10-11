@@ -143,50 +143,60 @@ class SubTaskHandler(
                     }
                     append(sb.trimEnd().toString(), LogLevel.ERROR)
                 }
-                ioScope.launch {
-                    achievementRepository.report {
-                        event = AchievementEvents.SUB_TASK_ERROR
-                        "subtask" to subtask
-                    }
-                }
+                reportSubTaskError(subtask)
             }
 
             "CopilotTask" -> {
-                ioScope.launch {
-                    achievementRepository.report {
-                        event = AchievementEvents.SUB_TASK_ERROR
-                        "subtask" to subtask
-                    }
-                }
+                reportSubTaskError(subtask)
+                // what 与 details 同级，details 里只有附加字段
                 val innerDetails = details.getJSONObject("details")
-                val what = innerDetails?.getString("what")
-                if (what == "UserAdditionalOperInvalid") {
-                    val name = innerDetails.getString("name") ?: ""
-                    append(str("CopilotUserAdditionalNameInvalid", name), LogLevel.ERROR)
+                when (details.getString("what")) {
+                    "UserAdditionalOperInvalid" -> {
+                        val name = innerDetails?.getString("name") ?: ""
+                        append(str("CopilotUserAdditionalNameInvalid", name), LogLevel.ERROR)
+                    }
+
+                    "CopilotFileReadError" -> append(
+                        resources.getString(R.string.copilot_file_read_error),
+                        LogLevel.ERROR
+                    )
+
+                    "CopilotStageNotSupported" -> {
+                        val stage = innerDetails?.getString("stage_name") ?: ""
+                        append(
+                            resources.getString(R.string.copilot_unsupported_stage, stage),
+                            LogLevel.ERROR
+                        )
+                    }
+
+                    "OperboxDataParseFailed" -> append(
+                        str("CopilotOperboxDataParseFailed"),
+                        LogLevel.ERROR
+                    )
                 }
+            }
+
+            "DepotRecognitionTask" -> {
+                if (details.getString("what") == "DepotTemplateLoadError") {
+                    val ids = details.getJSONObject("details")?.getJSONArray("item_ids")
+                        ?.mapNotNull { (it as? String)?.ifEmpty { null } }
+                        .orEmpty()
+                    append(str("DepotTemplateLoadError", ids.joinToString(", ")), LogLevel.ERROR)
+                }
+                reportSubTaskError(subtask)
             }
 
             "InfrastInfoTask" -> {
                 // 常规模式下布局识别失败会中止整个基建任务
-                val what = details.getJSONObject("details")?.getString("what")
+                val what = details.getString("what")
                 if (what == "FacilityLayoutRecognitionFailed") {
                     append(str("InfrastFacilityLayoutRecognitionFailed"), LogLevel.ERROR)
                 }
-                ioScope.launch {
-                    achievementRepository.report {
-                        event = AchievementEvents.SUB_TASK_ERROR
-                        "subtask" to subtask
-                    }
-                }
+                reportSubTaskError(subtask)
             }
 
             else -> {
-                ioScope.launch {
-                    achievementRepository.report {
-                        event = AchievementEvents.SUB_TASK_ERROR
-                        "subtask" to subtask
-                    }
-                }
+                reportSubTaskError(subtask)
                 Timber.d("SubTaskError unhandled subtask=$subtask")
             }
         }
@@ -796,6 +806,24 @@ class SubTaskHandler(
                 copilotRuntimeStateStore.markRequirementIgnored()
             }
 
+            // 一图流数据辅助编队的预检结果，set_params 阶段发出
+            "BattleFormationOperboxMatched" -> {
+                val lines = subDetails?.getJSONArray("matched_groups").orEmpty().mapNotNull {
+                    val group = it as? JSONObject ?: return@mapNotNull null
+                    "${group.getString("group_name").orEmpty()} => ${group.getString("oper_name").orEmpty()}"
+                }
+                append(
+                    (listOf(str("BattleFormationOperboxMatched")) + lines).joinToString("\n"),
+                    LogLevel.INFO
+                )
+            }
+
+            "BattleFormationOperbox1Unmatched" -> {
+                val group = subDetails?.getString("group_name").orEmpty()
+                val borrow = subDetails?.getString("may_borrow_oper").orEmpty()
+                append(str("BattleFormationOperbox1Unmatched", group, borrow), LogLevel.WARNING)
+            }
+
             "CopilotAction" -> handleCopilotAction(subDetails)
             "CopilotListLoadTaskFileSuccess" -> {
                 val fileName = subDetails?.getString("file_name") ?: ""
@@ -1288,6 +1316,15 @@ class SubTaskHandler(
 
     private fun str(key: String, vararg args: Any): String =
         MaaStringRes.getString(resources, packageName, key, *args)
+
+    private fun reportSubTaskError(subtask: String) {
+        ioScope.launch {
+            achievementRepository.report {
+                event = AchievementEvents.SUB_TASK_ERROR
+                "subtask" to subtask
+            }
+        }
+    }
 
     private fun append(content: String, level: LogLevel) {
         sessionLogger.append(content, level)

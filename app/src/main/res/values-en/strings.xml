@@ -35,6 +35,7 @@
     <string name="search_keywords_resolution">resolution virtual display 1080 720 quality</string>
     <string name="search_keywords_pip">picture in picture pip floating window</string>
     <string name="search_keywords_wake_unlock">lock screen unlock wake password pin gesture schedule</string>
+    <string name="search_keywords_app_blacklist">blacklist block skip foreground game interrupt schedule</string>
     <string name="search_keywords_mute">mute sound audio volume</string>
     <string name="search_keywords_run_duration">duration time limit timeout runtime</string>
     <string name="search_keywords_screen_off">screen off black display lock battery</string>
@@ -158,6 +159,7 @@
     <string name="settings_yituliu_open_api_token">OpenAPI token</string>
     <string name="settings_yituliu_open_api_token_hint">Generated in your Yituliu account; read-only is enough</string>
     <string name="settings_yituliu_token_verify">Verify</string>
+    <string name="settings_yituliu_get_token">Get token</string>
     <string name="settings_yituliu_token_empty">Enter a token first</string>
     <string name="settings_yituliu_token_valid">Token is valid, %1$d operators</string>
     <string name="settings_yituliu_token_valid_no_data">Token is valid, but the account has no operator data</string>
@@ -400,6 +402,8 @@
     <string name="copilot_file_read_error">Failed to read file!</string>
     <string name="copilot_file_read_error_with_detail">Failed to read file: %1$s</string>
     <string name="copilot_status_started">Copilot started</string>
+    <string name="copilot_start_failed">Copilot failed to start</string>
+    <string name="copilot_operbox_assist_write_failed">Failed to write operator data; formation assist unavailable</string>
     <string name="copilot_empty_load_first">Copilot is empty. Load a homework first</string>
     <string name="copilot_type_mismatch">The selected Copilot job does not match the current tab</string>
     <string name="copilot_empty_list">Using ｢Multi-Job mode｣, but no tasks have been added</string>
@@ -581,6 +585,7 @@
     <string name="maa_combat_error">Combat error</string>
     <string name="maa_start_task">Start task: </string>
     <string name="maa_complete_task">Complete task: </string>
+    <string name="maa_task_time">\n(in %1$s)</string>
     <string name="maa_task_stopped">Has stopped</string>
     <string name="maa_all_tasks_complete">All task(s) completed!</string>
     <string name="maa_task_completed_with_errors">Tasks finished, but errors occurred in the following tasks:\n%1$s</string>
@@ -618,6 +623,8 @@
     <string name="maa_penguin_upload_unknown_drops">Unknown drops</string>
     <string name="maa_missing_operators">No operators in the following groups meet this operation\'s requirements (not owned or attributes below the requirements):</string>
     <string name="maa_copilot_user_additional_name_invalid">Additional custom Operator name invalid: %1$s, please check spelling</string>
+    <string name="maa_copilot_operbox_data_parse_failed">Failed to parse operator box data</string>
+    <string name="maa_depot_template_load_error">Failed to load depot recognition templates (%1$s); recognition stopped. Resource files may be corrupted; go to Settings → Updates → Reinitialize Resources and retry</string>
     <string name="maa_mission_start">Mission started</string>
     <string name="maa_stone_used">Originite Prime used</string>
     <string name="maa_acting_command_error">PRTS error</string>
@@ -705,6 +712,8 @@
     <string name="maa_battle_formation_parse_failed">Formation parse failed</string>
     <string name="maa_battle_formation_selected">Selected: </string>
     <string name="maa_battle_formation_oper_unavailable">Operator unavailable: %1$s, reason: %2$s</string>
+    <string name="maa_battle_formation_operbox_matched">Pre-matched operators (groups):</string>
+    <string name="maa_battle_formation_operbox1_unmatched">No owned operator matches group %1$s; a support unit is needed (suggested %2$s, the actual pick follows the support list)</string>
     <string name="maa_current_steps">Step: %1$s %2$s</string>
     <string name="maa_elapsed_time">Elapsed time: %1$sms</string>
     <string name="maa_current_stage">Current Stage: %1$s</string>
@@ -823,9 +832,21 @@
     <string name="panel_autobattle_read_single">Load Copilot</string>
     <string name="panel_autobattle_operator_header">Operators</string>
     <string name="panel_autobattle_source_web">PRTS Plus #%1$d</string>
+    <string name="panel_autobattle_source_web_unnumbered">PRTS Plus</string>
     <string name="panel_autobattle_source_local">Local homework</string>
-    <string name="panel_autobattle_group_header">Group: %1$s</string>
-    <string name="panel_autobattle_summary_count">Total %1$d operators / groups</string>
+    <string name="panel_autobattle_group_header">Group · %1$s</string>
+    <string name="panel_autobattle_oper_elite_0">E0</string>
+    <string name="panel_autobattle_oper_elite_1">E1</string>
+    <string name="panel_autobattle_oper_elite_2">E2</string>
+    <string name="panel_autobattle_oper_promotion">%1$s %2$d</string>
+    <string name="panel_autobattle_oper_skill">S%1$d</string>
+    <string name="panel_autobattle_oper_no_skill">No skill</string>
+    <string name="panel_autobattle_oper_skill_level">Lv.%1$d</string>
+    <string name="panel_autobattle_oper_mastery_1">M1</string>
+    <string name="panel_autobattle_oper_mastery_2">M2</string>
+    <string name="panel_autobattle_oper_mastery_3">M3</string>
+    <string name="panel_autobattle_oper_module">Mod %1$s</string>
+    <string name="panel_autobattle_oper_no_module">No module</string>
     <string name="panel_autobattle_auto_formation">Auto Squad</string>
     <string name="panel_autobattle_auto_formation_tip">\"Favorite\" marked operators may not be recognized</string>
     <string name="panel_autobattle_use_formation">Use formation</string>
@@ -836,6 +857,9 @@
     <string name="panel_autobattle_support_fill_gaps">When Needed</string>
     <string name="panel_autobattle_support_random">Random</string>
     <string name="panel_autobattle_add_trust">Add low-trust operators</string>
+    <string name="panel_autobattle_operbox_assist">Use Yituliu data to assist formation</string>
+    <string name="panel_autobattle_operbox_assist_tip">Before auto formation, pre-match the squad against your Yituliu operator data (including skills and modules); the run won\'t start if it can\'t be filled\nFirst enter a Yituliu token in Settings → Third-party services, turn on \"Fetch operator data from Yituliu\" and sync once</string>
+    <string name="panel_autobattle_operbox_sync">Sync</string>
     <string name="panel_autobattle_battle_list">Multi-Job mode</string>
     <string name="panel_autobattle_battle_list_tip">Only supported in the following modes:\n  1. Main Theme: Navigate within the same chapter\n  2. Side Story: Navigate within the current page (Normal / EX / S cannot jump across pages)\n  3. Story Collection: Navigate within the current page\n  4. Paradox Simulation: Start from the operator list\nPlease start from the corresponding screen. Cross-chapter navigation is not supported.\n\nWhen ｢Multi-Job mode｣ is enabled, individual jobs will be automatically added to the ｢Job List｣.</string>
     <string name="panel_autobattle_copilot_list">Job List</string>
@@ -928,15 +952,8 @@
     <string name="panel_fight_annihilation_chernobog">Chernobog</string>
     <string name="panel_fight_annihilation_outskirts">Lungmen Outskirts</string>
     <string name="panel_fight_annihilation_downtown">Lungmen Downtown</string>
-    <string name="panel_fight_weekday_monday">Monday</string>
-    <string name="panel_fight_weekday_tuesday">Tuesday</string>
-    <string name="panel_fight_weekday_wednesday">Wednesday</string>
-    <string name="panel_fight_weekday_thursday">Thursday</string>
-    <string name="panel_fight_weekday_friday">Friday</string>
-    <string name="panel_fight_weekday_saturday">Saturday</string>
-    <string name="panel_fight_weekday_sunday">Sunday</string>
-    <string name="panel_fight_weekly_schedule">Weekly Schedule</string>
-    <string name="panel_fight_weekly_schedule_tip">When enabled, this task only runs on selected days (based on server time, with reset at 04:00).</string>
+    <string name="panel_weekly_schedule">Weekly Schedule</string>
+    <string name="panel_weekly_schedule_tip">When enabled, this task only runs on selected days (based on server time, with reset at 04:00).</string>
 
     <!-- panel: stone -->
     <string name="panel_stone_allow_save">Save \"Use Originium\"</string>
@@ -1280,7 +1297,7 @@
     <string name="panel_userdata_profile_tip">Operator and depot inventory are saved per configuration. If toolbox data looks wrong, check whether you switched configurations.</string>
 
     <string name="panel_depot_update_before_start">Update inventory before starting</string>
-    <string name="panel_depot_update_before_start_tip">Runs depot recognition first to refresh inventory data; each plan recomputes its deficit from the latest inventory when it starts, so this recognition takes effect immediately</string>
+    <string name="panel_depot_update_before_start_tip">Runs depot recognition first to refresh inventory data; queued plans recompute their deficit from the latest inventory when they start. Plans judged sufficient before the run aren\'t queued; if recognition shows they\'re actually short, it\'s only logged, and running again farms them</string>
     <string name="panel_depot_use_auto_series">Auto Series</string>
     <string name="panel_depot_use_auto_series_tip">When unchecked, runs at 1×; when checked, runs at the highest series multiplier allowed by current sanity, so drops from a single run may exceed the target inventory limit.</string>
     <string name="panel_depot_skip_during_activity">Skip during event</string>
@@ -1730,7 +1747,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="virtual_display_idle">Idle</string>
 
     <!-- i18n: task start -->
-    <string name="task_start_warning_game_not_running">The game is not running and the Login task is not enabled. Continuing may fail immediately. Please enable the Login task before starting. Start anyway?</string>
+    <string name="task_start_warning_game_not_running">The game is not running, and this run will not launch it automatically. Please enable the Login task and select \"Launch Game\" before starting, or the task may fail. Start anyway?</string>
     <string name="task_start_warning_wake_up_skipped">The game is not running and this run starts partway through, skipping the Login task. Continuing may fail immediately. Start anyway?</string>
     <string name="task_start_warning_game_not_installed">The game package for the current client type was not detected. Check the client type in Wake Up. Start anyway?</string>
     <string name="task_start_warning_eye_protection_enabled">Eye comfort / night mode is enabled, which may affect color recognition accuracy. Start anyway?</string>
@@ -1787,6 +1804,10 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="schedule_trigger_log_title">Trigger log</string>
     <string name="schedule_wake_unlock_title">Wake &amp; Unlock</string>
     <string name="schedule_wake_unlock_desc">When a scheduled task fires while the device is locked, it unlocks using the method below. Manually started tasks are not affected.</string>
+    <string name="schedule_app_blacklist_title">App Blacklist</string>
+    <string name="schedule_app_blacklist_desc">Background mode only. If a checked app is in use when a schedule fires, that run is skipped and you are notified</string>
+    <string name="schedule_app_blacklist_foreground_inactive">Run mode is foreground, so the blacklist does nothing</string>
+    <string name="schedule_app_blacklist_selected">Selected (%1$d)</string>
     <string name="schedule_create_strategy">New schedule</string>
     <string name="schedule_empty_state">No schedules yet</string>
     <string name="schedule_empty_hint_add">Tap the button in the upper-right corner to add one</string>
@@ -1833,6 +1854,11 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="schedule_force_start_tip">Stop the current task, restart the game, and start the new tasks</string>
     <string name="schedule_auto_screen_saver">Enable screen saver while running</string>
     <string name="schedule_auto_screen_saver_tip">Background mode only. Enables a dark screen saver at minimum brightness before the countdown starts, and turns it off when the task ends. It is skipped if you are already using the device (screen on and unlocked) at trigger time</string>
+    <string name="schedule_silent_start">Silent start</string>
+    <string name="schedule_silent_start_tip">Background mode only. If you are using the phone (screen on and unlocked) at trigger time, no window pops up and the countdown moves to the notification; when the device is idle the window still opens. MaaMeow cannot keep the screen on while it is not in the foreground, so an auto-lock mid-run will interrupt the task</string>
+    <string name="schedule_silent_start_risk_title">Enable silent start?</string>
+    <string name="schedule_silent_start_risk_body">If you are using the phone (screen on and unlocked) when this schedule fires, MaaMeow will not open its window. The countdown only shows in the notification, where you can cancel or start right away. When the device is idle the window still opens as usual\n\nBefore enabling, note:\n• MaaMeow can only keep the screen on while it is in the foreground. If the phone auto-locks mid-run, the lock screen takes over the background virtual display and the task stops or misrecognizes\n• The game runs alongside the app you are using, which may cause lag, heat and extra battery drain\n• There is no popup. The countdown is only in the notification shade and is easy to miss, and with notifications disabled you cannot cancel it\n\nConsider a longer auto-lock timeout. If you need to put the phone down mid-run, open MaaMeow to keep the screen on</string>
+    <string name="schedule_silent_start_risk_confirm">Got it, enable</string>
     <string name="schedule_auto_sleep_after_task">Auto sleep after task</string>
     <string name="schedule_auto_sleep_tip">Automatically turn off the screen after the scheduled task completes to save battery</string>
     <string name="schedule_skip_auto_sleep_if_awake">Skip if screen was already on</string>
@@ -1919,6 +1945,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="schedule_result_failed_ui_launch">UI launch failed</string>
     <string name="schedule_result_skipped_busy">System busy</string>
     <string name="schedule_result_skipped_locked">Skipped while locked</string>
+    <string name="schedule_result_skipped_blacklist">Skipped by blacklist</string>
     <string name="schedule_result_cancelled">Cancelled</string>
     <string name="schedule_interval_every_days_hours">Every %1$d day(s) %2$d hour(s)</string>
     <string name="schedule_interval_every_days">Every %1$d day(s)</string>
@@ -1948,6 +1975,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="notification_schedule_title">Scheduled Task</string>
     <string name="notification_schedule_skipped">Scheduled task skipped</string>
     <string name="notification_schedule_failed">Scheduled task failed to start</string>
+    <string name="notification_schedule_silent_countdown">\"%1$s\" will start silently in the background. Cancel or start now here</string>
     <string name="notification_schedule_preparing">Preparing to launch…</string>
     <string name="notification_schedule_device_locked">Device is locked</string>
     <string name="notification_schedule_pin_required">Skipped: a device lock password is set. Configure a PIN or record an unlock gesture in "Schedule → Wake &amp; Unlock", or use "Tasks → Options → Screen Off" instead of the system lock screen</string>
@@ -1960,6 +1988,9 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <!-- i18n: schedule trigger journal (pipeline) -->
     <string name="schedule_log_received">Launch request received: %1$s</string>
     <string name="schedule_log_skipped_busy">Another scheduled launch is already in progress</string>
+    <string name="schedule_log_silent_start">Phone in use; starting silently with the countdown in the notification instead of opening the app</string>
+    <string name="schedule_log_blacklist_hit">Foreground app \"%1$s\" is blacklisted; skipped</string>
+    <string name="schedule_log_blacklist_unknown">Could not detect the foreground app; blacklist not applied</string>
     <string name="schedule_log_task_running_busy">A task is already running</string>
     <string name="schedule_log_backend_connecting">Connecting to the service…</string>
     <string name="schedule_log_backend_connect_cause">Service failed to start: %1$s</string>
@@ -2413,6 +2444,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="runlog_fight_stage_unavailable">%1$s: no stage open today (primary %2$s), fight task skipped</string>
     <string name="runlog_depot_set_params_failed">%1$s: failed to update task params; original params will be used</string>
     <string name="runlog_depot_plan_sanity_insufficient">%1$s: not enough sanity (estimated %2$d, stage costs %3$d), skipped</string>
+    <string name="runlog_depot_plan_stale_skipped">%1$s #%2$d: %3$s is actually %4$d/%5$d, insufficient. Plans skipped at the pre-check can\'t be added mid-run; run again to farm it</string>
     <string name="runlog_depot_skipped_activity">An event is in progress; Depot Maintain skipped</string>
     <string name="runlog_depot_skipped_resource">The resource collection event is active; Depot Maintain skipped</string>
     <string name="runlog_copilot_start">Starting auto-battle</string>
@@ -2656,6 +2688,8 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="panel_depot_only_first_insufficient_plan">Only run the first insufficient plan</string>
     <string name="panel_depot_only_first_insufficient_plan_tip">Use the inventory saved at startup to select the first plan with insufficient stock and an available stage. Later plans are considered on the next run.</string>
     <string name="runlog_append_task_failed">Failed to add task to the queue: %1$s</string>
+    <string name="runlog_weekly_schedule_skipped">%1$s: not selected for today in the weekly schedule, skipped</string>
+    <string name="runlog_no_task_appended">No task was added to the queue; start cancelled</string>
     <string name="runlog_task_with_detail">%1$s (%2$s)</string>
     <string name="task_type_switch_theme">Switch Theme</string>
     <string name="panel_task_type_switch_theme">Switch Theme</string>

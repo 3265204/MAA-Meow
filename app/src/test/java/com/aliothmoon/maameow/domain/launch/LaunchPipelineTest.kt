@@ -78,6 +78,20 @@ class LaunchPipelineTest {
     @Volatile
     private var remoteBlocker: BackendBlock? = null
 
+    private val blacklist = MutableStateFlow<Set<String>>(emptySet())
+    private val foregroundProbes = AtomicInteger(0)
+
+    @Volatile
+    private var foregroundPkg: String? = null
+
+    @Volatile
+    private var probeTimesOut = false
+
+    @Volatile
+    private var lastPresentation: LaunchPresentation? = null
+
+    private var current: LaunchPipeline? = null
+
     private val runMode = MutableStateFlow(RunMode.BACKGROUND)
     private val unlockType = MutableStateFlow("swipe")
     private val wakeCred = MutableStateFlow("")
@@ -102,6 +116,7 @@ class LaunchPipelineTest {
             shouldAbort: () -> Boolean,
         ): Boolean {
             onTick(1)
+            lastPresentation = (current?.session?.value as? LaunchSession.InFlight)?.presentation
             return false
         }
     }
@@ -129,6 +144,11 @@ class LaunchPipelineTest {
         stopCalls.set(0)
         uiLaunches.set(0)
         remoteBlocker = null
+        blacklist.value = emptySet()
+        foregroundPkg = null
+        foregroundProbes.set(0)
+        probeTimesOut = false
+        lastPresentation = null
         recorded.clear()
         keyguardLocked.set(false)
         deviceLocked.set(false)
@@ -144,6 +164,7 @@ class LaunchPipelineTest {
             every { closeAppOnTaskEnd } returns this@LaunchPipelineTest.closeAppOnTaskEnd
             every { wakeCredential } returns wakeCred
             every { wakeUnlockType } returns unlockType
+            every { scheduleAppBlacklist } returns blacklist
         }
         wake = mockk(relaxed = true)
         coEvery { wake.unlock(any()) } returns WakeUnlockEngine.WakeResult.OK
@@ -250,7 +271,13 @@ class LaunchPipelineTest {
             true
         },
         remoteAccessBlocker = { remoteBlocker },
-    )
+        foregroundPackage = {
+            foregroundProbes.incrementAndGet()
+            if (probeTimesOut) withTimeout(1) { delay(1_000) }
+            foregroundPkg
+        },
+        appLabel = { "label:$it" },
+    ).also { current = it }
 
     private fun givenWakeGate(
         interactive: Boolean = true,
@@ -277,6 +304,7 @@ class LaunchPipelineTest {
         skipIfAwake: Boolean = false,
         autoScreenSaver: Boolean = false,
         closeGame: Boolean = false,
+        silent: Boolean = false,
     ) = LaunchRequest(
         requestId = id,
         source = LaunchSource.Schedule,
@@ -285,6 +313,7 @@ class LaunchPipelineTest {
         scheduledTimeMs = 1_000L,
         forceStart = force,
         autoScreenSaver = autoScreenSaver,
+        silentStartWhenInUse = silent,
         closeGameAfterTask = closeGame,
         autoSleepAfterTask = autoSleep,
         skipAutoSleepIfAwake = skipIfAwake,
@@ -453,7 +482,7 @@ class LaunchPipelineTest {
 
     /** 全局开关开启时由后台任务页负责，这里不重复关 */
     @Test
-    fun closeGame_globalSettingOn_delegatesToViewModel() = runBlocking<Unit> {
+    fun closeGame_globalSettingOn_leftToTaskEndRegistry() = runBlocking<Unit> {
         closeAppOnTaskEnd.value = true
         pipeline().execute(scheduleRequest(closeGame = true)).join()
         driveTaskToEnd()
@@ -902,7 +931,7 @@ class LaunchPipelineTest {
         }
     }
 
-    /** 前台无倒计时：不 presentUi，直接启动。 */
+    /** 前台无倒计时，直接启动 */
     @Test
     fun foreground_skipsCountdownAndStarts() = runBlocking<Unit> {
         runMode.value = RunMode.FOREGROUND
@@ -943,7 +972,7 @@ class LaunchPipelineTest {
         assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
     }
 
-    /** 后台无论 Schedule/External 都有 Dialog 倒计时（presentUi=true）。 */
+    /** 后台无论 Schedule/External 都有 Dialog 倒计时 */
     @Test
     fun background_alwaysPresentUiCountdown() = runBlocking<Unit> {
         runMode.value = RunMode.BACKGROUND
@@ -953,7 +982,7 @@ class LaunchPipelineTest {
         val job = p.execute(scheduleRequest("bg-1"))
         withTimeout(5_000) { entered.await() }
         val session = p.session.value
-        assertTrue(session is LaunchSession.InFlight && session.presentUi)
+        assertTrue(session is LaunchSession.InFlight && session.presentation == LaunchPresentation.DIALOG)
         release.complete(Unit)
         job.join()
         assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
@@ -1050,6 +1079,204 @@ class LaunchPipelineTest {
         assertEquals(ExecutionResult.STARTED, recorded.last())
         assertNull(mutex.current)
         assertTrue(p.session.value is LaunchSession.Idle)
+    }
+
+    @Test
+    fun blacklistHit_inUse_skipsBeforeUnlockAndUi() = runBlocking<Unit> {
+        blacklist.value = setOf("com.game")
+        foregroundPkg = "com.game"
+
+        pipeline().execute(scheduleRequest()).join()
+
+        val reason = uiTextOf(R.string.schedule_log_blacklist_hit, "label:com.game")
+        assertEquals(listOf(ExecutionResult.SKIPPED_BLACKLIST), recorded.toList())
+        verify { logSession.end(ExecutionResult.SKIPPED_BLACKLIST, reason) }
+        verify(exactly = 1) {
+            notificationCenter.notifyLaunchNotStarted("Test", ExecutionResult.SKIPPED_BLACKLIST, reason, any())
+        }
+        coVerify(exactly = 0) { wake.unlock(any()) }
+        assertEquals(0, uiLaunches.get())
+        assertEquals(0, startCalls.get())
+    }
+
+    @Test
+    fun blacklistMiss_inUse_starts() = runBlocking<Unit> {
+        blacklist.value = setOf("com.game")
+        foregroundPkg = "com.other"
+
+        pipeline().execute(scheduleRequest()).join()
+
+        assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
+        assertEquals(1, foregroundProbes.get())
+        assertEquals(1, uiLaunches.get())
+    }
+
+    /** 名单命中前台应用，但这些场景不该去探测 */
+    private suspend fun assertStartsWithoutProbe(request: LaunchRequest) {
+        blacklist.value = setOf("com.game")
+        foregroundPkg = "com.game"
+        pipeline().execute(request).join()
+        assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
+        assertEquals(0, foregroundProbes.get())
+    }
+
+    // 待机时顶层是熄屏前留下的应用，不代表在用
+    @Test
+    fun blacklist_idleDevice_notChecked() = runBlocking<Unit> {
+        givenWakeGate(interactive = false)
+        assertStartsWithoutProbe(scheduleRequest())
+    }
+
+    @Test
+    fun blacklist_lockedDevice_notChecked() = runBlocking<Unit> {
+        givenWakeGate(keyguard = true)
+        assertStartsWithoutProbe(scheduleRequest())
+    }
+
+    @Test
+    fun blacklist_foregroundMode_notChecked() = runBlocking<Unit> {
+        runMode.value = RunMode.FOREGROUND
+        assertStartsWithoutProbe(scheduleRequest())
+    }
+
+    @Test
+    fun blacklist_externalLaunch_notChecked() = runBlocking<Unit> {
+        assertStartsWithoutProbe(externalRequest())
+    }
+
+    @Test
+    fun blacklistEmpty_skipsProbe() = runBlocking<Unit> {
+        foregroundPkg = "com.game"
+
+        pipeline().execute(scheduleRequest()).join()
+
+        assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
+        assertEquals(0, foregroundProbes.get())
+    }
+
+    @Test
+    fun blacklist_foregroundUnknown_startsAndLogs() = runBlocking<Unit> {
+        blacklist.value = setOf("com.game")
+        foregroundPkg = null
+
+        pipeline().execute(scheduleRequest()).join()
+
+        assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
+        verify { logSession.append(uiTextOf(R.string.schedule_log_blacklist_unknown)) }
+    }
+
+    // 探测超时也是 CancellationException，不能被当成被抢占
+    @Test
+    fun blacklist_probeTimeout_treatedAsUnknown() = runBlocking<Unit> {
+        blacklist.value = setOf("com.game")
+        probeTimesOut = true
+
+        pipeline().execute(scheduleRequest()).join()
+
+        assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
+        verify { logSession.append(uiTextOf(R.string.schedule_log_blacklist_unknown)) }
+    }
+
+    // 命中就别把在跑的任务停了
+    @Test
+    fun blacklistHit_forceStart_keepsRunningTask() = runBlocking<Unit> {
+        compositionState.value = MaaExecutionState.RUNNING
+        blacklist.value = setOf("com.game")
+        foregroundPkg = "com.game"
+
+        pipeline().execute(scheduleRequest(force = true)).join()
+
+        assertEquals(listOf(ExecutionResult.SKIPPED_BLACKLIST), recorded.toList())
+        assertEquals(0, stopCalls.get())
+        coVerify(exactly = 0) { composition.stopVirtualDisplay() }
+    }
+
+    // 也别抢占在途的启动
+    @Test
+    fun blacklistHit_forcePreempt_keepsInFlightLaunch() = runBlocking<Unit> {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val p = pipeline(countdown = gatedCountdown(entered, release))
+        val first = p.execute(scheduleRequest("a"))
+        withTimeout(5_000) { entered.await() }
+
+        blacklist.value = setOf("com.game")
+        foregroundPkg = "com.game"
+        p.execute(scheduleRequest("b", force = true)).join()
+        assertEquals(listOf(ExecutionResult.SKIPPED_BLACKLIST), recorded.toList())
+        assertEquals(0, stopCalls.get())
+
+        release.complete(Unit)
+        first.join()
+        assertEquals(listOf(ExecutionResult.SKIPPED_BLACKLIST, ExecutionResult.STARTED), recorded.toList())
+    }
+
+    @Test
+    fun silent_inUse_noUiCountdownViaNotification() = runBlocking<Unit> {
+        pipeline().execute(scheduleRequest(silent = true)).join()
+
+        assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
+        assertEquals(0, uiLaunches.get())
+        assertEquals(LaunchPresentation.NOTIFICATION, lastPresentation)
+        verify { logSession.append(uiTextOf(R.string.schedule_log_silent_start)) }
+    }
+
+    // 待机时要靠拉起的界面保持亮屏
+    @Test
+    fun silent_idleDevice_stillLaunchesUi() = runBlocking<Unit> {
+        givenWakeGate(interactive = false)
+
+        pipeline().execute(scheduleRequest(silent = true)).join()
+
+        assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
+        assertEquals(1, uiLaunches.get())
+        assertEquals(LaunchPresentation.DIALOG, lastPresentation)
+    }
+
+    @Test
+    fun silentOff_inUse_launchesUi() = runBlocking<Unit> {
+        pipeline().execute(scheduleRequest()).join()
+
+        assertEquals(1, uiLaunches.get())
+        assertEquals(LaunchPresentation.DIALOG, lastPresentation)
+    }
+
+    // 通知里的旧按钮不能误伤别的请求
+    @Test
+    fun notificationCancel_staleRequestIgnored() = runBlocking<Unit> {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val p = pipeline(countdown = gatedCountdown(entered, release))
+        val job = p.execute(scheduleRequest(silent = true))
+        withTimeout(5_000) { entered.await() }
+        p.submit(LaunchUserEvent.Cancel, "stale")
+        release.complete(Unit)
+        job.join()
+        assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
+    }
+
+    @Test
+    fun notificationCancel_matchingRequestCancels() = runBlocking<Unit> {
+        val entered = CompletableDeferred<Unit>()
+        val p = pipeline(countdown = object : CountdownUI {
+            override suspend fun await(
+                request: LaunchRequest,
+                onTick: (remainingSeconds: Int) -> Unit,
+                shouldAbort: () -> Boolean,
+            ): Boolean {
+                entered.complete(Unit)
+                withTimeout(5_000) {
+                    while (!shouldAbort()) delay(10)
+                }
+                return false
+            }
+        })
+        val job = p.execute(scheduleRequest("req-silent", silent = true))
+        withTimeout(5_000) { entered.await() }
+        p.submit(LaunchUserEvent.Cancel, "req-silent")
+        job.join()
+        assertEquals(listOf(ExecutionResult.CANCELLED), recorded.toList())
+        assertEquals(0, startCalls.get())
     }
 
     private companion object {

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Alarm
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.LockOpen
@@ -161,6 +162,12 @@ fun ScheduleListView(
                         Icon(
                             imageVector = Icons.Outlined.LockOpen,
                             contentDescription = stringResource(R.string.schedule_wake_unlock_title),
+                        )
+                    }
+                    IconButton(onClick = { navController.navigate(Routes.SCHEDULE_APP_BLACKLIST) }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Block,
+                            contentDescription = stringResource(R.string.schedule_app_blacklist_title),
                         )
                     }
                     IconButton(
@@ -440,6 +447,7 @@ private fun formatExecutionResult(result: ExecutionResult, message: String?): St
         ExecutionResult.FAILED_START,
         ExecutionResult.FAILED_UI_LAUNCH,
         ExecutionResult.SKIPPED_BUSY,
+        ExecutionResult.SKIPPED_BLACKLIST,
         ExecutionResult.CANCELLED -> {
             stringResource(R.string.schedule_last_result, scheduleExecutionResultLabel(result))
         }
@@ -458,6 +466,7 @@ private fun executionResultColor(
     return when (result) {
         ExecutionResult.STARTED -> successColor
         ExecutionResult.SKIPPED_BUSY,
+        ExecutionResult.SKIPPED_BLACKLIST,
         ExecutionResult.CANCELLED -> warningColor
 
         ExecutionResult.FAILED_VALIDATION,

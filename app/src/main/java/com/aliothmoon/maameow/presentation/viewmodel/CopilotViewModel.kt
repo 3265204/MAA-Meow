@@ -18,8 +18,10 @@ import com.aliothmoon.maameow.data.resource.CopilotResourceProvider
 import com.aliothmoon.maameow.data.resource.ResourceDataManager
 import com.aliothmoon.maameow.domain.service.CopilotCodeType
 import com.aliothmoon.maameow.domain.service.CopilotManager
+import com.aliothmoon.maameow.domain.service.CopilotOperBoxAssist
 import com.aliothmoon.maameow.domain.service.CopilotRequestException
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
+import com.aliothmoon.maameow.domain.service.OperBoxYituliuSync
 import com.aliothmoon.maameow.domain.service.OperatorSummaryData
 import com.aliothmoon.maameow.domain.service.copilot.CopilotRequirementCorrector
 import com.aliothmoon.maameow.domain.state.MaaExecutionState
@@ -111,6 +113,8 @@ data class CopilotUiState(
     val builtinLoaded: Boolean = false,
     val builtinTree: List<CopilotResourceProvider.Node> = emptyList(),
     val builtinExpandedFolders: Set<String> = emptySet(),
+    val operBoxAssist: CopilotOperBoxAssist.State = CopilotOperBoxAssist.State(),
+    val syncingOperBox: Boolean = false,
 ) {
     /** 用户偏好；是否生效看 listModeActive */
     val useCopilotList: Boolean get() = config.useCopilotList
@@ -131,6 +135,8 @@ class CopilotViewModel(
     private val checkGameReadiness: CheckGameReadinessUseCase,
     private val chainState: TaskChainState,
     private val achievementRepository: AchievementRepository,
+    private val operBoxAssist: CopilotOperBoxAssist,
+    private val operBoxYituliuSync: OperBoxYituliuSync,
 ) : ViewModel() {
 
     companion object {
@@ -191,7 +197,8 @@ class CopilotViewModel(
     private fun formatStartStatus(result: MaaCompositionService.StartResult): UiText {
         return when (result) {
             is MaaCompositionService.StartResult.Success -> text(R.string.copilot_status_started)
-            is MaaCompositionService.StartResult.StartError -> text(R.string.copilot_file_read_error)
+            // 具体原因由 core 回调写进日志，这里只给结论
+            is MaaCompositionService.StartResult.StartError -> text(R.string.copilot_start_failed)
             else -> appContext.resolveTaskStartFailureMessage(result)
                 ?: text(R.string.copilot_status_started)
         }
@@ -206,6 +213,11 @@ class CopilotViewModel(
     }
 
     private fun observeRuntimeState() {
+        viewModelScope.launch {
+            operBoxAssist.state.collect { assist ->
+                _state.update { it.copy(operBoxAssist = assist) }
+            }
+        }
         viewModelScope.launch {
             runtimeStateStore.hasRequirementIgnored.collect { ignored ->
                 _state.update { it.copy(hasRequirementIgnored = ignored) }
@@ -273,7 +285,8 @@ class CopilotViewModel(
                 lastFilePath = filePath
                 lastJson = fixed.json
 
-                if (files.size > 1 || _state.value.listModeActive) {
+                // 单文件留到循环后先展示再入列表，与神秘代码读取一致
+                if (files.size > 1) {
                     autoAddLoadedCopilotToListIfNeeded(
                         data = fixed.data,
                         filePath = filePath,
@@ -293,13 +306,19 @@ class CopilotViewModel(
                 return@launch
             }
 
-            if (files.size == 1 && !_state.value.listModeActive) {
+            if (files.size == 1) {
                 applyLoadedCopilot(
                     data = lastData!!,
                     json = lastJson,
                     filePath = lastFilePath,
                     copilotId = 0,
                     fromWeb = false
+                )
+                autoAddLoadedCopilotToListIfNeeded(
+                    data = lastData,
+                    filePath = lastFilePath,
+                    copilotId = 0,
+                    source = "local"
                 )
             } else {
                 _state.update {
@@ -418,11 +437,12 @@ class CopilotViewModel(
             onSuccess = { (id, data, json) ->
                 val fixed = correctRequirements(data, json, id)
                 val filePath = repository.saveCopilotJson(id, fixed.json)
+                // 对齐 WPF：单作业校正后仍用原 id
                 applyLoadedCopilot(
                     data = fixed.data,
                     json = fixed.json,
                     filePath = filePath,
-                    copilotId = fixed.copilotId,
+                    copilotId = id,
                     fromWeb = true
                 )
                 autoAddLoadedCopilotToListIfNeeded(
@@ -598,7 +618,7 @@ class CopilotViewModel(
 
     /**
      * 落盘前统一做一次干员需求与动作字段校正
-     * 改动过的作业不再带原作业 id，免得把改后的跑法算到原作者头上
+     * 改动过的作业返回 id 为 0，自动入列表的条目据此不点赞（WPF is_corrected）
      */
     private fun correctRequirements(
         data: CopilotTaskData,
@@ -1023,6 +1043,10 @@ class CopilotViewModel(
                         base.copy(
                             currentCopilot = data,
                             currentTaskType = inferTaskType(data),
+                            videoUrl = copilotManager.extractVideoUrl(data.doc.details),
+                            operatorSummary = copilotManager.getOperatorSummary(data),
+                            // 列表文件已校正过，清掉上一份的提示
+                            requirementWarnings = emptyList(),
                             copilotId = item.copilotId,
                             canLike = item.copilotId > 0,
                             isDataFromWeb = item.source == "web",
@@ -1166,15 +1190,21 @@ class CopilotViewModel(
             }
 
             val config = buildEffectiveConfig(snapshot)
+            val operBoxDataPath = if (config.useOperBoxAssist) {
+                operBoxAssist.writeCoreData() ?: run {
+                    _state.update { it.copy(statusMessage = text(R.string.copilot_operbox_assist_write_failed)) }
+                    return@launch
+                }
+            } else null
             val tasks = if (snapshot.listModeActive) {
                 val checked = snapshot.taskList.filter { it.isChecked }
                 pendingCopilotIds.clear()
                 pendingCopilotIds.addAll(checked.map { it.copilotId }.filter { it > 0 })
                 // 传完整列表: buildListTask 内部按全列表下标分配 id(与 onCopilotTaskSuccess 同坐标系)
-                copilotManager.buildListTask(snapshot.tabIndex, snapshot.taskList, config)
+                copilotManager.buildListTask(snapshot.tabIndex, snapshot.taskList, config, operBoxDataPath)
             } else {
                 val type = resolveSingleTaskType(snapshot)
-                listOf(copilotManager.buildSingleTask(type, snapshot.currentFilePath, config))
+                listOf(copilotManager.buildSingleTask(type, snapshot.currentFilePath, config, operBoxDataPath))
             }
 
             runtimeStateStore.resetRequirementIgnored()
@@ -1191,6 +1221,18 @@ class CopilotViewModel(
             compositionService.stop()
             runtimeStateStore.resetCurrentCopilotIndex()
             _state.update { it.copy(statusMessage = text(R.string.toolbox_status_stopped)) }
+        }
+    }
+
+    /** 拉一图流练度，不连提权服务；成功后 [CopilotOperBoxAssist.state] 随快照刷新 */
+    fun onSyncOperBox() {
+        if (_state.value.syncingOperBox) return
+        _state.update {
+            it.copy(syncingOperBox = true, statusMessage = text(R.string.oper_box_yituliu_fetching))
+        }
+        viewModelScope.launch {
+            val message = operBoxYituliuSync.sync().message
+            _state.update { it.copy(syncingOperBox = false, statusMessage = message) }
         }
     }
 
@@ -1368,6 +1410,9 @@ class CopilotViewModel(
                 addUserAdditional = false,
                 userAdditional = ""
             )
+        }
+        if (!config.formation || !snapshot.operBoxAssist.available) {
+            config = config.copy(useOperBoxAssist = false)
         }
         if (!supportsLoopCount(snapshot.tabIndex)) {
             config = config.copy(loop = false, loopTimes = 1)

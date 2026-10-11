@@ -64,6 +64,9 @@ class AppSettingsManager internal constructor(
         /** 纯数字 PIN 最大位数 */
         const val MAX_PIN_LENGTH = 16
 
+        fun parsePackageList(raw: String): Set<String> =
+            raw.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
         /** 首启引导版本，内容大改需全员重看时 +1 */
         const val ONBOARDING_VERSION = 1
 
@@ -736,6 +739,20 @@ class AppSettingsManager internal constructor(
         val digits = credential.filter { it.isDigit() }.take(MAX_PIN_LENGTH)
         with(AppSettingsSchema) {
             context.dataStore.edit { it[wakeCredential] = digits }
+        }
+    }
+
+    val scheduleAppBlacklist: StateFlow<Set<String>> = setting { parsePackageList(it.scheduleAppBlacklist) }
+
+    suspend fun setScheduleAppBlacklisted(packageName: String, blacklisted: Boolean) {
+        if (packageName.isBlank()) return
+        with(AppSettingsSchema) {
+            // 读改写放在同一个 edit 里，连点不丢
+            context.dataStore.edit { prefs ->
+                val current = parsePackageList(prefs[scheduleAppBlacklist].orEmpty())
+                val next = if (blacklisted) current + packageName else current - packageName
+                prefs[scheduleAppBlacklist] = next.joinToString(",")
+            }
         }
     }
 

@@ -16,6 +16,7 @@ import io.mockk.verify
 import io.mockk.verifyOrder
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -70,6 +71,14 @@ class MaaNotificationCenterLaunchTest {
     @Test
     fun skip_notifiesWithoutPush() {
         assertEquals("skipped", published(ExecutionResult.SKIPPED_LOCKED, "locked").title)
+        verify(exactly = 0) { external.send(any(), any()) }
+    }
+
+    @Test
+    fun blacklistSkip_notifiesWithoutPush() {
+        val session = published(ExecutionResult.SKIPPED_BLACKLIST, "game")
+        assertEquals("skipped", session.title)
+        assertFalse(session.isError)
         verify(exactly = 0) { external.send(any(), any()) }
     }
 

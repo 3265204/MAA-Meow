@@ -144,7 +144,7 @@ class MaaNotificationCenter(
         if (replacesStartFailure) {
             liveCoordinator.withdrawResult()
         }
-        val skipped = result == ExecutionResult.SKIPPED_BUSY || result == ExecutionResult.SKIPPED_LOCKED
+        val skipped = result.isSkipped
         val title = appContext.getString(
             if (skipped) R.string.notification_schedule_skipped else R.string.notification_schedule_failed
         )

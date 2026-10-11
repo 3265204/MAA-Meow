@@ -490,6 +490,7 @@ private fun resultColor(result: ExecutionResult) = when (result) {
     ExecutionResult.STARTED -> MaterialTheme.colorScheme.primary
     ExecutionResult.SKIPPED_BUSY,
     ExecutionResult.SKIPPED_LOCKED,
+    ExecutionResult.SKIPPED_BLACKLIST,
     ExecutionResult.CANCELLED -> MaterialTheme.colorScheme.tertiary
 
     ExecutionResult.FAILED_VALIDATION,
