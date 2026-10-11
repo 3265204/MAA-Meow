@@ -831,6 +831,24 @@ class SubTaskHandler(
                 copilotRuntimeStateStore.markRequirementIgnored()
             }
 
+            // 一图流数据辅助编队的预检结果，set_params 阶段发出
+            "BattleFormationOperboxMatched" -> {
+                val lines = subDetails?.getJSONArray("matched_groups").orEmpty().mapNotNull {
+                    val group = it as? JSONObject ?: return@mapNotNull null
+                    "${group.getString("group_name").orEmpty()} => ${group.getString("oper_name").orEmpty()}"
+                }
+                append(
+                    (listOf(str("BattleFormationOperboxMatched")) + lines).joinToString("\n"),
+                    LogLevel.INFO
+                )
+            }
+
+            "BattleFormationOperbox1Unmatched" -> {
+                val group = subDetails?.getString("group_name").orEmpty()
+                val borrow = subDetails?.getString("may_borrow_oper").orEmpty()
+                append(str("BattleFormationOperbox1Unmatched", group, borrow), LogLevel.WARNING)
+            }
+
             "CopilotAction" -> handleCopilotAction(subDetails)
             "CopilotListLoadTaskFileSuccess" -> {
                 val fileName = subDetails?.getString("file_name") ?: ""

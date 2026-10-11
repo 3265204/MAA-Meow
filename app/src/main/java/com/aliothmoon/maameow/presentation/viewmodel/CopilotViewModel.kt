@@ -18,8 +18,10 @@ import com.aliothmoon.maameow.data.resource.CopilotResourceProvider
 import com.aliothmoon.maameow.data.resource.ResourceDataManager
 import com.aliothmoon.maameow.domain.service.CopilotCodeType
 import com.aliothmoon.maameow.domain.service.CopilotManager
+import com.aliothmoon.maameow.domain.service.CopilotOperBoxAssist
 import com.aliothmoon.maameow.domain.service.CopilotRequestException
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
+import com.aliothmoon.maameow.domain.service.OperBoxYituliuSync
 import com.aliothmoon.maameow.domain.service.OperatorSummaryData
 import com.aliothmoon.maameow.domain.service.copilot.CopilotRequirementCorrector
 import com.aliothmoon.maameow.domain.state.MaaExecutionState
@@ -111,6 +113,8 @@ data class CopilotUiState(
     val builtinLoaded: Boolean = false,
     val builtinTree: List<CopilotResourceProvider.Node> = emptyList(),
     val builtinExpandedFolders: Set<String> = emptySet(),
+    val operBoxAssist: CopilotOperBoxAssist.State = CopilotOperBoxAssist.State(),
+    val syncingOperBox: Boolean = false,
 ) {
     /** 用户偏好；是否生效看 listModeActive */
     val useCopilotList: Boolean get() = config.useCopilotList
@@ -131,6 +135,8 @@ class CopilotViewModel(
     private val checkGameReadiness: CheckGameReadinessUseCase,
     private val chainState: TaskChainState,
     private val achievementRepository: AchievementRepository,
+    private val operBoxAssist: CopilotOperBoxAssist,
+    private val operBoxYituliuSync: OperBoxYituliuSync,
 ) : ViewModel() {
 
     companion object {
@@ -207,6 +213,11 @@ class CopilotViewModel(
     }
 
     private fun observeRuntimeState() {
+        viewModelScope.launch {
+            operBoxAssist.state.collect { assist ->
+                _state.update { it.copy(operBoxAssist = assist) }
+            }
+        }
         viewModelScope.launch {
             runtimeStateStore.hasRequirementIgnored.collect { ignored ->
                 _state.update { it.copy(hasRequirementIgnored = ignored) }
@@ -1179,15 +1190,21 @@ class CopilotViewModel(
             }
 
             val config = buildEffectiveConfig(snapshot)
+            val operBoxDataPath = if (config.useOperBoxAssist) {
+                operBoxAssist.writeCoreData() ?: run {
+                    _state.update { it.copy(statusMessage = text(R.string.copilot_operbox_assist_write_failed)) }
+                    return@launch
+                }
+            } else null
             val tasks = if (snapshot.listModeActive) {
                 val checked = snapshot.taskList.filter { it.isChecked }
                 pendingCopilotIds.clear()
                 pendingCopilotIds.addAll(checked.map { it.copilotId }.filter { it > 0 })
                 // 传完整列表: buildListTask 内部按全列表下标分配 id(与 onCopilotTaskSuccess 同坐标系)
-                copilotManager.buildListTask(snapshot.tabIndex, snapshot.taskList, config)
+                copilotManager.buildListTask(snapshot.tabIndex, snapshot.taskList, config, operBoxDataPath)
             } else {
                 val type = resolveSingleTaskType(snapshot)
-                listOf(copilotManager.buildSingleTask(type, snapshot.currentFilePath, config))
+                listOf(copilotManager.buildSingleTask(type, snapshot.currentFilePath, config, operBoxDataPath))
             }
 
             runtimeStateStore.resetRequirementIgnored()
@@ -1204,6 +1221,21 @@ class CopilotViewModel(
             compositionService.stop()
             runtimeStateStore.resetCurrentCopilotIndex()
             _state.update { it.copy(statusMessage = text(R.string.toolbox_status_stopped)) }
+        }
+    }
+
+    /** 拉一图流练度，不连提权服务；成功后 [CopilotOperBoxAssist.state] 随快照刷新 */
+    fun onSyncOperBox() {
+        if (_state.value.syncingOperBox) return
+        _state.update {
+            it.copy(syncingOperBox = true, statusMessage = text(R.string.oper_box_yituliu_fetching))
+        }
+        viewModelScope.launch {
+            val message = when (val result = operBoxYituliuSync.sync()) {
+                is OperBoxYituliuSync.Result.Success -> result.message
+                is OperBoxYituliuSync.Result.Failed -> result.message
+            }
+            _state.update { it.copy(syncingOperBox = false, statusMessage = message) }
         }
     }
 
@@ -1381,6 +1413,10 @@ class CopilotViewModel(
                 addUserAdditional = false,
                 userAdditional = ""
             )
+        }
+        // 对齐上游 EffectiveOperBoxAssist：只在自动编队时预检；数据不可用时勾选框显示为未勾选，这里也不生效
+        if (!config.formation || !operBoxAssist.isAvailable) {
+            config = config.copy(useOperBoxAssist = false)
         }
         if (!supportsLoopCount(snapshot.tabIndex)) {
             config = config.copy(loop = false, loopTimes = 1)

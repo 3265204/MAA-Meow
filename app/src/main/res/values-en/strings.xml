@@ -402,6 +402,7 @@
     <string name="copilot_file_read_error_with_detail">Failed to read file: %1$s</string>
     <string name="copilot_status_started">Copilot started</string>
     <string name="copilot_start_failed">Copilot failed to start</string>
+    <string name="copilot_operbox_assist_write_failed">Failed to write operator data; formation assist unavailable</string>
     <string name="copilot_empty_load_first">Copilot is empty. Load a homework first</string>
     <string name="copilot_type_mismatch">The selected Copilot job does not match the current tab</string>
     <string name="copilot_empty_list">Using ｢Multi-Job mode｣, but no tasks have been added</string>
@@ -709,6 +710,8 @@
     <string name="maa_battle_formation_parse_failed">Formation parse failed</string>
     <string name="maa_battle_formation_selected">Selected: </string>
     <string name="maa_battle_formation_oper_unavailable">Operator unavailable: %1$s, reason: %2$s</string>
+    <string name="maa_battle_formation_operbox_matched">Pre-matched operators (groups):</string>
+    <string name="maa_battle_formation_operbox1_unmatched">No owned operator matches group %1$s; a support unit is needed (suggested %2$s, the actual pick follows the support list)</string>
     <string name="maa_current_steps">Step: %1$s %2$s</string>
     <string name="maa_elapsed_time">Elapsed time: %1$sms</string>
     <string name="maa_current_stage">Current Stage: %1$s</string>
@@ -852,6 +855,9 @@
     <string name="panel_autobattle_support_fill_gaps">When Needed</string>
     <string name="panel_autobattle_support_random">Random</string>
     <string name="panel_autobattle_add_trust">Add low-trust operators</string>
+    <string name="panel_autobattle_operbox_assist">Use Yituliu data to assist formation</string>
+    <string name="panel_autobattle_operbox_assist_tip">Before auto formation, pre-match the squad against your Yituliu operator data (including skills and modules); the run won\'t start if it can\'t be filled\nFirst enter a Yituliu token in Settings → Third-party services, turn on \"Fetch operator data from Yituliu\" and sync once</string>
+    <string name="panel_autobattle_operbox_sync">Sync</string>
     <string name="panel_autobattle_battle_list">Multi-Job mode</string>
     <string name="panel_autobattle_battle_list_tip">Only supported in the following modes:\n  1. Main Theme: Navigate within the same chapter\n  2. Side Story: Navigate within the current page (Normal / EX / S cannot jump across pages)\n  3. Story Collection: Navigate within the current page\n  4. Paradox Simulation: Start from the operator list\nPlease start from the corresponding screen. Cross-chapter navigation is not supported.\n\nWhen ｢Multi-Job mode｣ is enabled, individual jobs will be automatically added to the ｢Job List｣.</string>
     <string name="panel_autobattle_copilot_list">Job List</string>

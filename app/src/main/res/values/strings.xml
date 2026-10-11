@@ -168,6 +168,8 @@
     <string name="maa_battle_formation_parse_failed">编队解析失败</string>
     <string name="maa_battle_formation_selected">选择干员: </string>
     <string name="maa_battle_formation_oper_unavailable">干员不可用: %1$s, 原因: %2$s</string>
+    <string name="maa_battle_formation_operbox_matched">预匹配的干员（组）：</string>
+    <string name="maa_battle_formation_operbox1_unmatched">干员（组）%1$s 没有匹配的干员，需要借助战（预匹配建议 %2$s，实际按助战列表选择）</string>
     <string name="maa_current_steps">当前步骤: %1$s %2$s</string>
     <string name="maa_elapsed_time">当前计时器: %1$sms</string>
     <string name="maa_current_stage">当前关卡: %1$s</string>
@@ -639,6 +641,7 @@
     <string name="copilot_file_read_error_with_detail">读取文件失败：%1$s</string>
     <string name="copilot_status_started">自动战斗已启动</string>
     <string name="copilot_start_failed">自动战斗启动失败</string>
+    <string name="copilot_operbox_assist_write_failed">干员练度数据写入失败，无法辅助编队</string>
     <string name="copilot_empty_load_first">作业为空，请先读取作业</string>
     <string name="copilot_type_mismatch">当前选择的作业与页签不匹配</string>
     <string name="copilot_empty_list">正在使用 ｢多作业模式｣, 但未添加任何作业</string>
@@ -906,6 +909,9 @@
     <string name="panel_autobattle_support_fill_gaps">补漏</string>
     <string name="panel_autobattle_support_random">随机</string>
     <string name="panel_autobattle_add_trust">补充低信赖干员</string>
+    <string name="panel_autobattle_operbox_assist">使用一图流数据辅助编队</string>
+    <string name="panel_autobattle_operbox_assist_tip">自动编队前，按一图流干员练度（含技能与模组）预匹配作业编队，配不齐时不开打\n需先在「设置 → 三方服务」填写一图流 Token、开启「干员识别从一图流获取」，并同步一次数据</string>
+    <string name="panel_autobattle_operbox_sync">同步</string>
     <string name="panel_autobattle_battle_list">多作业模式</string>
     <string name="panel_autobattle_battle_list_tip">仅支持以下模式:\n  1. 主线: 同一章节内导航\n  2. SideStory: 当前页面内导航（普通/EX/S 不能互跳）\n  3. 故事集: 当前页面内导航\n  4. 悖论模拟: 从干员列表启动\n请在对应界面启动，不支持跨章节导航\n\n当 ｢多作业模式｣ 启用后, 选择单个作业时会自动添加到 ｢作业列表｣</string>
     <string name="panel_autobattle_copilot_list">作业列表</string>
