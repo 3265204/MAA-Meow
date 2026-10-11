@@ -15,6 +15,7 @@ import java.lang.reflect.Method;
 public final class RootUserService {
 
     private static final String TAG = "RootUserService";
+    private static final int ANDROID_UIDS_PER_USER = 100_000;
 
     private RootUserService() {
     }
@@ -25,7 +26,7 @@ public final class RootUserService {
             return null;
         }
 
-        int userId = parsed.uid / 100000;
+        int userId = userIdFromUid(parsed.uid);
         String appName = parsed.debugName != null ? parsed.debugName : parsed.packageName + ":root_service";
 
         Ln.i(String.format("%s: starting service %s/%s...", TAG, parsed.packageName, parsed.className));
@@ -56,6 +57,17 @@ public final class RootUserService {
         } catch (Throwable tr) {
             Ln.e(String.format("%s: unable to start service %s/%s", TAG, parsed.packageName, parsed.className), tr);
             return null;
+        }
+    }
+
+    /** 优先使用系统 UID 映射；命名常量兜底用于兼容旧系统和部分 OEM 实现。 */
+    public static int userIdFromUid(int uid) {
+        try {
+            Class<?> userHandleClass = Class.forName("android.os.UserHandle");
+            Method method = userHandleClass.getDeclaredMethod("getUserId", int.class);
+            return (int) method.invoke(null, uid);
+        } catch (Throwable ignored) {
+            return uid / ANDROID_UIDS_PER_USER;
         }
     }
 

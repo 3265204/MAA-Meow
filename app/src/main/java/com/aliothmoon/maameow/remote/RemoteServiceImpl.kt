@@ -3,6 +3,8 @@ package com.aliothmoon.maameow.remote
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
+import android.os.Binder
+import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.system.Os
@@ -81,6 +83,14 @@ class RemoteServiceImpl : RemoteService.Stub() {
     private val virtualDisplayMode = AtomicInteger(DisplayMode.PRIMARY)
     private val appPid = AtomicInteger(0)
     private val destroyed = AtomicBoolean(false)
+    private var vdmShellBinder: IBinder? = null
+    private val vdmShellDeath = IBinder.DeathRecipient {
+        Thread {
+            Ln.e("$TAG: VDM shell sidecar died; restarting privileged service")
+            performEmergencyCleanup()
+            exitProcess(1)
+        }.apply { name = "vdm-shell-death" }.start()
+    }
     /** 同一进程内 setup 幂等：成功后再调直接返回 OK，失败则下次重试 */
     private var setup = false
     private val coreData = CoreDataStore()
@@ -100,6 +110,9 @@ class RemoteServiceImpl : RemoteService.Stub() {
             return
         }
         Ln.i("$TAG: destroy()")
+        // 从这里开始，辅助进程退出属于正常清理流程，不能再按崩溃处理。
+        vdmShellBinder?.let { runCatching { it.unlinkToDeath(vdmShellDeath, 0) } }
+        vdmShellBinder = null
         InputControlUtils.setTouchCallback(null)
         GameFpsMonitor.stop()
         StaleFrameGuard.stop()
@@ -146,6 +159,7 @@ class RemoteServiceImpl : RemoteService.Stub() {
 
     override fun setup(userDir: String?, isDebug: Boolean): Int {
         if (setup) return SetupResult.OK
+        VirtualDisplayManager.configureAppUid(Binder.getCallingUid())
         RemoteBootTrace.mark("SETUP_BEGIN")
         // 清上一实例可能残留的断网规则，同步执行先于业务 AIDL
         runCatching { XmsfFirewall.ensureRestored() }
@@ -498,6 +512,20 @@ class RemoteServiceImpl : RemoteService.Stub() {
         // 空前缀行行命中，会把整份系统日志带出设备
         if (processPrefix.isNullOrEmpty()) return "# missing process prefix"
         return SystemLogDump.dump(sinceMs, untilMs, pid, processPrefix)
+    }
+
+    override fun attachVdmShellService(service: IBinder) {
+        val callerUid = Binder.getCallingUid()
+        val old = vdmShellBinder
+        if (old === service) return
+        old?.let { runCatching { it.unlinkToDeath(vdmShellDeath, 0) } }
+        service.linkToDeath(vdmShellDeath, 0)
+        vdmShellBinder = service
+        VirtualDisplayManager.attachVdmShellService(
+            serviceBinder = service,
+            appUid = callerUid,
+            ownerBinder = asBinder(),
+        )
     }
 
     override fun isSmartResolutionEnabled(): Boolean {

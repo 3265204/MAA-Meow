@@ -1,14 +1,11 @@
 package com.aliothmoon.maameow.remote.internal.display
 
 import android.companion.AssociationInfo
-import android.companion.CompanionDeviceManager
-import android.content.Context
 import android.os.Build
 import android.os.IBinder
 import android.os.SystemClock
 import androidx.annotation.RequiresApi
 import com.aliothmoon.maameow.BuildConfig
-import com.aliothmoon.maameow.third.FakeContext
 import com.aliothmoon.maameow.third.Ln
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -21,16 +18,14 @@ import java.util.concurrent.TimeUnit
 internal object CompanionAssociation {
     private const val SHELL_PACKAGE = "com.android.shell"
     private const val STREAMING_PROFILE = "android.app.role.COMPANION_DEVICE_APP_STREAMING"
-    private const val USER_ID = 0
-
     private const val COMMAND_TIMEOUT_SECONDS = 5L
     private const val ASSOCIATION_TIMEOUT_MS = 3_000L
     private const val ASSOCIATION_POLL_MS = 100L
 
     private const val COMPANION_INTERFACE = "android.companion.ICompanionDeviceManager"
 
-    fun address(): String {
-        val hash = BuildConfig.APPLICATION_ID.hashCode()
+    fun address(userId: Int): String {
+        val hash = 31 * BuildConfig.APPLICATION_ID.hashCode() + userId
         return String.format(
             Locale.ROOT,
             "02:4D:41:%02X:%02X:%02X",
@@ -40,82 +35,85 @@ internal object CompanionAssociation {
         )
     }
 
-    fun ensure(address: String): AssociationInfo {
-        find(address)?.let { return it }
+    fun ensure(address: String, userId: Int): AssociationInfo {
+        find(address, userId)?.let { return it }
 
-        // Android 15+ 会在关联存续期间向 com.android.shell 异步授予 app streaming
-        // 角色；命令返回不代表关联已经可见，因此后续轮询结构化状态。
-        runCommand(
+        val command = mutableListOf(
             "cmd",
             "companiondevice",
             "associate",
-            USER_ID.toString(),
+            userId.toString(),
             SHELL_PACKAGE,
             address,
-            STREAMING_PROFILE,
-            "false",
         )
-        return await(address)
+        // Android 14 的 shell 命令只消费前三个参数；15+ 才正式支持 profile 和
+        // self-managed 参数。按平台能力组装命令，避免依赖“忽略多余参数”的实现细节。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            command += STREAMING_PROFILE
+            command += "false"
+        }
+        runCommand(*command.toTypedArray())
+        return await(address, userId)
             ?: throw IllegalStateException("Companion association was not created")
     }
 
-    fun cleanupStale() {
-        val address = address()
-        if (find(address) == null) return
+    fun cleanupStale(userId: Int) {
+        val address = address(userId)
+        if (find(address, userId) == null) return
 
-        remove(address)
-        check(awaitRemoval(address)) {
+        remove(address, userId)
+        check(awaitRemoval(address, userId)) {
             "Stale companion association was not removed"
         }
         Ln.i("Removed stale VDM companion association")
     }
 
-    fun remove(address: String) {
-        if (find(address) == null) return
+    fun remove(address: String, userId: Int) {
+        if (find(address, userId) == null) return
         runCommand(
             "cmd",
             "companiondevice",
             "disassociate",
-            USER_ID.toString(),
+            userId.toString(),
             SHELL_PACKAGE,
             address,
         )
     }
 
-    private fun find(address: String): AssociationInfo? =
-        companionDeviceManager().myAssociations.firstOrNull { association ->
+    private fun find(address: String, userId: Int): AssociationInfo? =
+        associationsForUser(userId).firstOrNull { association ->
             address.equals(
                 association.deviceMacAddress?.toString(),
                 ignoreCase = true,
             )
         }
 
-    private fun await(address: String): AssociationInfo? {
+    private fun await(address: String, userId: Int): AssociationInfo? {
         val deadline = SystemClock.elapsedRealtime() + ASSOCIATION_TIMEOUT_MS
         do {
-            val association = find(address)
+            val association = find(address, userId)
             if (association != null) return association
             SystemClock.sleep(ASSOCIATION_POLL_MS)
         } while (SystemClock.elapsedRealtime() < deadline)
-        return find(address)
+        return find(address, userId)
     }
 
-    private fun awaitRemoval(address: String): Boolean {
+    private fun awaitRemoval(address: String, userId: Int): Boolean {
         val deadline = SystemClock.elapsedRealtime() + ASSOCIATION_TIMEOUT_MS
         do {
-            if (find(address) == null) return true
+            if (find(address, userId) == null) return true
             SystemClock.sleep(ASSOCIATION_POLL_MS)
         } while (SystemClock.elapsedRealtime() < deadline)
-        return find(address) == null
+        return find(address, userId) == null
     }
 
-    private fun companionDeviceManager(): CompanionDeviceManager {
+    @Suppress("UNCHECKED_CAST")
+    private fun associationsForUser(userId: Int): List<AssociationInfo> {
         val aidlClass = Class.forName(COMPANION_INTERFACE)
-        val aidl = getBinderInterface(Context.COMPANION_DEVICE_SERVICE, aidlClass)
-        val constructor = CompanionDeviceManager::class.java
-            .getDeclaredConstructor(aidlClass, Context::class.java)
-            .apply { isAccessible = true }
-        return constructor.newInstance(aidl, FakeContext.get())
+        val aidl = getBinderInterface("companiondevice", aidlClass)
+        return aidl.javaClass
+            .getMethod("getAssociations", String::class.java, Int::class.javaPrimitiveType)
+            .invokeUnwrapped(aidl, SHELL_PACKAGE, userId) as List<AssociationInfo>
     }
 
     private fun getBinderInterface(serviceName: String, aidlClass: Class<*>): Any {

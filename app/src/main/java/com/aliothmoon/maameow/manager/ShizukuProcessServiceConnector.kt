@@ -1,7 +1,12 @@
 package com.aliothmoon.maameow.manager
 
+import android.os.Build
+import android.os.IBinder
+import com.aliothmoon.maameow.RemoteService
+import com.aliothmoon.maameow.VdmShellService
 import com.aliothmoon.maameow.domain.models.RemoteBackend
 import com.aliothmoon.maameow.remote.RemoteServiceImpl
+import com.aliothmoon.maameow.remote.VdmShellServiceImpl
 
 /** Shizuku 唯一路径：newProcess 拉起自研 starter，见 [ShizukuSpawner] */
 object ShizukuProcessServiceConnector : ProcessServiceConnectorBackend(ShizukuSpawner) {
@@ -17,4 +22,19 @@ object ShizukuProcessServiceConnector : ProcessServiceConnectorBackend(ShizukuSp
 
     // root 模式 Shizuku 与 root 后端同规则；adb 模式下 launcher 已是 shell，标志自动无效
     override val keepRoot: Boolean get() = keepRootForInputInjection
+
+    override val sidecarServiceClass: Class<*>?
+        get() = VdmShellServiceImpl::class.java
+            .takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE }
+    override val sidecarProcessNameSuffix = "shizuku_vdm_shell"
+    override val sidecarLogFileName = "shizuku_vdm_shell_launch_debug.log"
+
+    override fun attachSidecar(primaryBinder: IBinder, sidecarBinder: IBinder) {
+        RemoteService.Stub.asInterface(primaryBinder)?.attachVdmShellService(sidecarBinder)
+            ?: error("Shizuku RemoteService unavailable while attaching VDM sidecar")
+    }
+
+    override fun destroySidecar(sidecarBinder: IBinder) {
+        VdmShellService.Stub.asInterface(sidecarBinder)?.destroy()
+    }
 }

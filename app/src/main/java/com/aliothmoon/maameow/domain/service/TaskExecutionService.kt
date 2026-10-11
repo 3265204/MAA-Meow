@@ -72,6 +72,7 @@ class TaskExecutionService : Service() {
     private var renderJob: Job? = null
     private var boundToken: Long = 0L
     private var observeToken: Long = 0L
+    private var taskWakeLock: TaskExecutionWakeLock? = null
 
     /** startForeground 被系统拒绝后本实例已 stopSelf，排队中的 start 不再重试 */
     private var foregroundDenied = false
@@ -91,6 +92,7 @@ class TaskExecutionService : Service() {
             handleTerminalState(boundToken, initial)
             return
         }
+        ensureTaskWakeLock()
         ensureObserveProgress()
         ensureObserveRenderChanges()
     }
@@ -107,6 +109,7 @@ class TaskExecutionService : Service() {
         if (isTerminal(snapshot.state)) {
             handleTerminalState(boundToken, snapshot)
         } else {
+            ensureTaskWakeLock()
             ensureObserveProgress()
             ensureObserveRenderChanges()
         }
@@ -117,6 +120,7 @@ class TaskExecutionService : Service() {
         // 系统侧终止与 StateFlow 收集存在竞态；此处兜底确保 Live Update 通知被清除。
         // observeProgress 的 collector 由 serviceScope.cancel() 结构化取消
         progressJob = null
+        releaseTaskWakeLock()
         removeActiveNotification(boundToken)
         serviceScope.cancel()
         super.onDestroy()
@@ -194,24 +198,33 @@ class TaskExecutionService : Service() {
                             handleTerminalState(token, snapshot)
                         }
 
-                        MaaExecutionState.STARTING -> forceUpdate(
-                            snapshot.copy(
-                                statusText = getString(R.string.notification_task_starting)
+                        MaaExecutionState.STARTING -> {
+                            ensureTaskWakeLock()
+                            forceUpdate(
+                                snapshot.copy(
+                                    statusText = getString(R.string.notification_task_starting)
+                                )
                             )
-                        )
+                        }
 
-                        MaaExecutionState.STOPPING -> forceUpdate(
-                            snapshot.copy(
-                                statusText = getString(R.string.notification_task_stopping)
+                        MaaExecutionState.STOPPING -> {
+                            ensureTaskWakeLock()
+                            forceUpdate(
+                                snapshot.copy(
+                                    statusText = getString(R.string.notification_task_stopping)
+                                )
                             )
-                        )
+                        }
 
-                        MaaExecutionState.RUNNING -> throttledUpdate(
-                            snapshot.copy(
-                                statusText = snapshot.statusText
-                                    ?: getString(R.string.notification_task_running)
+                        MaaExecutionState.RUNNING -> {
+                            ensureTaskWakeLock()
+                            throttledUpdate(
+                                snapshot.copy(
+                                    statusText = snapshot.statusText
+                                        ?: getString(R.string.notification_task_running)
+                                )
                             )
-                        )
+                        }
                     }
                 }
         }
@@ -221,6 +234,7 @@ class TaskExecutionService : Service() {
         if (!liveCoordinator.isCurrent(token)) return
         if (!isTerminal(compositionService.state.value)) return
         Timber.i("TaskExecutionService: state=%s token=%s, stopping", snapshot.state, token)
+        releaseTaskWakeLock()
         liveCoordinator.cancelProgress(token)
         clearProgressNotification()
         stopSelf()
@@ -239,6 +253,19 @@ class TaskExecutionService : Service() {
             stopSelf()
             return false
         }
+    }
+
+    private fun ensureTaskWakeLock() {
+        val holder = taskWakeLock ?: TaskExecutionWakeLock(this).also { taskWakeLock = it }
+        runCatching { holder.acquire() }
+            .onFailure { Timber.e(it, "TaskExecutionService: acquire wake lock failed") }
+    }
+
+    private fun releaseTaskWakeLock() {
+        val holder = taskWakeLock ?: return
+        taskWakeLock = null
+        runCatching { holder.release() }
+            .onFailure { Timber.w(it, "TaskExecutionService: release wake lock failed") }
     }
 
     private fun postForegroundNotification(

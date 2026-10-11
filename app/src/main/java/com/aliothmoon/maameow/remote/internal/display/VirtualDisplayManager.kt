@@ -3,20 +3,25 @@ package com.aliothmoon.maameow.remote.internal.display
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.os.Build
+import android.os.IBinder
 import android.view.Surface
+import com.aliothmoon.maameow.VdmShellService
 import com.aliothmoon.maameow.bridge.NativeBridgeLib
 import com.aliothmoon.maameow.constant.AndroidVersions
 import com.aliothmoon.maameow.constant.DefaultDisplayConfig
 import com.aliothmoon.maameow.constant.DefaultDisplayConfig.VD_NAME
+import com.aliothmoon.maameow.root.RootUserService
 import com.aliothmoon.maameow.third.Ln
 import com.aliothmoon.maameow.third.wrappers.ServiceManager
 import com.aliothmoon.maameow.third.wrappers.WindowManager
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 
 object VirtualDisplayManager {
 
+    private const val USER_UNSET = -1
     private const val STATE_IDLE = 0
     private const val STATE_CAPTURING = 1
 
@@ -52,14 +57,31 @@ object VirtualDisplayManager {
     private val config = AtomicReference(DisplayConfig())
     private val displayId = AtomicInteger(DISPLAY_NONE)
     private val virtualDisplay = AtomicReference<VirtualDisplay?>()
-    private val vdmSession = AtomicReference<VdmDisplaySession?>()
+    private val remoteVdmActive = AtomicBoolean(false)
+    private val vdmShellService = AtomicReference<VdmShellService?>()
+    private val androidUserId = AtomicInteger(USER_UNSET)
 
     private val monitorSurface = AtomicReference<Surface?>()
 
     private data class DisplaySelection(
-        val display: VirtualDisplay,
-        val vdmSession: VdmDisplaySession? = null,
+        val displayId: Int,
+        val legacyDisplay: VirtualDisplay? = null,
+        val remoteVdm: Boolean = false,
     )
+
+    /** App 将主服务发布为已连接前，先挂载 VDM 辅助进程。 */
+    fun attachVdmShellService(serviceBinder: IBinder, appUid: Int, ownerBinder: IBinder) {
+        val service = VdmShellService.Stub.asInterface(serviceBinder)
+            ?: throw IllegalStateException("VDM shell service binder has no interface")
+        androidUserId.set(RootUserService.userIdFromUid(appUid))
+        service.attachOwner(ownerBinder)
+        vdmShellService.set(service)
+        Ln.i("VDM shell sidecar attached for user=${androidUserId.get()}")
+    }
+
+    fun configureAppUid(appUid: Int) {
+        androidUserId.set(RootUserService.userIdFromUid(appUid))
+    }
 
     fun setMonitorSurface(surface: Surface?) {
         val old = monitorSurface.getAndSet(surface)
@@ -115,7 +137,9 @@ object VirtualDisplayManager {
     /** 清理由上一个被强杀或崩溃的特权服务进程遗留的 VDM 关联。 */
     fun cleanupStaleState() {
         if (Build.VERSION.SDK_INT < AndroidVersions.API_34_ANDROID_14) return
-        CompanionAssociation.cleanupStale()
+        val service = vdmShellService.get()
+            ?: throw IllegalStateException("VDM shell sidecar is unavailable")
+        service.cleanupStale(currentAndroidUserId())
     }
 
     private fun startInternal(): Int {
@@ -136,17 +160,11 @@ object VirtualDisplayManager {
 
     private fun releaseResources(removeAssociation: Boolean) {
         val vd = virtualDisplay.getAndSet(null)
-        val session = vdmSession.getAndSet(null)
-        if (
-            Build.VERSION.SDK_INT >= AndroidVersions.API_34_ANDROID_14 &&
-            session != null
-        ) {
+        if (remoteVdmActive.getAndSet(false)) {
             try {
-                if (removeAssociation) session.close() else session.closeForRestart()
+                vdmShellService.get()?.closeDisplay(removeAssociation)
             } catch (failure: Exception) {
-                Ln.e("Failed to close VDM display session", failure)
-            } catch (failure: LinkageError) {
-                Ln.e("VDM display cleanup API unavailable", failure)
+                Ln.e("Failed to close shell-owned VDM display", failure)
             }
         } else {
             vd?.release()
@@ -166,20 +184,19 @@ object VirtualDisplayManager {
         Ln.i("Physical display rotation: $physicalRotation")
 
         val selection = selectDisplay(surface, cfg, flags)
-        val vd = selection.display
-        vdmSession.set(selection.vdmSession)
-        virtualDisplay.set(vd)
-        val vdId = vd.display.displayId
+        virtualDisplay.set(selection.legacyDisplay)
+        remoteVdmActive.set(selection.remoteVdm)
+        val vdId = selection.displayId
         displayId.set(vdId)
 
-        val d = vd.display
+        val d = ServiceManager.getDisplayManager().getDisplayInfo(vdId)
         val groupId = runCatching {
             ServiceManager.getDisplayManager().getDisplayGroupId(vdId)
         }.onFailure { Ln.w("Could not read VD display group: ${it.message}") }.getOrNull()
         Ln.i(
             "VD created: id=$vdId" +
                     ", configured=${cfg.width}x${cfg.height}" +
-                    ", actual=${d.mode.physicalWidth}x${d.mode.physicalHeight}" +
+                    ", actual=${d.size.width}x${d.size.height}" +
                     ", rotation=${d.rotation}" +
                     ", groupId=${groupId ?: "unknown"}" +
                     ", requestedFlags=0x${flags.toString(16)}" +
@@ -193,7 +210,8 @@ object VirtualDisplayManager {
             // 所有旋转非零的情况都先尝试 freezeRotation
             runCatching {
                 wm.freezeRotation(vdId, Surface.ROTATION_0)
-                Ln.i("freezeRotation done, post-freeze rotation=${vd.display.rotation}")
+                val rotation = ServiceManager.getDisplayManager().getDisplayInfo(vdId).rotation
+                Ln.i("freezeRotation done, post-freeze rotation=$rotation")
             }.onFailure { e -> Ln.w("freezeRotation failed: ${e.message}") }
 
             if (physicalRotation == Surface.ROTATION_0) {
@@ -246,21 +264,21 @@ object VirtualDisplayManager {
             return attachLegacySurface(legacy, surface)
         }
 
-        var independent: VdmDisplaySession? = null
         val legacyId = legacy.display.displayId
         try {
-            independent = VdmDisplayFactory.create(
+            val service = vdmShellService.get()
+                ?: throw IllegalStateException("VDM shell sidecar is unavailable")
+            val independentId = service.createDisplay(
                 VD_NAME,
                 cfg.width,
                 cfg.height,
                 cfg.dpi,
                 surface,
+                currentAndroidUserId(),
             )
-            independent.awaitReady()
 
             // VDM 默认让可信显示使用本地输入法，这与旧 VD 不同；正式采用候选显示前，
             // 恢复为旧路径使用的回退显示输入法策略。
-            val independentId = independent.display.display.displayId
             val windowManager = ServiceManager.getWindowManager()
             val imePolicy = runCatching {
                 windowManager.setDisplayImePolicy(
@@ -278,24 +296,16 @@ object VirtualDisplayManager {
 
             // 仅在 VDM 显示进入独立显示组且状态为 STATE_ON 后，才正式切换。
             legacy.release()
-            VdmDiagnostics.reportSuccess(independent.display.display, legacyId, imePolicy)
-            return DisplaySelection(independent.display, independent)
+            VdmDiagnostics.reportRemoteSuccess(independentId, legacyId, imePolicy)
+            return DisplaySelection(independentId, remoteVdm = true)
         } catch (failure: Exception) {
-            VdmDiagnostics.reportFallback(failure, independent?.display?.display, legacyId)
+            closeRejectedRemoteDisplay()
+            VdmDiagnostics.reportFallback(failure, null, legacyId)
         } catch (failure: LinkageError) {
-            VdmDiagnostics.reportFallback(failure, independent?.display?.display, legacyId)
+            closeRejectedRemoteDisplay()
+            VdmDiagnostics.reportFallback(failure, null, legacyId)
         }
 
-        independent?.let { candidate ->
-            try {
-                candidate.detachSurface()
-                candidate.close()
-            } catch (cleanupFailure: Exception) {
-                Ln.e("Failed to clean up rejected independent display", cleanupFailure)
-            } catch (cleanupFailure: LinkageError) {
-                Ln.e("Rejected independent display cleanup API unavailable", cleanupFailure)
-            }
-        }
         return attachLegacySurface(legacy, surface)
     }
 
@@ -304,10 +314,19 @@ object VirtualDisplayManager {
         surface: Surface,
     ): DisplaySelection = try {
         legacy.setSurface(surface)
-        DisplaySelection(legacy)
+        DisplaySelection(legacy.display.displayId, legacyDisplay = legacy)
     } catch (failure: Throwable) {
         legacy.release()
         throw failure
+    }
+
+    private fun closeRejectedRemoteDisplay() {
+        runCatching { vdmShellService.get()?.closeDisplay(true) }
+            .onFailure { Ln.e("Failed to clean up rejected shell-owned VDM display", it) }
+    }
+
+    private fun currentAndroidUserId(): Int = androidUserId.get().also { userId ->
+        check(userId >= 0) { "Android user was not configured" }
     }
 
     private fun buildDisplayFlags(): Int {

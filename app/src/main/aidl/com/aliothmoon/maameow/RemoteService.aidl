@@ -2,6 +2,7 @@ package com.aliothmoon.maameow;
 
 import android.content.Intent;
 import android.os.ParcelFileDescriptor;
+import android.os.IBinder;
 import android.view.Surface;
 import com.aliothmoon.maameow.ITouchEventCallback;
 import com.aliothmoon.maameow.MaaCoreService;
@@ -10,9 +11,9 @@ import com.aliothmoon.maameow.remote.PermissionStateInfo;
 
 interface RemoteService {
 
-    oneway void destroy() = 16777114; // Destroy method defined by Shizuku server
+    oneway void destroy() = 16777114; // Shizuku 服务端定义的销毁方法
 
-    void exit() = 1; // Exit method defined by user
+    void exit() = 1; // 用户服务定义的退出方法
 
     String version() = 2;
 
@@ -38,7 +39,7 @@ interface RemoteService {
 
     void stopVirtualDisplay() = 15;
 
-    // contact: 手指 id 0..15，与 MotionEvent pointer id 一致
+    // 触点：手指 ID 为 0..15，与 MotionEvent 的 pointer ID 一致
     oneway void touchDown(int x, int y, int contact) = 17;
 
     oneway void touchMove(int x, int y, int contact) = 18;
@@ -77,7 +78,7 @@ interface RemoteService {
     // 避免跨进程读取 ashmem 被 SELinux 拒绝）。返回保存的绝对路径，失败返回 null。仅调试模式 UI 调用。
     String captureFramePng(String dirPath) = 31;
 
-    // 把漂移到其它 display 的应用任务拉回虚拟显示器，成功返回 true
+    // 把漂移到其他显示器的应用任务拉回虚拟显示器，成功返回 true
     boolean moveAppToVirtualDisplay(String packageName) = 32;
 
     int unlock(String credential) = 33;
@@ -123,4 +124,8 @@ interface RemoteService {
 
     // 替被杀的上一个提权进程翻系统日志
     String dumpSystemLog(long sinceMs, long untilMs, int pid, String processPrefix) = 53;
+
+    // Android 14+ 永久 shell 身份的 VDM 辅助进程；App 侧连接器会先挂载它，
+    // 再将主服务发布为已连接。
+    void attachVdmShellService(IBinder service) = 54;
 }

@@ -2,7 +2,6 @@ package com.aliothmoon.maameow.remote.internal.display
 
 import android.hardware.display.VirtualDisplay
 import android.os.Build
-import android.view.Surface
 import androidx.annotation.RequiresApi
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -10,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 internal class VdmDisplaySession internal constructor(
     private val address: String,
+    private val userId: Int,
     private val virtualDevice: VirtualDeviceHandle,
     val display: VirtualDisplay,
 ) : AutoCloseable {
@@ -19,10 +19,6 @@ internal class VdmDisplaySession internal constructor(
     fun awaitReady() {
         check(!closed.get()) { "Independent display is already closed" }
         VdmDiagnostics.awaitDisplayOn(display.display)
-    }
-
-    fun detachSurface() {
-        if (!closed.get()) display.setSurface(null)
     }
 
     override fun close() = release(removeAssociation = true)
@@ -35,32 +31,19 @@ internal class VdmDisplaySession internal constructor(
 
         var failure: Throwable? = null
         try {
-            BinderIdentityRunner.onOwnerThread(
-                action = {
-                    BinderIdentityRunner.withShellIdentity {
-                        try {
-                            display.setSurface(null)
-                            display.release()
-                        } finally {
-                            virtualDevice.close()
-                        }
-                    }
-                },
-                onAbandoned = {
-                    if (removeAssociation) CompanionAssociation.remove(address)
-                },
-                onAbandonedFailure = {
-                    if (removeAssociation) CompanionAssociation.remove(address)
-                },
-            )
+            try {
+                display.setSurface(null)
+                display.release()
+            } finally {
+                virtualDevice.close()
+            }
         } catch (t: Throwable) {
             failure = t
         }
 
-        // A timed-out owner task still needs the association until its delayed cleanup runs.
-        if (removeAssociation && failure !is OwnerThreadAbandonedException) {
+        if (removeAssociation) {
             try {
-                CompanionAssociation.remove(address)
+                CompanionAssociation.remove(address, userId)
             } catch (cleanupFailure: Throwable) {
                 if (failure == null) {
                     failure = cleanupFailure

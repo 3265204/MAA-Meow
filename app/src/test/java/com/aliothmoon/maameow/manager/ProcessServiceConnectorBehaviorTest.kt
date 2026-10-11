@@ -84,6 +84,7 @@ class ProcessServiceConnectorBehaviorTest {
         registry: BootstrapRegistry,
         private val logFile: File,
         timeoutMs: Long,
+        enableSidecar: Boolean = false,
     ) : ProcessServiceConnectorBackend(spawner, registry) {
         override val backend = RemoteBackend.ROOT
         override val eventPrefix = "FAKE"
@@ -91,12 +92,32 @@ class ProcessServiceConnectorBehaviorTest {
         override val serviceClass: Class<*> = Any::class.java
         override val logFileName = "fake.log"
         override val spawnTimeoutMs = timeoutMs
+        override val sidecarServiceClass: Class<*>? = Any::class.java.takeIf { enableSidecar }
 
         private val tokens = LinkedBlockingQueue<String>()
+        val attachedSidecars = LinkedBlockingQueue<Pair<IBinder, IBinder>>()
+        val destroyedSidecars = AtomicInteger()
 
         override fun buildStartCommand(token: String, logFile: File): String {
             tokens.add(token)
             return "fake-cmd"
+        }
+
+        override fun buildSidecarStartCommand(
+            token: String,
+            logFile: File,
+            targetClass: Class<*>,
+        ): String {
+            tokens.add(token)
+            return "fake-sidecar-cmd"
+        }
+
+        override fun attachSidecar(primaryBinder: IBinder, sidecarBinder: IBinder) {
+            attachedSidecars.add(primaryBinder to sidecarBinder)
+        }
+
+        override fun destroySidecar(sidecarBinder: IBinder) {
+            destroyedSidecars.incrementAndGet()
         }
 
         override fun debugLogFile(): File = logFile
@@ -131,11 +152,11 @@ class ProcessServiceConnectorBehaviorTest {
         fun awaitError() = errorLatch.await(5, TimeUnit.SECONDS)
     }
 
-    private inner class Harness(timeoutMs: Long = 300L) {
+    private inner class Harness(timeoutMs: Long = 300L, enableSidecar: Boolean = false) {
         val spawner = FakeSpawner()
         val registry = FakeRegistry()
         val callbacks = RecordingCallbacks()
-        val connector = FakeConnector(spawner, registry, logFile, timeoutMs).apply {
+        val connector = FakeConnector(spawner, registry, logFile, timeoutMs, enableSidecar).apply {
             initialize(mockk<Context>(relaxed = true), logFile.parentFile!!)
         }
 
@@ -270,5 +291,39 @@ class ProcessServiceConnectorBehaviorTest {
         assertNotNull("新 token 仍在等待", h.registry.pending[token2])
         assertTrue(h.callbacks.connected.isEmpty())
         h.connector.disconnect(null)
+    }
+
+    @Test
+    fun sidecar_isAttachedBeforePrimaryIsPublished() {
+        val h = Harness(timeoutMs = 5_000L, enableSidecar = true)
+        val primary = mockk<IBinder>(relaxed = true)
+        val sidecar = mockk<IBinder>(relaxed = true)
+
+        h.connector.connect(h.callbacks)
+        assertTrue(h.registry.attach(h.connector.awaitToken(), primary))
+        val sidecarToken = h.connector.awaitToken()
+
+        assertTrue("主服务必须等 sidecar attach 后才能发布", h.callbacks.connected.isEmpty())
+        assertTrue(h.registry.attach(sidecarToken, sidecar))
+        assertTrue(h.callbacks.awaitConnected())
+
+        assertEquals(primary to sidecar, h.connector.attachedSidecars.poll(1, TimeUnit.SECONDS))
+        assertEquals(2, h.spawner.spawnCalls.get())
+    }
+
+    @Test
+    fun sidecarTimeout_keepsPrimaryAndFallsBack() {
+        val h = Harness(timeoutMs = 300L, enableSidecar = true)
+        val primary = mockk<IBinder>(relaxed = true)
+
+        h.connector.connect(h.callbacks)
+        assertTrue(h.registry.attach(h.connector.awaitToken(), primary))
+        h.connector.awaitToken()
+
+        assertTrue("sidecar 失败不能拖死主服务", h.callbacks.awaitConnected())
+        assertEquals(listOf(primary), h.callbacks.connected)
+        assertTrue(h.callbacks.errors.isEmpty())
+        assertTrue("失败的 sidecar 必须清残留", h.spawner.awaitKill())
+        assertEquals(2 * (300L + 3_000L), h.connector.worstCaseConnectMs)
     }
 }

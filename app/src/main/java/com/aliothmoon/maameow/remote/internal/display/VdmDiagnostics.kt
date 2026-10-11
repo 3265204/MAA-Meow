@@ -61,12 +61,14 @@ internal object VdmDiagnostics {
         )
     }
 
-    fun reportSuccess(display: Display, legacyId: Int, imePolicy: String) {
+    fun reportRemoteSuccess(displayId: Int, legacyId: Int, imePolicy: String) {
+        val groupId = runCatching {
+            ServiceManager.getDisplayManager().getDisplayGroupId(displayId)
+        }.getOrNull()
         Ln.i(
             commonPrefix("selected") +
-                " stage=complete legacyId=$legacyId displayId=${display.displayId}" +
-                " groupId=${readGroupId(display) ?: "unknown"}" +
-                " state=${display.state} imePolicy=$imePolicy"
+                " owner=shell-sidecar stage=complete legacyId=$legacyId displayId=$displayId" +
+                " groupId=${groupId ?: "unknown"} imePolicy=$imePolicy"
         )
     }
 
@@ -99,8 +101,8 @@ internal object VdmDiagnostics {
     @Suppress("DEPRECATION")
     private fun commonPrefix(result: String): String {
         val identity = when (Process.myUid()) {
-            Process.ROOT_UID -> "root-owner-shell"
-            Process.SHELL_UID -> "shell-direct"
+            Process.ROOT_UID -> "root-controller"
+            Process.SHELL_UID -> "shell-process"
             else -> "unsupported-uid-${Process.myUid()}"
         }
         val effectiveUid = runCatching { Os.geteuid() }.getOrDefault(-1)
