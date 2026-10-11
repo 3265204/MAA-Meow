@@ -61,6 +61,8 @@
     <string name="maa_penguin_upload_unknown_drops">未识别掉落物</string>
     <string name="maa_missing_operators">以下干员组中没有符合本次作业要求的干员（未拥有或属性未达标）：</string>
     <string name="maa_copilot_user_additional_name_invalid">追加自定干员名称无效: %1$s，请检查拼写</string>
+    <string name="maa_copilot_operbox_data_parse_failed">干员识别数据解析失败</string>
+    <string name="maa_depot_template_load_error">仓库识别模板加载失败（%1$s），已停止识别；资源文件可能已损坏，可在「设置 → 更新管理 → 重新初始化资源」修复后重试</string>
 
     <!-- subtask_start -->
     <string name="maa_mission_start">已开始行动</string>

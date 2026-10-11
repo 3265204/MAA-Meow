@@ -620,6 +620,8 @@
     <string name="maa_penguin_upload_unknown_drops">Unknown drops</string>
     <string name="maa_missing_operators">No operators in the following groups meet this operation\'s requirements (not owned or attributes below the requirements):</string>
     <string name="maa_copilot_user_additional_name_invalid">Additional custom Operator name invalid: %1$s, please check spelling</string>
+    <string name="maa_copilot_operbox_data_parse_failed">Failed to parse operator box data</string>
+    <string name="maa_depot_template_load_error">Failed to load depot recognition templates (%1$s); recognition stopped. Resource files may be corrupted; go to Settings → Updates → Reinitialize Resources and retry</string>
     <string name="maa_mission_start">Mission started</string>
     <string name="maa_stone_used">Originite Prime used</string>
     <string name="maa_acting_command_error">PRTS error</string>

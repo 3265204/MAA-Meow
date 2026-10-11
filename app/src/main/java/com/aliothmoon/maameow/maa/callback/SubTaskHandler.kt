@@ -165,6 +165,39 @@ class SubTaskHandler(
                         val name = innerDetails?.getString("name") ?: ""
                         append(str("CopilotUserAdditionalNameInvalid", name), LogLevel.ERROR)
                     }
+
+                    "CopilotFileReadError" -> append(
+                        resources.getString(R.string.copilot_file_read_error),
+                        LogLevel.ERROR
+                    )
+
+                    "CopilotStageNotSupported" -> {
+                        val stage = innerDetails?.getString("stage_name") ?: ""
+                        append(
+                            resources.getString(R.string.copilot_unsupported_stage, stage),
+                            LogLevel.ERROR
+                        )
+                    }
+
+                    "OperboxDataParseFailed" -> append(
+                        str("CopilotOperboxDataParseFailed"),
+                        LogLevel.ERROR
+                    )
+                }
+            }
+
+            "DepotRecognitionTask" -> {
+                if (details.getString("what") == "DepotTemplateLoadError") {
+                    val ids = details.getJSONObject("details")?.getJSONArray("item_ids")
+                        ?.mapNotNull { (it as? String)?.ifEmpty { null } }
+                        .orEmpty()
+                    append(str("DepotTemplateLoadError", ids.joinToString(", ")), LogLevel.ERROR)
+                }
+                ioScope.launch {
+                    achievementRepository.report {
+                        event = AchievementEvents.SUB_TASK_ERROR
+                        "subtask" to subtask
+                    }
                 }
             }
 
