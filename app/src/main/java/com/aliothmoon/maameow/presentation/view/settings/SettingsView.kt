@@ -178,6 +178,7 @@ fun SettingsView(
     val penguinId by viewModel.penguinId.collectAsStateWithLifecycle()
     val yituliuOpenApiToken by viewModel.yituliuOpenApiToken.collectAsStateWithLifecycle()
     val operBoxUseYituliuApi by viewModel.operBoxUseYituliuApi.collectAsStateWithLifecycle()
+    val operBoxAssist by viewModel.operBoxAssistState.collectAsStateWithLifecycle()
     val yituliuVerifyMessage by viewModel.yituliuVerifyMessage.collectAsStateWithLifecycle()
     val yituliuVerifying by viewModel.yituliuVerifying.collectAsStateWithLifecycle()
     val forceFullscreenOnVirtualDisplay by viewModel.forceFullscreenOnVirtualDisplay.collectAsStateWithLifecycle()
@@ -918,6 +919,17 @@ fun SettingsView(
                                     contentColor = contentColor,
                                     checked = operBoxUseYituliuApi,
                                     onCheckedChange = { viewModel.setOperBoxUseYituliuApi(it) }
+                                )
+                            }
+                            ListItemDivider()
+                            SettingSearchTarget(R.string.panel_autobattle_operbox_assist) {
+                                SettingSwitchItem(
+                                    title = stringResource(R.string.panel_autobattle_operbox_assist),
+                                    description = stringResource(R.string.settings_oper_box_assist_desc),
+                                    contentColor = contentColor,
+                                    checked = operBoxAssist.active,
+                                    enabled = operBoxAssist.available,
+                                    onCheckedChange = { viewModel.setOperBoxAssistEnabled(it) }
                                 )
                             }
                         }

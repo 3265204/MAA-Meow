@@ -25,14 +25,22 @@ class CopilotOperBoxAssist(
         val yituliuEnabled: Boolean = false,
         val dataUsable: Boolean = false,
         val syncTimeMillis: Long = 0L,
+        /** 用户开关；数据不可用时保留，恢复后自动生效 */
+        val enabled: Boolean = false,
     ) {
         val available: Boolean get() = yituliuEnabled && dataUsable
+        val active: Boolean get() = enabled && available
     }
 
-    val state: Flow<State> =
-        combine(appSettings.operBoxUseYituliuApi, operBoxRepository.snapshot) { enabled, snap ->
-            State(enabled, snap.canAssistFormation, snap.syncTimeMillis)
-        }
+    val state: Flow<State> = combine(
+        appSettings.operBoxUseYituliuApi,
+        appSettings.operBoxAssistEnabled,
+        operBoxRepository.snapshot,
+    ) { yituliu, enabled, snap ->
+        State(yituliu, snap.canAssistFormation, snap.syncTimeMillis, enabled)
+    }
+
+    suspend fun setEnabled(enabled: Boolean) = appSettings.setOperBoxAssistEnabled(enabled)
 
     suspend fun writeCoreData(): String? = withContext(Dispatchers.IO) {
         val file = File(pathConfig.rootDir, "${MaaFiles.OPER_BOX_DATA_DIR}/${MaaFiles.OPER_BOX_DATA_FILE}")

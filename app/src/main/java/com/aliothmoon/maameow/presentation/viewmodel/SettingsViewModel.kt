@@ -23,6 +23,7 @@ import com.aliothmoon.maameow.domain.models.CoreDataLocation
 import com.aliothmoon.maameow.domain.models.RemoteBackend
 import com.aliothmoon.maameow.domain.notification.LiveUpdatePublisher
 import com.aliothmoon.maameow.domain.service.AchievementReporter
+import com.aliothmoon.maameow.domain.service.CopilotOperBoxAssist
 import com.aliothmoon.maameow.domain.service.CoreDataPusher
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
 import com.aliothmoon.maameow.domain.service.MaaResourceLoader
@@ -71,6 +72,7 @@ class SettingsViewModel(
     private val compositionService: MaaCompositionService,
     private val yituliuApiService: YituliuApiService,
     private val livePublisher: LiveUpdatePublisher,
+    private val operBoxAssist: CopilotOperBoxAssist,
 ) : ViewModel() {
 
     // ========== 导入导出 ==========
@@ -315,6 +317,14 @@ class SettingsViewModel(
 
     fun setOperBoxUseYituliuApi(enabled: Boolean) {
         viewModelScope.launch { appSettingsManager.setOperBoxUseYituliuApi(enabled) }
+    }
+
+    /** 与自动战斗页同一个开关 */
+    val operBoxAssistState: StateFlow<CopilotOperBoxAssist.State> = operBoxAssist.state
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CopilotOperBoxAssist.State())
+
+    fun setOperBoxAssistEnabled(enabled: Boolean) {
+        viewModelScope.launch { operBoxAssist.setEnabled(enabled) }
     }
 
     /** [ok] 决定提示用什么颜色 */

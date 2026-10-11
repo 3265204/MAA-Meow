@@ -548,16 +548,14 @@ fun AutoBattlePanel(
 
                             val assist = state.operBoxAssist
                             CheckBoxWithExpandableTip(
-                                checked = state.config.useOperBoxAssist && assist.available,
-                                onCheckedChange = {
-                                    viewModel.onConfigChanged(state.config.copy(useOperBoxAssist = it))
-                                },
+                                checked = assist.active,
+                                onCheckedChange = viewModel::onToggleOperBoxAssist,
                                 label = stringResource(R.string.panel_autobattle_operbox_assist),
                                 tipText = stringResource(R.string.panel_autobattle_operbox_assist_tip),
                                 enabled = assist.available,
                             )
                             // 数据不可用时也露出同步入口，免得勾不上又找不到去哪拉数据
-                            if (assist.yituliuEnabled && (state.config.useOperBoxAssist || !assist.dataUsable)) {
+                            if (assist.yituliuEnabled && (assist.enabled || !assist.dataUsable)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         text = if (assist.syncTimeMillis > 0L) {

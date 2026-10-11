@@ -165,6 +165,7 @@
     <string name="settings_yituliu_token_valid_no_data">Token is valid, but the account has no operator data</string>
     <string name="settings_oper_box_yituliu_title">Fetch operator data from Yituliu</string>
     <string name="settings_oper_box_yituliu_desc">Fetches from Yituliu instead of recognising in-game screenshots. Data comes from Skland imports and only exists for the CN server.</string>
+    <string name="settings_oper_box_assist_desc">Pre-matches the auto-battle squad against your Yituliu operator data before formation; same switch as the option on the Copilot page. Requires the option above and synced Yituliu data</string>
     <string name="oper_box_yituliu_fetching">Fetching operator data from Yituliu…</string>
     <string name="oper_box_yituliu_done">Fetched %1$d operators from Yituliu</string>
     <string name="oper_box_yituliu_done_skipped">Fetched %1$d operators from Yituliu; %2$d not present in local resources were skipped</string>

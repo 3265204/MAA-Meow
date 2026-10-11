@@ -1190,7 +1190,8 @@ class CopilotViewModel(
             }
 
             val config = buildEffectiveConfig(snapshot)
-            val operBoxDataPath = if (config.useOperBoxAssist) {
+            // 只在自动编队时预检，非常规页签的自动编队已在 buildEffectiveConfig 关掉
+            val operBoxDataPath = if (config.formation && snapshot.operBoxAssist.active) {
                 operBoxAssist.writeCoreData() ?: run {
                     _state.update { it.copy(statusMessage = text(R.string.copilot_operbox_assist_write_failed)) }
                     return@launch
@@ -1222,6 +1223,10 @@ class CopilotViewModel(
             runtimeStateStore.resetCurrentCopilotIndex()
             _state.update { it.copy(statusMessage = text(R.string.toolbox_status_stopped)) }
         }
+    }
+
+    fun onToggleOperBoxAssist(enabled: Boolean) {
+        viewModelScope.launch { operBoxAssist.setEnabled(enabled) }
     }
 
     /** 拉一图流练度，不连提权服务；成功后 [CopilotOperBoxAssist.state] 随快照刷新 */
@@ -1410,9 +1415,6 @@ class CopilotViewModel(
                 addUserAdditional = false,
                 userAdditional = ""
             )
-        }
-        if (!config.formation || !snapshot.operBoxAssist.available) {
-            config = config.copy(useOperBoxAssist = false)
         }
         if (!supportsLoopCount(snapshot.tabIndex)) {
             config = config.copy(loop = false, loopTimes = 1)

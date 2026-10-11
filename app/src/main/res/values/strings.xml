@@ -399,6 +399,7 @@
     <string name="settings_yituliu_token_valid_no_data">Token 有效，但账号暂无干员练度数据</string>
     <string name="settings_oper_box_yituliu_title">干员识别从一图流获取</string>
     <string name="settings_oper_box_yituliu_desc">开启后不再进游戏截图识别，改为拉取一图流数据；数据来自森空岛导入，仅国服有</string>
+    <string name="settings_oper_box_assist_desc">自动战斗编队前按一图流练度预匹配作业编队，与自动战斗页同名选项是同一个开关；需开启上一项并同步过一图流数据</string>
     <string name="oper_box_yituliu_fetching">正在从一图流获取干员数据…</string>
     <string name="oper_box_yituliu_done">已从一图流获取 %1$d 名干员</string>
     <string name="oper_box_yituliu_done_skipped">已从一图流获取 %1$d 名干员，%2$d 名在本地资源中不存在，已跳过</string>

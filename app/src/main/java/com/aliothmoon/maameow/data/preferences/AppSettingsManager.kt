@@ -797,6 +797,15 @@ class AppSettingsManager internal constructor(
         }
     }
 
+    val operBoxAssistEnabled: StateFlow<Boolean> =
+        setting { it.operBoxAssistEnabled.toBooleanStrictOrNull() ?: false }
+
+    suspend fun setOperBoxAssistEnabled(enabled: Boolean) {
+        with(AppSettingsSchema) {
+            context.dataStore.edit { it[operBoxAssistEnabled] = enabled.toString() }
+        }
+    }
+
     val telemetryEnabled: StateFlow<Boolean> = setting { it.telemetryEnabled.toBooleanStrictOrNull() ?: true }
 
     suspend fun setTelemetryEnabled(enabled: Boolean) {

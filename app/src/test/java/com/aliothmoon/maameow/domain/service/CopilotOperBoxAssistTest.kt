@@ -44,12 +44,14 @@ class CopilotOperBoxAssistTest {
 
     private fun assist(
         yituliu: Boolean = true,
+        enabled: Boolean = true,
         owned: List<OperBoxOperator> = listOf(trained),
         version: Int = OperBoxSnapshot.CURRENT_VERSION,
         root: File = tmp.root,
     ): CopilotOperBoxAssist {
         val settings = mockk<AppSettingsManager> {
             every { operBoxUseYituliuApi } returns MutableStateFlow(yituliu)
+            every { operBoxAssistEnabled } returns MutableStateFlow(enabled)
         }
         val repo = mockk<OperBoxRepository> {
             every { snapshot } returns MutableStateFlow(
@@ -70,6 +72,16 @@ class CopilotOperBoxAssistTest {
         assertTrue(assist().available())
         assertFalse(assist(yituliu = false).available())
         assertFalse(assist(owned = listOf(recognized)).available())
+    }
+
+    @Test
+    fun switchOffKeepsAvailabilityButIsNotActive() = runTest {
+        val state = assist(enabled = false).state.first()
+        assertTrue(state.available)
+        assertFalse(state.active)
+        assertTrue(assist().state.first().active)
+        // 数据不可用时保留用户开关，但不生效
+        assertFalse(assist(yituliu = false).state.first().active)
     }
 
     @Test
