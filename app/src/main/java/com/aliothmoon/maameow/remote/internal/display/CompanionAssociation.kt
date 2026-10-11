@@ -19,7 +19,12 @@ internal object CompanionAssociation {
     private const val SHELL_PACKAGE = "com.android.shell"
     private const val STREAMING_PROFILE = "android.app.role.COMPANION_DEVICE_APP_STREAMING"
     private const val COMMAND_TIMEOUT_SECONDS = 5L
-    private const val ASSOCIATION_TIMEOUT_MS = 3_000L
+    // 带 profile 的关联要等 RoleController 异步回调后才会入库；AOSP 的远端请求
+    // 超时是 15 秒，轮询预算必须覆盖它，避免超时回落后关联又迟到写入。
+    private const val ASSOCIATION_TIMEOUT_MS = 17_000L
+    // cmd 本地超时时，system_server 的 RoleController 请求仍可能在 15 秒窗口内完成。
+    // 失败清理必须覆盖同一完整预算，不能只观察几秒便留下迟到关联。
+    private const val FAILED_ENSURE_CLEANUP_GRACE_MS = ASSOCIATION_TIMEOUT_MS
     private const val ASSOCIATION_POLL_MS = 100L
 
     private const val COMPANION_INTERFACE = "android.companion.ICompanionDeviceManager"
@@ -36,8 +41,31 @@ internal object CompanionAssociation {
     }
 
     fun ensure(address: String, userId: Int): AssociationInfo {
-        find(address, userId)?.let { return it }
+        find(address, userId)?.let { association ->
+            if (!requiresStreamingProfileMigration(association.deviceProfile, Build.VERSION.SDK_INT)) {
+                return association
+            }
+            remove(address, userId)
+            check(awaitRemoval(address, userId)) {
+                "Legacy companion association was not removed before migration"
+            }
+        }
 
+        val command = buildAssociateCommand(address, userId, Build.VERSION.SDK_INT)
+        try {
+            // 命令进程即使超时，system_server 也可能已经受理了异步创建请求。
+            runCommand(*command.toTypedArray())
+            val association = await(address, userId)
+                ?: throw IllegalStateException("Companion association was not created")
+            return association
+        } catch (failure: Throwable) {
+            runCatching { cleanupFailedEnsure(address, userId) }
+                .onFailure(failure::addSuppressed)
+            throw failure
+        }
+    }
+
+    internal fun buildAssociateCommand(address: String, userId: Int, sdkInt: Int): List<String> {
         val command = mutableListOf(
             "cmd",
             "companiondevice",
@@ -48,14 +76,15 @@ internal object CompanionAssociation {
         )
         // Android 14 的 shell 命令只消费前三个参数；15+ 才正式支持 profile 和
         // self-managed 参数。按平台能力组装命令，避免依赖“忽略多余参数”的实现细节。
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (sdkInt >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
             command += STREAMING_PROFILE
             command += "false"
         }
-        runCommand(*command.toTypedArray())
-        return await(address, userId)
-            ?: throw IllegalStateException("Companion association was not created")
+        return command
     }
+
+    internal fun requiresStreamingProfileMigration(deviceProfile: String?, sdkInt: Int): Boolean =
+        sdkInt >= Build.VERSION_CODES.VANILLA_ICE_CREAM && deviceProfile != STREAMING_PROFILE
 
     fun cleanupStale(userId: Int) {
         val address = address(userId)
@@ -105,6 +134,28 @@ internal object CompanionAssociation {
             SystemClock.sleep(ASSOCIATION_POLL_MS)
         } while (SystemClock.elapsedRealtime() < deadline)
         return find(address, userId) == null
+    }
+
+    private fun cleanupFailedEnsure(address: String, userId: Int) {
+        val deadline = SystemClock.elapsedRealtime() + FAILED_ENSURE_CLEANUP_GRACE_MS
+        do {
+            if (find(address, userId) != null) {
+                remove(address, userId)
+                check(awaitRemoval(address, userId)) {
+                    "Failed companion association was not removed"
+                }
+                return
+            }
+            SystemClock.sleep(ASSOCIATION_POLL_MS)
+        } while (SystemClock.elapsedRealtime() < deadline)
+
+        // 封住轮询截止与最终检查之间的边界。
+        if (find(address, userId) != null) {
+            remove(address, userId)
+            check(awaitRemoval(address, userId)) {
+                "Late companion association was not removed"
+            }
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

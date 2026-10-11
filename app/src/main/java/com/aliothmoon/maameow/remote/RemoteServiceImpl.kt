@@ -83,14 +83,12 @@ class RemoteServiceImpl : RemoteService.Stub() {
     private val virtualDisplayMode = AtomicInteger(DisplayMode.PRIMARY)
     private val appPid = AtomicInteger(0)
     private val destroyed = AtomicBoolean(false)
-    private var vdmShellBinder: IBinder? = null
-    private val vdmShellDeath = IBinder.DeathRecipient {
-        Thread {
-            Ln.e("$TAG: VDM shell sidecar died; restarting privileged service")
-            performEmergencyCleanup()
-            exitProcess(1)
-        }.apply { name = "vdm-shell-death" }.start()
-    }
+    private val vdmShellLock = Any()
+    private var vdmShellConnection: VdmShellConnection? = null
+    private data class VdmShellConnection(
+        val binder: IBinder,
+        val deathRecipient: IBinder.DeathRecipient,
+    )
     /** 同一进程内 setup 幂等：成功后再调直接返回 OK，失败则下次重试 */
     private var setup = false
     private val coreData = CoreDataStore()
@@ -111,8 +109,12 @@ class RemoteServiceImpl : RemoteService.Stub() {
         }
         Ln.i("$TAG: destroy()")
         // 从这里开始，辅助进程退出属于正常清理流程，不能再按崩溃处理。
-        vdmShellBinder?.let { runCatching { it.unlinkToDeath(vdmShellDeath, 0) } }
-        vdmShellBinder = null
+        synchronized(vdmShellLock) {
+            vdmShellConnection?.let { connection ->
+                runCatching { connection.binder.unlinkToDeath(connection.deathRecipient, 0) }
+            }
+            vdmShellConnection = null
+        }
         InputControlUtils.setTouchCallback(null)
         GameFpsMonitor.stop()
         StaleFrameGuard.stop()
@@ -167,7 +169,7 @@ class RemoteServiceImpl : RemoteService.Stub() {
         RemoteBootTrace.mark("SETUP_XMSF_RESTORED")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             runCatching { VirtualDisplayManager.cleanupStaleState() }
-                .onFailure { Ln.w("VDM boot cleanup failed: ${it.message}") }
+                .onFailure { Ln.e("VDM boot cleanup failed; stale association may remain", it) }
         }
         // 不可访问的路径进 AsstSetUserDir 会 abort 整个进程（#227），这里只报告，换到哪由用户在设置里决定
         val dir = File(userDir.orEmpty())
@@ -516,16 +518,50 @@ class RemoteServiceImpl : RemoteService.Stub() {
 
     override fun attachVdmShellService(service: IBinder) {
         val callerUid = Binder.getCallingUid()
-        val old = vdmShellBinder
-        if (old === service) return
-        old?.let { runCatching { it.unlinkToDeath(vdmShellDeath, 0) } }
-        service.linkToDeath(vdmShellDeath, 0)
-        vdmShellBinder = service
-        VirtualDisplayManager.attachVdmShellService(
-            serviceBinder = service,
-            appUid = callerUid,
-            ownerBinder = asBinder(),
-        )
+        synchronized(vdmShellLock) {
+            val old = vdmShellConnection
+            if (old?.binder === service) return
+
+            // attachOwner 可能抛异常；先完成它，再注册 death recipient，避免失败的
+            // sidecar 日后死亡时误杀主服务。link 成功后才向 VDM 发布新连接。
+            val shellService = VirtualDisplayManager.prepareVdmShellService(
+                serviceBinder = service,
+                ownerBinder = asBinder(),
+            )
+            val deathRecipient = IBinder.DeathRecipient { onVdmShellDied(service) }
+            var linked = false
+            try {
+                service.linkToDeath(deathRecipient, 0)
+                linked = true
+                VirtualDisplayManager.commitVdmShellService(service, shellService, callerUid)
+                vdmShellConnection = VdmShellConnection(service, deathRecipient)
+            } catch (failure: Throwable) {
+                if (linked) runCatching { service.unlinkToDeath(deathRecipient, 0) }
+                throw failure
+            }
+            old?.let { connection ->
+                runCatching { connection.binder.unlinkToDeath(connection.deathRecipient, 0) }
+            }
+        }
+    }
+
+    private fun onVdmShellDied(deadBinder: IBinder) {
+        Thread {
+            val isCurrent = synchronized(vdmShellLock) {
+                val current = vdmShellConnection
+                if (current?.binder !== deadBinder) {
+                    false
+                } else {
+                    vdmShellConnection = null
+                    true
+                }
+            }
+            if (!isCurrent) return@Thread
+
+            Ln.e("$TAG: VDM shell sidecar died; falling back to legacy virtual display")
+            runCatching { VirtualDisplayManager.onVdmShellServiceDied(deadBinder) }
+                .onFailure { Ln.e("$TAG: Failed to fall back after VDM sidecar death", it) }
+        }.apply { name = "vdm-shell-death" }.start()
     }
 
     override fun isSmartResolutionEnabled(): Boolean {

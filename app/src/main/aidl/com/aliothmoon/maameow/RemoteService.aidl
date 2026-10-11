@@ -11,9 +11,9 @@ import com.aliothmoon.maameow.remote.PermissionStateInfo;
 
 interface RemoteService {
 
-    oneway void destroy() = 16777114; // Shizuku 服务端定义的销毁方法
+    oneway void destroy() = 16777114; // Destroy method defined by Shizuku server
 
-    void exit() = 1; // 用户服务定义的退出方法
+    void exit() = 1; // Exit method defined by user
 
     String version() = 2;
 
@@ -39,7 +39,7 @@ interface RemoteService {
 
     void stopVirtualDisplay() = 15;
 
-    // 触点：手指 ID 为 0..15，与 MotionEvent 的 pointer ID 一致
+    // contact: 手指 id 0..15，与 MotionEvent pointer id 一致
     oneway void touchDown(int x, int y, int contact) = 17;
 
     oneway void touchMove(int x, int y, int contact) = 18;
@@ -78,7 +78,7 @@ interface RemoteService {
     // 避免跨进程读取 ashmem 被 SELinux 拒绝）。返回保存的绝对路径，失败返回 null。仅调试模式 UI 调用。
     String captureFramePng(String dirPath) = 31;
 
-    // 把漂移到其他显示器的应用任务拉回虚拟显示器，成功返回 true
+    // 把漂移到其它 display 的应用任务拉回虚拟显示器，成功返回 true
     boolean moveAppToVirtualDisplay(String packageName) = 32;
 
     int unlock(String credential) = 33;

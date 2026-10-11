@@ -17,13 +17,20 @@ import com.aliothmoon.maameow.third.wrappers.WindowManager
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 
 object VirtualDisplayManager {
 
     private const val USER_UNSET = -1
     private const val STATE_IDLE = 0
-    private const val STATE_CAPTURING = 1
+    private const val STATE_STARTING = 1
+    private const val STATE_CAPTURING = 2
+    private const val STATE_STOPPING = 3
+    // Android 15 从旧 null-profile 关联迁移时，删除和重新关联各自都可能经历
+    // 5 秒命令预算与 17 秒异步等待；失败收尾还会再观察一个异步窗口。
+    private const val START_WAIT_TIMEOUT_MS = 75_000L
 
     private const val VIRTUAL_DISPLAY_FLAG_PUBLIC: Int = DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
     private const val VIRTUAL_DISPLAY_FLAG_PRESENTATION: Int =
@@ -58,8 +65,11 @@ object VirtualDisplayManager {
     private val displayId = AtomicInteger(DISPLAY_NONE)
     private val virtualDisplay = AtomicReference<VirtualDisplay?>()
     private val remoteVdmActive = AtomicBoolean(false)
-    private val vdmShellService = AtomicReference<VdmShellService?>()
+    private val vdmShellConnection = AtomicReference<VdmShellConnection?>()
+    private val sidecarLostDuringStart = AtomicBoolean(false)
     private val androidUserId = AtomicInteger(USER_UNSET)
+    private val lifecycleLock = ReentrantLock()
+    private val lifecycleChanged = lifecycleLock.newCondition()
 
     private val monitorSurface = AtomicReference<Surface?>()
 
@@ -69,14 +79,84 @@ object VirtualDisplayManager {
         val remoteVdm: Boolean = false,
     )
 
-    /** App 将主服务发布为已连接前，先挂载 VDM 辅助进程。 */
-    fun attachVdmShellService(serviceBinder: IBinder, appUid: Int, ownerBinder: IBinder) {
+    private data class VdmShellConnection(
+        val binder: IBinder,
+        val service: VdmShellService,
+    )
+
+    /**
+     * 先验证辅助进程并挂 owner，但不发布。调用方须在 linkToDeath 成功后再调用
+     * [commitVdmShellService]，避免 attach 失败留下一个会误触发死亡处理的 binder。
+     */
+    fun prepareVdmShellService(serviceBinder: IBinder, ownerBinder: IBinder): VdmShellService {
         val service = VdmShellService.Stub.asInterface(serviceBinder)
             ?: throw IllegalStateException("VDM shell service binder has no interface")
-        androidUserId.set(RootUserService.userIdFromUid(appUid))
         service.attachOwner(ownerBinder)
-        vdmShellService.set(service)
+        return service
+    }
+
+    fun commitVdmShellService(
+        serviceBinder: IBinder,
+        service: VdmShellService,
+        appUid: Int,
+    ) {
+        androidUserId.set(RootUserService.userIdFromUid(appUid))
+        vdmShellConnection.set(VdmShellConnection(serviceBinder, service))
         Ln.i("VDM shell sidecar attached for user=${androidUserId.get()}")
+    }
+
+    /** 辅助进程丢失只撤销 VDM 能力；正在使用独立显示时同步重建为旧 VD。 */
+    fun onVdmShellServiceDied(serviceBinder: IBinder) {
+        var restartOwned = false
+        var cleanupIdle = false
+        lifecycleLock.withLock {
+            val connection = vdmShellConnection.get()
+            if (connection?.binder !== serviceBinder ||
+                !vdmShellConnection.compareAndSet(connection, null)
+            ) return
+
+            sidecarLostDuringStart.set(true)
+            when (state.get()) {
+                STATE_STARTING -> Unit
+                STATE_CAPTURING -> {
+                    if (remoteVdmActive.get() &&
+                        state.compareAndSet(STATE_CAPTURING, STATE_STARTING)
+                    ) {
+                        sidecarLostDuringStart.set(false)
+                        restartOwned = true
+                        lifecycleChanged.signalAll()
+                    } else {
+                        sidecarLostDuringStart.set(false)
+                    }
+                }
+
+                STATE_IDLE -> {
+                    // 用短状态迁移挡住新 start，避免旧 sidecar 的清理命令删掉刚创建的关联。
+                    if (state.compareAndSet(STATE_IDLE, STATE_STOPPING)) {
+                        cleanupIdle = true
+                        lifecycleChanged.signalAll()
+                    }
+                }
+
+                STATE_STOPPING -> sidecarLostDuringStart.set(false)
+            }
+        }
+
+        if (restartOwned) {
+            finishOwnedRestart(removeAssociation = true)
+            return
+        }
+        if (cleanupIdle) {
+            try {
+                cleanupAssociationBestEffort(
+                    "Failed to clean stale association after VDM sidecar death"
+                )
+            } finally {
+                sidecarLostDuringStart.set(false)
+                state.compareAndSet(STATE_STOPPING, STATE_IDLE)
+                signalLifecycleChange()
+            }
+        }
     }
 
     fun configureAppUid(appUid: Int) {
@@ -92,41 +172,106 @@ object VirtualDisplayManager {
         Ln.i("setMonitorSurface: old=${old != null}, new=${surface != null}")
     }
 
-    @Synchronized
     fun start(): Int {
-        if (!state.compareAndSet(STATE_IDLE, STATE_CAPTURING)) {
-            Ln.w("start: already capturing")
-            return displayId.get()
+        val deadlineNanos = System.nanoTime() + START_WAIT_TIMEOUT_MS * 1_000_000L
+        while (true) {
+            when (val current = state.get()) {
+                STATE_IDLE -> if (state.compareAndSet(STATE_IDLE, STATE_STARTING)) {
+                    return finishStart()
+                }
+
+                STATE_STARTING -> if (!awaitStartTransition(deadlineNanos)) {
+                    Ln.w("start: timed out waiting for the in-flight display start")
+                    return DISPLAY_NONE
+                }
+
+                STATE_CAPTURING -> {
+                    val currentDisplayId = lifecycleLock.withLock {
+                        if (state.get() != STATE_CAPTURING ||
+                            remoteVdmActive.get() &&
+                            (sidecarLostDuringStart.get() || vdmShellConnection.get() == null)
+                        ) {
+                            null
+                        } else {
+                            displayId.get()
+                        }
+                    }
+                    if (currentDisplayId != null) return currentDisplayId
+                    if (!awaitStartTransition(deadlineNanos)) {
+                        Ln.w("start: timed out waiting for the display lifecycle to stabilize")
+                        return DISPLAY_NONE
+                    }
+                }
+
+                STATE_STOPPING -> {
+                    Ln.w("start: display lifecycle is stopping")
+                    return DISPLAY_NONE
+                }
+
+                else -> error("Unknown display lifecycle state: $current")
+            }
         }
-        return startInternal()
     }
 
-    @Synchronized
     fun stop() {
-        if (!state.compareAndSet(STATE_CAPTURING, STATE_IDLE)) {
-            return
+        while (true) {
+            val current = state.get()
+            when (current) {
+                STATE_IDLE, STATE_STOPPING -> return
+                STATE_STARTING, STATE_CAPTURING -> {
+                    if (!state.compareAndSet(current, STATE_STOPPING)) continue
+                    signalLifecycleChange()
+                    monitorSurface.getAndSet(null)?.release()
+                    // STARTING 的线程仍拥有尚未发布的 native/display 资源，由它在看到
+                    // STOPPING 后收尾；这里立即返回，退出路径不等待慢速系统调用。
+                    if (current == STATE_STARTING) return
+                    releaseResources(removeAssociation = true)
+                    state.compareAndSet(STATE_STOPPING, STATE_IDLE)
+                    signalLifecycleChange()
+                    Ln.i("VirtualDisplayManager stopped")
+                    return
+                }
+            }
         }
-        releaseResources(removeAssociation = true)
-        monitorSurface.getAndSet(null)?.release()
-        Ln.i("VirtualDisplayManager stopped")
     }
 
-    @Synchronized
     fun restart() {
-        if (state.get() != STATE_CAPTURING) {
-            return
+        restart(removeAssociation = false)
+    }
+
+    private fun restart(removeAssociation: Boolean): Boolean {
+        val ownsRestart = lifecycleLock.withLock {
+            state.compareAndSet(STATE_CAPTURING, STATE_STARTING).also { changed ->
+                if (changed) lifecycleChanged.signalAll()
+            }
         }
-        releaseResources(removeAssociation = false)
-        if (state.get() == STATE_CAPTURING) {
-            startInternal()
+        if (!ownsRestart) return false
+        finishOwnedRestart(removeAssociation)
+        return true
+    }
+
+    private fun finishOwnedRestart(removeAssociation: Boolean) {
+        releaseResources(removeAssociation = removeAssociation)
+        if (state.get() == STATE_STARTING) {
+            finishStart()
+        } else {
+            if (!removeAssociation) {
+                cleanupAssociationBestEffort("Failed to clean association after interrupted restart")
+            }
+            sidecarLostDuringStart.set(false)
+            state.compareAndSet(STATE_STOPPING, STATE_IDLE)
+            signalLifecycleChange()
         }
     }
 
-    @Synchronized
     fun setResolution(width: Int, height: Int, dpi: Int = config.get().dpi) {
         val newConfig = DisplayConfig(width, height, dpi)
-        val oldConfig = config.getAndSet(newConfig)
-        if (state.get() == STATE_CAPTURING && oldConfig != newConfig) {
+        var oldConfig: DisplayConfig
+        val shouldRestart = lifecycleLock.withLock {
+            oldConfig = config.getAndSet(newConfig)
+            state.get() == STATE_CAPTURING && oldConfig != newConfig
+        }
+        if (shouldRestart) {
             Ln.i("Resolution changed: ${oldConfig.width}x${oldConfig.height} -> ${width}x${height}, restart")
             restart()
         }
@@ -137,43 +282,134 @@ object VirtualDisplayManager {
     /** 清理由上一个被强杀或崩溃的特权服务进程遗留的 VDM 关联。 */
     fun cleanupStaleState() {
         if (Build.VERSION.SDK_INT < AndroidVersions.API_34_ANDROID_14) return
-        val service = vdmShellService.get()
-            ?: throw IllegalStateException("VDM shell sidecar is unavailable")
-        service.cleanupStale(currentAndroidUserId())
+        val userId = currentAndroidUserId()
+        val service = vdmShellConnection.get()?.service
+        val remoteFailure = service?.let {
+            val result = runCatching { it.cleanupStale(userId) }
+            if (result.isSuccess) return
+            result.exceptionOrNull()
+        }
+        try {
+            // 主服务本身以 root/shell 运行。sidecar 不可用时直接走 CDM shell 命令，
+            // 不能让一次辅助进程故障把同地址关联永久留在系统里。
+            CompanionAssociation.cleanupStale(userId)
+        } catch (localFailure: Throwable) {
+            remoteFailure?.let(localFailure::addSuppressed)
+            throw localFailure
+        }
     }
 
-    private fun startInternal(): Int {
-        try {
+    private fun finishStart(): Int {
+        while (state.get() == STATE_STARTING) {
             val cfg = config.get()
-            val surface = NativeBridgeLib.setupNativeCapturer(cfg.width, cfg.height)
-            createVirtualDisplay(surface, cfg)
+            val result = startInternal(cfg)
+            if (result == DISPLAY_NONE) return DISPLAY_NONE
 
+            if (state.get() != STATE_STARTING) {
+                releaseResources(removeAssociation = true)
+                state.compareAndSet(STATE_STOPPING, STATE_IDLE)
+                signalLifecycleChange()
+                return DISPLAY_NONE
+            }
+
+            var retryForConfig = false
+            var retryForSidecarLoss = false
+            var publishedWithLostLegacy = false
+            val published = lifecycleLock.withLock {
+                when {
+                    state.get() != STATE_STARTING -> false
+                    config.get() != cfg -> {
+                        retryForConfig = true
+                        false
+                    }
+                    sidecarLostDuringStart.get() && remoteVdmActive.get() -> {
+                        sidecarLostDuringStart.set(false)
+                        retryForSidecarLoss = true
+                        false
+                    }
+                    else -> {
+                        publishedWithLostLegacy = sidecarLostDuringStart.getAndSet(false)
+                        state.compareAndSet(STATE_STARTING, STATE_CAPTURING).also { changed ->
+                            if (changed) lifecycleChanged.signalAll()
+                        }
+                    }
+                }
+            }
+
+            if (retryForConfig || retryForSidecarLoss) {
+                releaseResources(removeAssociation = retryForSidecarLoss)
+                continue
+            }
+
+            if (!published) {
+                releaseResources(removeAssociation = true)
+                state.compareAndSet(STATE_STOPPING, STATE_IDLE)
+                signalLifecycleChange()
+                return DISPLAY_NONE
+            }
+
+            if (publishedWithLostLegacy) {
+                cleanupAssociationBestEffort("Failed to clean association after sidecar loss")
+            }
             Ln.i("VirtualDisplayManager started, displayId=${displayId.get()}")
             return displayId.get()
-        } catch (e: Exception) {
-            Ln.e("VirtualDisplayManager start failed", e)
-            releaseResources(removeAssociation = true)
-            state.set(STATE_IDLE)
-            return DISPLAY_NONE
         }
+        cleanupAssociationBestEffort("Failed to clean association after interrupted start")
+        sidecarLostDuringStart.set(false)
+        state.compareAndSet(STATE_STOPPING, STATE_IDLE)
+        signalLifecycleChange()
+        return DISPLAY_NONE
+    }
+
+    private fun startInternal(cfg: DisplayConfig): Int {
+        try {
+            val surface = NativeBridgeLib.setupNativeCapturer(cfg.width, cfg.height)
+            createVirtualDisplay(surface, cfg)
+            return displayId.get()
+        } catch (failure: Exception) {
+            return onStartFailure(failure)
+        } catch (failure: Error) {
+            // OEM 缺类/缺符号和 native 装载失败会以 LinkageError（Error）出现。
+            // 这里必须恢复状态，但边界只包围单次显示启动，不影响进程其他错误处理。
+            return onStartFailure(failure)
+        }
+    }
+
+    private fun onStartFailure(failure: Throwable): Int {
+        Ln.e("VirtualDisplayManager start failed", failure)
+        runCatching { releaseResources(removeAssociation = true) }
+            .onFailure { Ln.e("VirtualDisplayManager start cleanup failed", it) }
+        sidecarLostDuringStart.set(false)
+        state.set(STATE_IDLE)
+        signalLifecycleChange()
+        return DISPLAY_NONE
     }
 
     private fun releaseResources(removeAssociation: Boolean) {
         val vd = virtualDisplay.getAndSet(null)
         if (remoteVdmActive.getAndSet(false)) {
-            try {
-                vdmShellService.get()?.closeDisplay(removeAssociation)
-            } catch (failure: Exception) {
-                Ln.e("Failed to close shell-owned VDM display", failure)
+            val service = vdmShellConnection.get()?.service
+            if (service == null) {
+                Ln.w("VDM shell service is unavailable while closing the display")
+            } else {
+                runCatching { service.closeDisplay(removeAssociation) }
+                    .onFailure { Ln.e("Failed to close shell-owned VDM display", it) }
+            }
+            if (removeAssociation) {
+                // closeDisplay 对已经丢失 session 的 sidecar 是成功 no-op；无条件复查
+                // CDM 状态，避免“调用成功”掩盖前一次创建遗留的关联。
+                cleanupAssociationBestEffort("Failed to clean up shell-owned VDM association")
             }
         } else {
-            vd?.release()
+            runCatching { vd?.release() }
+                .onFailure { Ln.e("Failed to release legacy virtual display", it) }
             if (removeAssociation && Build.VERSION.SDK_INT >= AndroidVersions.API_34_ANDROID_14) {
                 runCatching { cleanupStaleState() }
-                    .onFailure { Ln.w("Failed to clean up VDM association: ${it.message}") }
+                    .onFailure { Ln.e("Failed to clean up VDM association", it) }
             }
         }
-        NativeBridgeLib.releaseNativeCapturer()
+        runCatching { NativeBridgeLib.releaseNativeCapturer() }
+            .onFailure { Ln.e("Failed to release native capturer", it) }
         displayId.set(DISPLAY_NONE)
     }
 
@@ -250,8 +486,15 @@ object VirtualDisplayManager {
             null,
             flags,
         )
+        val legacyId = try {
+            legacy.display.displayId
+        } catch (failure: Throwable) {
+            runCatching { legacy.release() }
+                .onFailure { failure.addSuppressed(it) }
+            throw failure
+        }
         val legacyGroup = runCatching {
-            displayManager.getDisplayGroupId(legacy.display.displayId)
+            displayManager.getDisplayGroupId(legacyId)
         }.onFailure {
             Ln.w("Could not read legacy VD display group: ${it.message}")
         }.getOrNull()
@@ -259,14 +502,14 @@ object VirtualDisplayManager {
         if (Build.VERSION.SDK_INT < AndroidVersions.API_34_ANDROID_14 || legacyGroup != 0) {
             if (Build.VERSION.SDK_INT >= AndroidVersions.API_34_ANDROID_14) {
                 runCatching { cleanupStaleState() }
-                    .onFailure { Ln.w("Failed to remove unused VDM association: ${it.message}") }
+                    .onFailure { Ln.e("Failed to remove unused VDM association", it) }
             }
             return attachLegacySurface(legacy, surface)
         }
 
-        val legacyId = legacy.display.displayId
+        var legacyReleased = false
         try {
-            val service = vdmShellService.get()
+            val service = vdmShellConnection.get()?.service
                 ?: throw IllegalStateException("VDM shell sidecar is unavailable")
             val independentId = service.createDisplay(
                 VD_NAME,
@@ -295,18 +538,22 @@ object VirtualDisplayManager {
             }
 
             // 仅在 VDM 显示进入独立显示组且状态为 STATE_ON 后，才正式切换。
+            legacyReleased = true
             legacy.release()
             VdmDiagnostics.reportRemoteSuccess(independentId, legacyId, imePolicy)
             return DisplaySelection(independentId, remoteVdm = true)
-        } catch (failure: Exception) {
+        } catch (failure: Throwable) {
             closeRejectedRemoteDisplay()
-            VdmDiagnostics.reportFallback(failure, null, legacyId)
-        } catch (failure: LinkageError) {
-            closeRejectedRemoteDisplay()
-            VdmDiagnostics.reportFallback(failure, null, legacyId)
+            if (failure is Exception || failure is LinkageError) {
+                VdmDiagnostics.reportFallback(failure, null, legacyId)
+                if (!legacyReleased) return attachLegacySurface(legacy, surface)
+            }
+            if (!legacyReleased) {
+                runCatching { legacy.release() }
+                    .onFailure { failure.addSuppressed(it) }
+            }
+            throw failure
         }
-
-        return attachLegacySurface(legacy, surface)
     }
 
     private fun attachLegacySurface(
@@ -321,8 +568,42 @@ object VirtualDisplayManager {
     }
 
     private fun closeRejectedRemoteDisplay() {
-        runCatching { vdmShellService.get()?.closeDisplay(true) }
-            .onFailure { Ln.e("Failed to clean up rejected shell-owned VDM display", it) }
+        val service = vdmShellConnection.get()?.service
+        if (service == null) {
+            Ln.w("VDM shell service is unavailable while rejecting the display")
+        } else {
+            runCatching { service.closeDisplay(true) }
+                .onFailure { Ln.e("Failed to clean up rejected shell-owned VDM display", it) }
+        }
+        cleanupAssociationBestEffort("Failed to clean up rejected VDM association")
+    }
+
+    private fun cleanupAssociationBestEffort(message: String) {
+        if (Build.VERSION.SDK_INT < AndroidVersions.API_34_ANDROID_14) return
+        runCatching { cleanupStaleState() }
+            .onFailure { Ln.e(message, it) }
+    }
+
+    private fun awaitStartTransition(deadlineNanos: Long): Boolean =
+        lifecycleLock.withLock {
+            while (state.get() == STATE_STARTING ||
+                state.get() == STATE_CAPTURING && remoteVdmActive.get() &&
+                (sidecarLostDuringStart.get() || vdmShellConnection.get() == null)
+            ) {
+                val remainingNanos = deadlineNanos - System.nanoTime()
+                if (remainingNanos <= 0L) return@withLock false
+                try {
+                    lifecycleChanged.awaitNanos(remainingNanos)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return@withLock false
+                }
+            }
+            true
+        }
+
+    private fun signalLifecycleChange() {
+        lifecycleLock.withLock { lifecycleChanged.signalAll() }
     }
 
     private fun currentAndroidUserId(): Int = androidUserId.get().also { userId ->

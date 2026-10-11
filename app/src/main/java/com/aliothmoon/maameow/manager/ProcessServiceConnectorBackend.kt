@@ -11,6 +11,7 @@ import com.aliothmoon.maameow.root.BootstrapRegistry
 import com.aliothmoon.maameow.root.RootServiceBootstrapRegistry
 import com.aliothmoon.maameow.root.RemoteServiceStarter
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -77,6 +78,7 @@ abstract class ProcessServiceConnectorBackend(
 
     @Volatile
     private var activeLaunch: ActiveLaunch? = null
+    private val launchStateLock = Any()
 
     private val currentSidecarBinder = java.util.concurrent.atomic.AtomicReference<IBinder?>()
 
@@ -99,14 +101,13 @@ abstract class ProcessServiceConnectorBackend(
 
     override fun connect(callbacks: RemoteServiceConnectorBackend.Callbacks) {
         check(::appContext.isInitialized) { "${javaClass.simpleName} is not initialized" }
-        // 取代进行中的旧拉起：旧 token 即刻注销，旧进程回投会被 provider 拒绝而自退
-        dropActiveLaunch()
         val token = UUID.randomUUID().toString()
         val deferred = registry.register(token)
 
-        val job = scope.launch {
+        val job = scope.launch(start = CoroutineStart.LAZY) {
             val logFile = debugLogFile()
             var spawned = false
+            var primaryBinder: IBinder? = null
             // 整段包住：check(launcherFile) 等异常逃逸会让协程未捕获致崩溃
             val result = runCatching {
                 // 先清旧日志，确保 dump 到的一定是本次启动的产物
@@ -115,18 +116,29 @@ abstract class ProcessServiceConnectorBackend(
                 ServiceBootLogger.event("${eventPrefix}_SPAWN_CALL", "token=$token")
                 val handle = spawner.spawn(command)
                 spawned = true
-                val primaryBinder = awaitBinder(deferred, handle)
-                attachOptionalSidecar(token, primaryBinder)
-                primaryBinder
-            }
-            if (activeLaunch?.token != token) {
-                registry.unregister(token)
-                return@launch
+                val binder = awaitBinder(deferred, handle)
+                primaryBinder = binder
+                attachOptionalSidecar(token, binder)
+                binder
             }
             result.onSuccess { binder ->
                 onBinderArrived(token, binder, callbacks)
             }.onFailure { throwable ->
-                activeLaunch = null
+                val ownsLaunch = synchronized(launchStateLock) {
+                    if (activeLaunch?.token != token) {
+                        false
+                    } else {
+                        activeLaunch = null
+                        true
+                    }
+                }
+                if (!ownsLaunch) {
+                    primaryBinder?.let { binder ->
+                        runCatching { destroyRemote(binder) }
+                            .onFailure { Timber.w(it, "destroy stale %s process failed", processName) }
+                    }
+                    return@onFailure
+                }
                 registry.unregister(token)
                 // 进程路径没有 server 端 record 代杀，卡在半路的服务进程只能自己清
                 if (spawned) spawner.killResidual(processName)
@@ -134,7 +146,15 @@ abstract class ProcessServiceConnectorBackend(
                 reportFailure(token, throwable, logFile, callbacks)
             }
         }
-        activeLaunch = ActiveLaunch(token, job)
+        // 原子替换 launch，避免并发 connect 在 drop 与 set 之间互相踩掉。
+        val previous = synchronized(launchStateLock) {
+            val old = activeLaunch
+            activeLaunch = ActiveLaunch(token, job)
+            old
+        }
+        // 取代进行中的旧拉起：旧 token 即刻注销，旧进程回投会被 provider 拒绝而自退
+        previous?.let(::cancelLaunch)
+        job.start()
     }
 
     override fun disconnect(currentBinder: IBinder?) {
@@ -216,8 +236,15 @@ abstract class ProcessServiceConnectorBackend(
     }
 
     private fun dropActiveLaunch() {
-        val previous = activeLaunch ?: return
-        activeLaunch = null
+        val previous = synchronized(launchStateLock) {
+            val current = activeLaunch ?: return
+            activeLaunch = null
+            current
+        }
+        cancelLaunch(previous)
+    }
+
+    private fun cancelLaunch(previous: ActiveLaunch) {
         previous.job.cancel()
         registry.unregister(previous.token)
         previous.sidecarToken?.let(registry::unregister)
@@ -226,10 +253,20 @@ abstract class ProcessServiceConnectorBackend(
     private suspend fun attachOptionalSidecar(primaryToken: String, primaryBinder: IBinder) {
         val targetClass = sidecarServiceClass ?: return
         val token = UUID.randomUUID().toString()
-        val launch = activeLaunch
-        if (launch?.token != primaryToken) return
-        launch.sidecarToken = token
         val deferred = registry.register(token)
+        val ownsLaunch = synchronized(launchStateLock) {
+            val launch = activeLaunch
+            if (launch?.token != primaryToken) {
+                false
+            } else {
+                launch.sidecarToken = token
+                true
+            }
+        }
+        if (!ownsLaunch) {
+            registry.unregister(token)
+            return
+        }
         val logFile = File(debugDir, sidecarLogFileName)
         logFile.delete()
 
@@ -240,7 +277,9 @@ abstract class ProcessServiceConnectorBackend(
             awaitBinder(deferred, handle)
         }.onFailure { failure ->
             registry.unregister(token)
-            spawner.killResidual(sidecarProcessName)
+            if (synchronized(launchStateLock) { activeLaunch?.token == primaryToken }) {
+                spawner.killResidual(sidecarProcessName)
+            }
             val described = describeFailure(
                 throwable = failure,
                 logTail = dumpSpawnDebugLog(logFile, sidecarProcessName),
@@ -253,14 +292,46 @@ abstract class ProcessServiceConnectorBackend(
             Timber.e(described, "%s sidecar failed; independent display will use legacy fallback", sidecarProcessName)
         }.getOrNull() ?: return
 
+        if (synchronized(launchStateLock) { activeLaunch?.token != primaryToken }) {
+            ServiceBootLogger.event(
+                "${eventPrefix}_SIDECAR_STALE",
+                "primaryToken=$primaryToken sidecarToken=$token stage=before_attach",
+            )
+            terminateSidecar(sidecarBinder, killResidualOnFailure = false)
+            return
+        }
+
         runCatching { attachSidecar(primaryBinder, sidecarBinder) }
             .onSuccess {
-                currentSidecarBinder.getAndSet(sidecarBinder)?.let(::terminateSidecar)
+                // attach 是同步 Binder 调用，期间 connect/disconnect 可能已替换 activeLaunch。
+                // 旧 launch 的 sidecar 绝不能覆盖新连接当前持有的 binder。
+                var replacedSidecar: IBinder? = null
+                val published = synchronized(launchStateLock) {
+                    if (activeLaunch?.token != primaryToken) {
+                        false
+                    } else {
+                        replacedSidecar = currentSidecarBinder.getAndSet(sidecarBinder)
+                        true
+                    }
+                }
+                if (!published) {
+                    ServiceBootLogger.event(
+                        "${eventPrefix}_SIDECAR_STALE",
+                        "primaryToken=$primaryToken sidecarToken=$token stage=before_publish",
+                    )
+                    terminateSidecar(sidecarBinder, killResidualOnFailure = false)
+                    return@onSuccess
+                }
+                replacedSidecar?.let {
+                    terminateSidecar(it, killResidualOnFailure = false)
+                }
                 ServiceBootLogger.event("${eventPrefix}_SIDECAR_CONNECTED", "token=$token")
             }
             .onFailure { failure ->
                 runCatching { destroySidecar(sidecarBinder) }
-                spawner.killResidual(sidecarProcessName)
+                if (synchronized(launchStateLock) { activeLaunch?.token == primaryToken }) {
+                    spawner.killResidual(sidecarProcessName)
+                }
                 Timber.e(failure, "Failed to attach %s sidecar", sidecarProcessName)
             }
     }
@@ -274,11 +345,16 @@ abstract class ProcessServiceConnectorBackend(
         }
     }
 
-    private fun terminateSidecar(binder: IBinder) {
+    private fun terminateSidecar(
+        binder: IBinder,
+        killResidualOnFailure: Boolean = true,
+    ) {
         runCatching { destroySidecar(binder) }
             .onFailure {
                 Timber.w(it, "destroy %s failed", sidecarProcessName)
-                scope.launch { spawner.killResidual(sidecarProcessName) }
+                if (killResidualOnFailure) {
+                    scope.launch { spawner.killResidual(sidecarProcessName) }
+                }
             }
     }
 
@@ -306,24 +382,84 @@ abstract class ProcessServiceConnectorBackend(
         binder: IBinder,
         callbacks: RemoteServiceConnectorBackend.Callbacks,
     ) {
+        if (!isCurrentLaunch(token)) {
+            destroyStaleRemote(token, binder)
+            return
+        }
         // token 认领：旧进程死讯不能误伤新连接
         runCatching {
-            binder.linkToDeath({
-                if (activeLaunch?.token != token) {
-                    Timber.i("Stale %s process binder death ignored (token=%s)", processName, token)
-                    return@linkToDeath
-                }
-                Timber.e("%s process died unexpectedly.", processName)
-                clearSidecar(killWhenMissing = true)
-                callbacks.onDisconnected(backend)
-            }, 0)
+            binder.linkToDeath({ onPrimaryBinderDied(token, callbacks) }, 0)
         }.onFailure {
             Timber.w(it, "linkToDeath failed for %s process binder", processName)
         }
 
+        if (!isCurrentLaunch(token)) {
+            destroyStaleRemote(token, binder)
+            return
+        }
+
         Timber.i("%s connected by %s bootstrap", processName, backend)
         ServiceBootLogger.event("${eventPrefix}_PROCESS_CONNECTED", "token=$token")
+        // callbacks 会取 RemoteServiceManager 的锁，不能持有 launchStateLock 回调，
+        // 否则会和管理器持锁调 connect/disconnect 形成锁反转。
         callbacks.onConnected(backend, binder)
+        // 回调期间同后端也可能已经开始下一次连接。管理器用 attempt 拒绝旧回调，
+        // 连接器还要精确结束旧进程，不能让它成为无人持有的特权进程。
+        if (!isCurrentLaunch(token)) {
+            destroyStaleRemote(token, binder)
+        }
+    }
+
+    private fun onPrimaryBinderDied(
+        token: String,
+        callbacks: RemoteServiceConnectorBackend.Callbacks,
+    ) {
+        val sidecarBinder = synchronized(launchStateLock) {
+            if (activeLaunch?.token != token) {
+                Timber.i("Stale %s process binder death ignored (token=%s)", processName, token)
+                return
+            }
+            currentSidecarBinder.getAndSet(null)
+        }
+
+        Timber.e("%s process died unexpectedly.", processName)
+        val needsResidualCleanup = if (sidecarBinder == null) {
+            sidecarServiceClass != null
+        } else {
+            runCatching { destroySidecar(sidecarBinder) }
+                .onFailure { Timber.w(it, "destroy %s failed", sidecarProcessName) }
+                .isFailure
+        }
+        callbacks.onDisconnected(backend)
+        if (needsResidualCleanup) scheduleSidecarResidualCleanup(token)
+    }
+
+    private fun scheduleSidecarResidualCleanup(deadToken: String) {
+        scope.launch {
+            val activeToken = synchronized(launchStateLock) { activeLaunch?.token }
+            // scope 是单并发队列。执行检查时若新 launch 已登记，它的 sidecar 可能已经
+            // 使用同一进程名，不能再按名称清；null 则表示死亡回调后的正常断开已完成。
+            if (activeToken == null || activeToken == deadToken) {
+                spawner.killResidual(sidecarProcessName)
+            } else {
+                Timber.i(
+                    "Skip stale %s residual cleanup; replacement launch is active",
+                    sidecarProcessName,
+                )
+            }
+        }
+    }
+
+    private fun isCurrentLaunch(token: String): Boolean = synchronized(launchStateLock) {
+        activeLaunch?.token == token
+    }
+
+    private fun destroyStaleRemote(token: String, binder: IBinder) {
+        registry.unregister(token)
+        // Binder 已回投后 token 才被取代，provider 无法再帮忙自退；
+        // 只通过这个旧 Binder 精确关闭，不按共用进程名误杀新实例。
+        runCatching { destroyRemote(binder) }
+            .onFailure { Timber.w(it, "destroy stale %s process failed", processName) }
     }
 
     private fun reportFailure(
