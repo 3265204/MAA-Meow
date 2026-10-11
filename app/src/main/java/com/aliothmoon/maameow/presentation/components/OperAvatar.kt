@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aliothmoon.maameow.data.resource.OperAvatarLoader
+import com.aliothmoon.maameow.data.resource.OperRoleIconLoader
 import com.aliothmoon.maameow.data.resource.ResourceDataManager
 import org.koin.compose.koinInject
 
@@ -69,3 +70,19 @@ fun AppIconAvatar(modifier: Modifier = Modifier, desaturated: Boolean = false) {
 }
 
 private const val APP_ICON_PX = 96
+
+/** 职业图标，[profession] 取自 battle_data；认不出的职业留空位 */
+@Composable
+fun OperRoleIcon(
+    profession: String?,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+    loader: OperRoleIconLoader = koinInject(),
+) {
+    TemplateImage(
+        id = OperRoleIconLoader.templateId(profession).orEmpty(),
+        loader = loader,
+        modifier = modifier,
+        contentDescription = contentDescription,
+    )
+}

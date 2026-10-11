@@ -797,13 +797,23 @@
     <string name="panel_operbox_tab_owned">Owned (%1$d)</string>
     <string name="panel_operbox_tab_not_owned">Not Owned (%1$d)</string>
     <string name="panel_operbox_copy_toast">Operator data copied</string>
+    <string name="panel_operbox_card_detail">View details</string>
+    <string name="panel_operbox_elite_icon">Elite %1$d</string>
+    <string name="panel_operbox_potential_icon">Potential %1$d</string>
+    <string name="oper_role_caster">Caster</string>
+    <string name="oper_role_medic">Medic</string>
+    <string name="oper_role_pioneer">Vanguard</string>
+    <string name="oper_role_sniper">Sniper</string>
+    <string name="oper_role_special">Specialist</string>
+    <string name="oper_role_support">Supporter</string>
+    <string name="oper_role_tank">Defender</string>
+    <string name="oper_role_warrior">Guard</string>
     <string name="operbox_export_header_main_skill_level">Skill level</string>
     <string name="operbox_export_header_skills">Skill mastery</string>
     <string name="operbox_export_header_equips">Modules</string>
     <string name="panel_operbox_title">Operator Recognition</string>
     <string name="panel_operbox_hint_scan">Tap \"Start Task\" below to scan owned operator data.</string>
     <string name="panel_operbox_hint_results">After recognition, you can review owned / not owned operators and export the result.</string>
-    <string name="panel_operbox_owned_meta">E%1$d Lv%2$d Pot%3$d</string>
 
     <!-- recognition result export (shared) -->
     <string name="panel_export_copy">Copy</string>

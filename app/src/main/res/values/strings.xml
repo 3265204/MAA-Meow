@@ -851,13 +851,23 @@
     <string name="panel_operbox_tab_owned">已拥有 (%1$d)</string>
     <string name="panel_operbox_tab_not_owned">未拥有 (%1$d)</string>
     <string name="panel_operbox_copy_toast">已复制干员数据</string>
+    <string name="panel_operbox_card_detail">查看详情</string>
+    <string name="panel_operbox_elite_icon">精英化 %1$d</string>
+    <string name="panel_operbox_potential_icon">潜能 %1$d</string>
+    <string name="oper_role_caster">术师</string>
+    <string name="oper_role_medic">医疗</string>
+    <string name="oper_role_pioneer">先锋</string>
+    <string name="oper_role_sniper">狙击</string>
+    <string name="oper_role_special">特种</string>
+    <string name="oper_role_support">辅助</string>
+    <string name="oper_role_tank">重装</string>
+    <string name="oper_role_warrior">近卫</string>
     <string name="operbox_export_header_main_skill_level">技能等级</string>
     <string name="operbox_export_header_skills">技能专精</string>
     <string name="operbox_export_header_equips">模组</string>
     <string name="panel_operbox_title">干员识别</string>
     <string name="panel_operbox_hint_scan">点击下方「开始任务」扫描已拥有的干员信息。</string>
     <string name="panel_operbox_hint_results">识别完成后可查看已拥有 / 未拥有干员，支持导出。</string>
-    <string name="panel_operbox_owned_meta">E%1$d Lv%2$d 潜%3$d</string>
 
     <!-- 识别结果导出（通用） -->
     <string name="panel_export_copy">复制</string>
