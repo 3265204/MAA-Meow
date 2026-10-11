@@ -18,8 +18,11 @@ object RootRemoteServiceConnector : ProcessServiceConnectorBackend(SuSpawner) {
     override val keepRoot: Boolean get() = keepRootForInputInjection
 
     override val sidecarServiceClass: Class<*>?
-        get() = VdmShellServiceImpl::class.java
-            .takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE }
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            VdmShellServiceImpl::class.java
+        } else {
+            null
+        }
     override val sidecarProcessNameSuffix = "root_vdm_shell"
     override val sidecarLogFileName = "root_vdm_shell_launch_debug.log"
 

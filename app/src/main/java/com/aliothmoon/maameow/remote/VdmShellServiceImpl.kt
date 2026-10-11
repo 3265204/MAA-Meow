@@ -1,9 +1,11 @@
 package com.aliothmoon.maameow.remote
 
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.os.Process
 import android.view.Surface
+import androidx.annotation.RequiresApi
 import com.aliothmoon.maameow.VdmShellService
 import com.aliothmoon.maameow.remote.internal.display.CompanionAssociation
 import com.aliothmoon.maameow.remote.internal.display.VdmDisplayFactory
@@ -19,6 +21,7 @@ import kotlin.system.exitProcess
  * CDM/VDM 资源均由此进程持有，使承担多种职责的 root 主服务无需在其他 Binder 或
  * native 任务运行期间切换 euid。
  */
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class VdmShellServiceImpl : VdmShellService.Stub() {
     private val session = AtomicReference<VdmDisplaySession?>()
     private val owner = AtomicReference<IBinder?>()

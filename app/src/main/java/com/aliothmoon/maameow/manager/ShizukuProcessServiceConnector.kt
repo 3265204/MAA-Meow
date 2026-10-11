@@ -24,8 +24,11 @@ object ShizukuProcessServiceConnector : ProcessServiceConnectorBackend(ShizukuSp
     override val keepRoot: Boolean get() = keepRootForInputInjection
 
     override val sidecarServiceClass: Class<*>?
-        get() = VdmShellServiceImpl::class.java
-            .takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE }
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            VdmShellServiceImpl::class.java
+        } else {
+            null
+        }
     override val sidecarProcessNameSuffix = "shizuku_vdm_shell"
     override val sidecarLogFileName = "shizuku_vdm_shell_launch_debug.log"
 
