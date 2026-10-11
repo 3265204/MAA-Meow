@@ -47,6 +47,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -101,6 +102,7 @@ fun OperProgressConfigPanel(
     var clearConfirm by remember { mutableStateOf(false) }
     var revealPlanId by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
+    val currentResources by rememberUpdatedState(LocalResources.current)
     val clipboard = LocalClipboard.current
     val inputFocus = LocalInputFocusManager.current
     val haptic = LocalHapticFeedback.current
@@ -228,7 +230,7 @@ fun OperProgressConfigPanel(
                                 } catch (error: CancellationException) {
                                     throw error
                                 } catch (error: OperProgressImportException) {
-                                    Toast.makeText(context, context.getString(error.textRes, error.operatorName), Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, currentResources.getString(error.textRes, error.operatorName), Toast.LENGTH_LONG).show()
                                 } catch (_: Exception) {
                                     Toast.makeText(context, R.string.oper_progress_import_invalid, Toast.LENGTH_LONG).show()
                                 }
