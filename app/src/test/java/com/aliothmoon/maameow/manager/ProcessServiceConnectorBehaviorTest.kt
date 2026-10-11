@@ -386,7 +386,11 @@ class ProcessServiceConnectorBehaviorTest {
         assertEquals(listOf(primary), h.callbacks.connected)
         assertTrue(h.callbacks.errors.isEmpty())
         assertTrue("失败的 sidecar 必须清残留", h.spawner.awaitKill())
-        assertEquals(2 * (300L + 3_000L), h.connector.worstCaseConnectMs)
+        assertEquals(
+            "连接预算只覆盖 primary + sidecar spawn，不包含后续虚拟显示生命周期预算",
+            2 * (300L + 3_000L),
+            h.connector.worstCaseConnectMs,
+        )
     }
 
     @Test

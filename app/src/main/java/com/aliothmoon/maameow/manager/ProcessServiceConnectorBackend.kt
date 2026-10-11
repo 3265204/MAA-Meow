@@ -46,7 +46,8 @@ abstract class ProcessServiceConnectorBackend(
 
     protected open val spawnTimeoutMs: Long = 15_000L
 
-    // spawn 同步调用与超时后的 kill / dump 不在 withTimeout 内，另计余量
+    // 这里只估算提权进程的连接阶段；虚拟显示创建另有自己的生命周期超时预算。
+    // spawn 同步调用与超时后的 kill / dump 不在 withTimeout 内，另计余量。
     override val worstCaseConnectMs: Long
         get() = (spawnTimeoutMs + SPAWN_OVERHEAD_MS) *
             (if (sidecarServiceClass == null) 1 else 2)
@@ -88,7 +89,7 @@ abstract class ProcessServiceConnectorBackend(
     private lateinit var debugDir: File
 
     /** 拉起进行中（binder 尚未回投） */
-    val isConnecting: Boolean get() = activeLaunch?.job?.isActive == true
+    val isConnecting: Boolean get() = activeLaunch?.job?.isCompleted == false
 
     private val processName: String get() = "${appContext.packageName}:$processNameSuffix"
     private val sidecarProcessName: String
@@ -297,6 +298,8 @@ abstract class ProcessServiceConnectorBackend(
                 "${eventPrefix}_SIDECAR_STALE",
                 "primaryToken=$primaryToken sidecarToken=$token stage=before_attach",
             )
+            // 此时替代 launch 可能已启动同名 sidecar；destroy Binder 是唯一精确目标，
+            // 失败后不能再按进程名兜底，否则会误杀新实例。
             terminateSidecar(sidecarBinder, killResidualOnFailure = false)
             return
         }
@@ -319,10 +322,12 @@ abstract class ProcessServiceConnectorBackend(
                         "${eventPrefix}_SIDECAR_STALE",
                         "primaryToken=$primaryToken sidecarToken=$token stage=before_publish",
                     )
+                    // 替代实例可能已经复用进程名，只能通过旧 Binder 精确关闭。
                     terminateSidecar(sidecarBinder, killResidualOnFailure = false)
                     return@onSuccess
                 }
                 replacedSidecar?.let {
+                    // 新 sidecar 已发布，禁止失败时按共享进程名清理旧实例。
                     terminateSidecar(it, killResidualOnFailure = false)
                 }
                 ServiceBootLogger.event("${eventPrefix}_SIDECAR_CONNECTED", "token=$token")
@@ -419,6 +424,8 @@ abstract class ProcessServiceConnectorBackend(
                 Timber.i("Stale %s process binder death ignored (token=%s)", processName, token)
                 return
             }
+            // 刻意保留 activeLaunch：排队的残留清理要用当前 token 判断期间是否已有
+            // 替代 launch，避免按共享进程名误杀新 sidecar。
             currentSidecarBinder.getAndSet(null)
         }
 

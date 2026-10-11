@@ -143,7 +143,10 @@ object VirtualDisplayManager {
         }
 
         if (restartOwned) {
-            finishOwnedRestart(removeAssociation = true)
+            finishOwnedRestart(
+                removeAssociation = true,
+                deadlineNanos = newStartDeadlineNanos(),
+            )
             return
         }
         if (cleanupIdle) {
@@ -173,14 +176,14 @@ object VirtualDisplayManager {
     }
 
     fun start(): Int {
-        val deadlineNanos = System.nanoTime() + START_WAIT_TIMEOUT_MS * 1_000_000L
+        val deadlineNanos = newStartDeadlineNanos()
         while (true) {
             when (val current = state.get()) {
                 STATE_IDLE -> if (state.compareAndSet(STATE_IDLE, STATE_STARTING)) {
-                    return finishStart()
+                    return finishStart(deadlineNanos)
                 }
 
-                STATE_STARTING -> if (!awaitStartTransition(deadlineNanos)) {
+                STATE_STARTING -> if (!awaitLifecycleTransition(deadlineNanos)) {
                     Ln.w("start: timed out waiting for the in-flight display start")
                     return DISPLAY_NONE
                 }
@@ -197,14 +200,14 @@ object VirtualDisplayManager {
                         }
                     }
                     if (currentDisplayId != null) return currentDisplayId
-                    if (!awaitStartTransition(deadlineNanos)) {
+                    if (!awaitLifecycleTransition(deadlineNanos)) {
                         Ln.w("start: timed out waiting for the display lifecycle to stabilize")
                         return DISPLAY_NONE
                     }
                 }
 
-                STATE_STOPPING -> {
-                    Ln.w("start: display lifecycle is stopping")
+                STATE_STOPPING -> if (!awaitLifecycleTransition(deadlineNanos)) {
+                    Ln.w("start: timed out waiting for the display lifecycle to stop")
                     return DISPLAY_NONE
                 }
 
@@ -246,21 +249,19 @@ object VirtualDisplayManager {
             }
         }
         if (!ownsRestart) return false
-        finishOwnedRestart(removeAssociation)
+        finishOwnedRestart(removeAssociation, newStartDeadlineNanos())
         return true
     }
 
-    private fun finishOwnedRestart(removeAssociation: Boolean) {
+    private fun finishOwnedRestart(removeAssociation: Boolean, deadlineNanos: Long) {
         releaseResources(removeAssociation = removeAssociation)
         if (state.get() == STATE_STARTING) {
-            finishStart()
+            finishStart(deadlineNanos)
         } else {
             if (!removeAssociation) {
                 cleanupAssociationBestEffort("Failed to clean association after interrupted restart")
             }
-            sidecarLostDuringStart.set(false)
-            state.compareAndSet(STATE_STOPPING, STATE_IDLE)
-            signalLifecycleChange()
+            completeStartCleanup()
         }
     }
 
@@ -299,16 +300,21 @@ object VirtualDisplayManager {
         }
     }
 
-    private fun finishStart(): Int {
+    private fun finishStart(deadlineNanos: Long): Int {
+        var attempts = 0
         while (state.get() == STATE_STARTING) {
+            if (System.nanoTime() >= deadlineNanos) {
+                Ln.w("start: retry deadline exceeded after $attempts attempt(s)")
+                return finishAbortedStart("Failed to clean association after start retry timeout")
+            }
+            attempts++
             val cfg = config.get()
             val result = startInternal(cfg)
             if (result == DISPLAY_NONE) return DISPLAY_NONE
 
             if (state.get() != STATE_STARTING) {
                 releaseResources(removeAssociation = true)
-                state.compareAndSet(STATE_STOPPING, STATE_IDLE)
-                signalLifecycleChange()
+                completeStartCleanup()
                 return DISPLAY_NONE
             }
 
@@ -343,8 +349,7 @@ object VirtualDisplayManager {
 
             if (!published) {
                 releaseResources(removeAssociation = true)
-                state.compareAndSet(STATE_STOPPING, STATE_IDLE)
-                signalLifecycleChange()
+                completeStartCleanup()
                 return DISPLAY_NONE
             }
 
@@ -354,11 +359,7 @@ object VirtualDisplayManager {
             Ln.i("VirtualDisplayManager started, displayId=${displayId.get()}")
             return displayId.get()
         }
-        cleanupAssociationBestEffort("Failed to clean association after interrupted start")
-        sidecarLostDuringStart.set(false)
-        state.compareAndSet(STATE_STOPPING, STATE_IDLE)
-        signalLifecycleChange()
-        return DISPLAY_NONE
+        return finishAbortedStart("Failed to clean association after interrupted start")
     }
 
     private fun startInternal(cfg: DisplayConfig): Int {
@@ -379,9 +380,7 @@ object VirtualDisplayManager {
         Ln.e("VirtualDisplayManager start failed", failure)
         runCatching { releaseResources(removeAssociation = true) }
             .onFailure { Ln.e("VirtualDisplayManager start cleanup failed", it) }
-        sidecarLostDuringStart.set(false)
-        state.set(STATE_IDLE)
-        signalLifecycleChange()
+        completeStartCleanup()
         return DISPLAY_NONE
     }
 
@@ -584,9 +583,10 @@ object VirtualDisplayManager {
             .onFailure { Ln.e(message, it) }
     }
 
-    private fun awaitStartTransition(deadlineNanos: Long): Boolean =
+    private fun awaitLifecycleTransition(deadlineNanos: Long): Boolean =
         lifecycleLock.withLock {
             while (state.get() == STATE_STARTING ||
+                state.get() == STATE_STOPPING ||
                 state.get() == STATE_CAPTURING && remoteVdmActive.get() &&
                 (sidecarLostDuringStart.get() || vdmShellConnection.get() == null)
             ) {
@@ -601,6 +601,37 @@ object VirtualDisplayManager {
             }
             true
         }
+
+    private fun finishAbortedStart(cleanupFailureMessage: String): Int {
+        cleanupAssociationBestEffort(cleanupFailureMessage)
+        completeStartCleanup()
+        return DISPLAY_NONE
+    }
+
+    /** 启动 owner 完成资源收尾后，精确结束 STARTING/STOPPING，不能覆盖其他状态。 */
+    private fun completeStartCleanup() {
+        sidecarLostDuringStart.set(false)
+        while (true) {
+            val current = state.get()
+            when (current) {
+                STATE_IDLE -> break
+                STATE_STARTING, STATE_STOPPING -> {
+                    if (state.compareAndSet(current, STATE_IDLE)) break
+                }
+
+                STATE_CAPTURING -> {
+                    Ln.w("start cleanup found an already-published display")
+                    return
+                }
+
+                else -> error("Unknown display lifecycle state: $current")
+            }
+        }
+        signalLifecycleChange()
+    }
+
+    private fun newStartDeadlineNanos(): Long =
+        System.nanoTime() + START_WAIT_TIMEOUT_MS * 1_000_000L
 
     private fun signalLifecycleChange() {
         lifecycleLock.withLock { lifecycleChanged.signalAll() }

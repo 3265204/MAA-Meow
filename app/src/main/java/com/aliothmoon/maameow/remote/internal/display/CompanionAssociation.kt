@@ -45,22 +45,33 @@ internal object CompanionAssociation {
             if (!requiresStreamingProfileMigration(association.deviceProfile, Build.VERSION.SDK_INT)) {
                 return association
             }
-            remove(address, userId)
-            check(awaitRemoval(address, userId)) {
-                "Legacy companion association was not removed before migration"
+            try {
+                remove(address, userId)
+                check(awaitRemoval(address, userId)) {
+                    "Legacy companion association was not removed before migration"
+                }
+            } catch (failure: Throwable) {
+                Ln.w("Failed to remove legacy companion association before migration", failure)
+                throw failure
             }
         }
 
         val command = buildAssociateCommand(address, userId, Build.VERSION.SDK_INT)
+        var requestMayCompleteAsynchronously = false
         try {
             // 命令进程即使超时，system_server 也可能已经受理了异步创建请求。
             runCommand(*command.toTypedArray())
+            requestMayCompleteAsynchronously = true
             val association = await(address, userId)
                 ?: throw IllegalStateException("Companion association was not created")
             return association
         } catch (failure: Throwable) {
-            runCatching { cleanupFailedEnsure(address, userId) }
-                .onFailure(failure::addSuppressed)
+            // 已成功提交或本地命令超时时，RoleController 仍可能在 15 秒内迟到写入；
+            // 明确的非零退出/进程启动失败则没有异步请求，无需空轮询 17 秒。
+            if (requestMayCompleteAsynchronously || failure is CommandTimedOutException) {
+                runCatching { cleanupFailedEnsure(address, userId) }
+                    .onFailure(failure::addSuppressed)
+            }
             throw failure
         }
     }
@@ -182,7 +193,7 @@ internal object CompanionAssociation {
         val process = ProcessBuilder(*command).redirectErrorStream(true).start()
         if (!process.waitFor(COMMAND_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
             process.destroyForcibly()
-            throw IOException("${command.joinToString(" ")} timed out")
+            throw CommandTimedOutException("${command.joinToString(" ")} timed out")
         }
 
         val bytes = ByteArrayOutputStream()
@@ -196,6 +207,8 @@ internal object CompanionAssociation {
         }
         return output
     }
+
+    private class CommandTimedOutException(message: String) : IOException(message)
 }
 
 private fun java.lang.reflect.Method.invokeUnwrapped(

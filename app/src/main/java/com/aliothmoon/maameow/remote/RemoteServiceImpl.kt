@@ -83,8 +83,12 @@ class RemoteServiceImpl : RemoteService.Stub() {
     private val virtualDisplayMode = AtomicInteger(DisplayMode.PRIMARY)
     private val appPid = AtomicInteger(0)
     private val destroyed = AtomicBoolean(false)
+    /** 只串行 attach；同步 Binder 调用期间不阻塞死亡回调更新已发布连接。 */
+    private val vdmShellAttachLock = Any()
     private val vdmShellLock = Any()
     private var vdmShellConnection: VdmShellConnection? = null
+    private var pendingVdmShellBinder: IBinder? = null
+    private var pendingVdmShellDied = false
     private data class VdmShellConnection(
         val binder: IBinder,
         val deathRecipient: IBinder.DeathRecipient,
@@ -109,11 +113,13 @@ class RemoteServiceImpl : RemoteService.Stub() {
         }
         Ln.i("$TAG: destroy()")
         // 从这里开始，辅助进程退出属于正常清理流程，不能再按崩溃处理。
-        synchronized(vdmShellLock) {
-            vdmShellConnection?.let { connection ->
-                runCatching { connection.binder.unlinkToDeath(connection.deathRecipient, 0) }
-            }
+        val shellConnection = synchronized(vdmShellLock) {
+            val current = vdmShellConnection
             vdmShellConnection = null
+            current
+        }
+        shellConnection?.let { connection ->
+            runCatching { connection.binder.unlinkToDeath(connection.deathRecipient, 0) }
         }
         InputControlUtils.setTouchCallback(null)
         GameFpsMonitor.stop()
@@ -518,9 +524,8 @@ class RemoteServiceImpl : RemoteService.Stub() {
 
     override fun attachVdmShellService(service: IBinder) {
         val callerUid = Binder.getCallingUid()
-        synchronized(vdmShellLock) {
-            val old = vdmShellConnection
-            if (old?.binder === service) return
+        synchronized(vdmShellAttachLock) {
+            if (synchronized(vdmShellLock) { vdmShellConnection?.binder === service }) return
 
             // attachOwner 可能抛异常；先完成它，再注册 death recipient，避免失败的
             // sidecar 日后死亡时误杀主服务。link 成功后才向 VDM 发布新连接。
@@ -530,17 +535,35 @@ class RemoteServiceImpl : RemoteService.Stub() {
             )
             val deathRecipient = IBinder.DeathRecipient { onVdmShellDied(service) }
             var linked = false
+            synchronized(vdmShellLock) {
+                pendingVdmShellBinder = service
+                pendingVdmShellDied = false
+            }
             try {
                 service.linkToDeath(deathRecipient, 0)
                 linked = true
-                VirtualDisplayManager.commitVdmShellService(service, shellService, callerUid)
-                vdmShellConnection = VdmShellConnection(service, deathRecipient)
+                val old = synchronized(vdmShellLock) {
+                    check(pendingVdmShellBinder === service && !pendingVdmShellDied) {
+                        "VDM shell sidecar died while being attached"
+                    }
+                    VirtualDisplayManager.commitVdmShellService(service, shellService, callerUid)
+                    val previous = vdmShellConnection
+                    vdmShellConnection = VdmShellConnection(service, deathRecipient)
+                    pendingVdmShellBinder = null
+                    previous
+                }
+                old?.let { connection ->
+                    runCatching { connection.binder.unlinkToDeath(connection.deathRecipient, 0) }
+                }
             } catch (failure: Throwable) {
+                synchronized(vdmShellLock) {
+                    if (pendingVdmShellBinder === service) {
+                        pendingVdmShellBinder = null
+                        pendingVdmShellDied = false
+                    }
+                }
                 if (linked) runCatching { service.unlinkToDeath(deathRecipient, 0) }
                 throw failure
-            }
-            old?.let { connection ->
-                runCatching { connection.binder.unlinkToDeath(connection.deathRecipient, 0) }
             }
         }
     }
@@ -550,6 +573,9 @@ class RemoteServiceImpl : RemoteService.Stub() {
             val isCurrent = synchronized(vdmShellLock) {
                 val current = vdmShellConnection
                 if (current?.binder !== deadBinder) {
+                    if (pendingVdmShellBinder === deadBinder) {
+                        pendingVdmShellDied = true
+                    }
                     false
                 } else {
                     vdmShellConnection = null
