@@ -1231,10 +1231,7 @@ class CopilotViewModel(
             it.copy(syncingOperBox = true, statusMessage = text(R.string.oper_box_yituliu_fetching))
         }
         viewModelScope.launch {
-            val message = when (val result = operBoxYituliuSync.sync()) {
-                is OperBoxYituliuSync.Result.Success -> result.message
-                is OperBoxYituliuSync.Result.Failed -> result.message
-            }
+            val message = operBoxYituliuSync.sync().message
             _state.update { it.copy(syncingOperBox = false, statusMessage = message) }
         }
     }
@@ -1414,8 +1411,7 @@ class CopilotViewModel(
                 userAdditional = ""
             )
         }
-        // 对齐上游 EffectiveOperBoxAssist：只在自动编队时预检；数据不可用时勾选框显示为未勾选，这里也不生效
-        if (!config.formation || !operBoxAssist.isAvailable) {
+        if (!config.formation || !snapshot.operBoxAssist.available) {
             config = config.copy(useOperBoxAssist = false)
         }
         if (!supportsLoopCount(snapshot.tabIndex)) {

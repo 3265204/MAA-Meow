@@ -11,6 +11,7 @@ import com.aliothmoon.maameow.utils.JsonUtils
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
@@ -44,13 +45,16 @@ class CopilotOperBoxAssistTest {
     private fun assist(
         yituliu: Boolean = true,
         owned: List<OperBoxOperator> = listOf(trained),
+        version: Int = OperBoxSnapshot.CURRENT_VERSION,
         root: File = tmp.root,
     ): CopilotOperBoxAssist {
         val settings = mockk<AppSettingsManager> {
             every { operBoxUseYituliuApi } returns MutableStateFlow(yituliu)
         }
         val repo = mockk<OperBoxRepository> {
-            every { snapshot } returns MutableStateFlow(OperBoxSnapshot(owned = owned, syncTimeMillis = 1L))
+            every { snapshot } returns MutableStateFlow(
+                OperBoxSnapshot(owned = owned, syncTimeMillis = 1L, version = version)
+            )
         }
         val paths = mockk<MaaPathConfig> {
             every { rootDir } returns root.absolutePath
@@ -59,11 +63,18 @@ class CopilotOperBoxAssistTest {
         return CopilotOperBoxAssist(settings, repo, paths)
     }
 
+    private suspend fun CopilotOperBoxAssist.available() = state.first().available
+
     @Test
-    fun availabilityNeedsYituliuSwitchAndTrainingData() {
-        assertTrue(assist().isAvailable)
-        assertFalse(assist(yituliu = false).isAvailable)
-        assertFalse(assist(owned = listOf(recognized)).isAvailable)
+    fun availabilityNeedsYituliuSwitchAndTrainingData() = runTest {
+        assertTrue(assist().available())
+        assertFalse(assist(yituliu = false).available())
+        assertFalse(assist(owned = listOf(recognized)).available())
+    }
+
+    @Test
+    fun snapshotFromBeforePromotedFormsWereKept_needsResync() = runTest {
+        assertFalse(assist(version = 0).available())
     }
 
     @Test

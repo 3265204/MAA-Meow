@@ -31,9 +31,11 @@ class OperBoxYituliuSync(
     private val chainState: TaskChainState,
 ) {
     sealed interface Result {
+        val message: UiText
+
         /** [skipped] 是本地干员表不认识、被跳过的数量 */
         data class Success(val synced: Int, val skipped: Int) : Result {
-            val message: UiText
+            override val message: UiText
                 get() = if (skipped == 0) {
                     uiTextOf(R.string.oper_box_yituliu_done, synced)
                 } else {
@@ -41,7 +43,7 @@ class OperBoxYituliuSync(
                 }
         }
 
-        data class Failed(val message: UiText) : Result
+        data class Failed(override val message: UiText) : Result
     }
 
     private val mutex = Mutex()

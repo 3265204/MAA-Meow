@@ -108,6 +108,7 @@ import com.aliothmoon.maameow.maa.callback.ConnectionInfoHandler
 import com.aliothmoon.maameow.maa.callback.CopilotRuntimeStateStore
 import com.aliothmoon.maameow.maa.callback.MaaCallbackDispatcher
 import com.aliothmoon.maameow.maa.callback.MaaExecutionStateHolder
+import com.aliothmoon.maameow.maa.callback.SetParamsErrorSignal
 import com.aliothmoon.maameow.maa.callback.SubTaskHandler
 import com.aliothmoon.maameow.maa.callback.TaskChainHandler
 import com.aliothmoon.maameow.maa.callback.TaskChainStatusTracker
@@ -358,6 +359,7 @@ val appModule = module {
     single { GameMuteCoordinator(get(), RemoteGameAudioAdapter) }
     single<FrameSnapshotter> { RemoteFrameSnapshotter() }
     singleOf(::MaaCallbackDispatcher)
+    singleOf(::SetParamsErrorSignal)
 
     // 定时唤醒 + 解锁
     singleOf(::WakeUnlockEngine)

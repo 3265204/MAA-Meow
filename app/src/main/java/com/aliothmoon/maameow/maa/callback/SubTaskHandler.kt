@@ -143,21 +143,11 @@ class SubTaskHandler(
                     }
                     append(sb.trimEnd().toString(), LogLevel.ERROR)
                 }
-                ioScope.launch {
-                    achievementRepository.report {
-                        event = AchievementEvents.SUB_TASK_ERROR
-                        "subtask" to subtask
-                    }
-                }
+                reportSubTaskError(subtask)
             }
 
             "CopilotTask" -> {
-                ioScope.launch {
-                    achievementRepository.report {
-                        event = AchievementEvents.SUB_TASK_ERROR
-                        "subtask" to subtask
-                    }
-                }
+                reportSubTaskError(subtask)
                 // what 与 details 同级，details 里只有附加字段
                 val innerDetails = details.getJSONObject("details")
                 when (details.getString("what")) {
@@ -193,12 +183,7 @@ class SubTaskHandler(
                         .orEmpty()
                     append(str("DepotTemplateLoadError", ids.joinToString(", ")), LogLevel.ERROR)
                 }
-                ioScope.launch {
-                    achievementRepository.report {
-                        event = AchievementEvents.SUB_TASK_ERROR
-                        "subtask" to subtask
-                    }
-                }
+                reportSubTaskError(subtask)
             }
 
             "InfrastInfoTask" -> {
@@ -207,21 +192,11 @@ class SubTaskHandler(
                 if (what == "FacilityLayoutRecognitionFailed") {
                     append(str("InfrastFacilityLayoutRecognitionFailed"), LogLevel.ERROR)
                 }
-                ioScope.launch {
-                    achievementRepository.report {
-                        event = AchievementEvents.SUB_TASK_ERROR
-                        "subtask" to subtask
-                    }
-                }
+                reportSubTaskError(subtask)
             }
 
             else -> {
-                ioScope.launch {
-                    achievementRepository.report {
-                        event = AchievementEvents.SUB_TASK_ERROR
-                        "subtask" to subtask
-                    }
-                }
+                reportSubTaskError(subtask)
                 Timber.d("SubTaskError unhandled subtask=$subtask")
             }
         }
@@ -1341,6 +1316,15 @@ class SubTaskHandler(
 
     private fun str(key: String, vararg args: Any): String =
         MaaStringRes.getString(resources, packageName, key, *args)
+
+    private fun reportSubTaskError(subtask: String) {
+        ioScope.launch {
+            achievementRepository.report {
+                event = AchievementEvents.SUB_TASK_ERROR
+                "subtask" to subtask
+            }
+        }
+    }
 
     private fun append(content: String, level: LogLevel) {
         sessionLogger.append(content, level)

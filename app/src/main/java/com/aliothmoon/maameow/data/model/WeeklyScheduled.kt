@@ -7,11 +7,11 @@ interface WeeklyScheduled {
     val useWeeklySchedule: Boolean
     val weeklySchedule: Map<String, Boolean>
 
-    /** 没记录的日子按勾选算，对齐 WPF */
+    /** 缺失日期默认启用 */
     fun isSkippedOn(day: DayOfWeek): Boolean =
         useWeeklySchedule && weeklySchedule[day.name] == false
-}
 
-object WeeklySchedule {
-    val ALL_DAYS: Map<String, Boolean> = DayOfWeek.entries.associate { it.name to true }
+    companion object {
+        val ALL_DAYS: Map<String, Boolean> = DayOfWeek.entries.associate { it.name to true }
+    }
 }

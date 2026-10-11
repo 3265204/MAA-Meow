@@ -247,7 +247,7 @@ data class FightConfig(
      * 迁移自 WPF FightTask.WeeklySchedule
      * key 为 DayOfWeek 枚举名（MONDAY~SUNDAY），value 为是否启用
      */
-    override val weeklySchedule: Map<String, Boolean> = WeeklySchedule.ALL_DAYS,
+    override val weeklySchedule: Map<String, Boolean> = WeeklyScheduled.ALL_DAYS,
 ) : TaskParamProvider, WeeklyScheduled {
     /**
      * 获取实际使用的关卡

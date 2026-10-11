@@ -13,7 +13,7 @@ import com.aliothmoon.maameow.data.model.TaskChainNode
 import com.aliothmoon.maameow.data.model.UserDataUpdateConfig
 import com.aliothmoon.maameow.domain.models.PlanSideTask
 import com.aliothmoon.maameow.data.model.WakeUpConfig
-import com.aliothmoon.maameow.data.model.WeeklySchedule
+import com.aliothmoon.maameow.data.model.WeeklyScheduled
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.data.preferences.TaskChainState
 import com.aliothmoon.maameow.data.repository.DepotRepository
@@ -21,7 +21,6 @@ import com.aliothmoon.maameow.data.repository.DepotSnapshot
 import com.aliothmoon.maameow.data.repository.OperBoxRepository
 import com.aliothmoon.maameow.data.repository.OperBoxSnapshot
 import com.aliothmoon.maameow.data.resource.ResourceDataManager
-import com.aliothmoon.maameow.data.resource.ServerTimezone
 import com.aliothmoon.maameow.maa.task.MaaTaskType
 import com.aliothmoon.maameow.utils.i18n.uiTextOf
 import io.mockk.every
@@ -148,18 +147,18 @@ class AnalyzeTaskChainUseCaseTest {
     }
 
     @Test
-    fun infrastWeeklySchedule_skipsOnlyUncheckedDay() = runBlocking {
-        val today = ServerTimezone.getYjDayOfWeek("Official")
-        fun infrastNode(skipToday: Boolean) = TaskChainNode(
+    fun infrastWeeklySchedule_skipsDisabledDaysAndKeepsEnabledDays() = runBlocking {
+        // 整周同值，避开 04:00 换日竞态
+        fun infrastNode(enabledEveryDay: Boolean) = TaskChainNode(
             name = "基建换班",
             config = InfrastConfig(
                 useWeeklySchedule = true,
-                weeklySchedule = WeeklySchedule.ALL_DAYS + (today.name to !skipToday),
+                weeklySchedule = WeeklyScheduled.ALL_DAYS.mapValues { enabledEveryDay },
             ),
         )
 
-        val skipped = useCase(listOf(infrastNode(skipToday = true), awardNode()))
-        val kept = useCase(listOf(infrastNode(skipToday = false), awardNode()))
+        val skipped = useCase(listOf(infrastNode(enabledEveryDay = false), awardNode()))
+        val kept = useCase(listOf(infrastNode(enabledEveryDay = true), awardNode()))
 
         val skippedPlan = (skipped as AnalyzeTaskChainResult.Ready).plan
         assertEquals(listOf(MaaTaskType.AWARD), skippedPlan.params.map { it.type })

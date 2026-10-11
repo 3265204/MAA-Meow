@@ -952,13 +952,6 @@
     <string name="panel_fight_annihilation_chernobog">Chernobog</string>
     <string name="panel_fight_annihilation_outskirts">Lungmen Outskirts</string>
     <string name="panel_fight_annihilation_downtown">Lungmen Downtown</string>
-    <string name="panel_weekday_monday">Monday</string>
-    <string name="panel_weekday_tuesday">Tuesday</string>
-    <string name="panel_weekday_wednesday">Wednesday</string>
-    <string name="panel_weekday_thursday">Thursday</string>
-    <string name="panel_weekday_friday">Friday</string>
-    <string name="panel_weekday_saturday">Saturday</string>
-    <string name="panel_weekday_sunday">Sunday</string>
     <string name="panel_weekly_schedule">Weekly Schedule</string>
     <string name="panel_weekly_schedule_tip">When enabled, this task only runs on selected days (based on server time, with reset at 04:00).</string>
 

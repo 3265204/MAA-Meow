@@ -19,23 +19,25 @@ import androidx.compose.ui.unit.dp
 import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.data.model.WeeklyScheduled
 import com.aliothmoon.maameow.theme.MaaAnimatedVisibility
+import java.time.DayOfWeek
 
-/** 周计划开关 + 星期选择，理智作战与基建换班共用 */
+@Composable
+fun dayOfWeekLabel(day: DayOfWeek): String = when (day) {
+    DayOfWeek.MONDAY -> stringResource(R.string.schedule_day_full_monday)
+    DayOfWeek.TUESDAY -> stringResource(R.string.schedule_day_full_tuesday)
+    DayOfWeek.WEDNESDAY -> stringResource(R.string.schedule_day_full_wednesday)
+    DayOfWeek.THURSDAY -> stringResource(R.string.schedule_day_full_thursday)
+    DayOfWeek.FRIDAY -> stringResource(R.string.schedule_day_full_friday)
+    DayOfWeek.SATURDAY -> stringResource(R.string.schedule_day_full_saturday)
+    DayOfWeek.SUNDAY -> stringResource(R.string.schedule_day_full_sunday)
+}
+
 @Composable
 fun WeeklyScheduleSection(
     config: WeeklyScheduled,
     onEnabledChange: (Boolean) -> Unit,
     onScheduleChange: (Map<String, Boolean>) -> Unit,
 ) {
-    val weekDays = listOf(
-        "MONDAY" to stringResource(R.string.panel_weekday_monday),
-        "TUESDAY" to stringResource(R.string.panel_weekday_tuesday),
-        "WEDNESDAY" to stringResource(R.string.panel_weekday_wednesday),
-        "THURSDAY" to stringResource(R.string.panel_weekday_thursday),
-        "FRIDAY" to stringResource(R.string.panel_weekday_friday),
-        "SATURDAY" to stringResource(R.string.panel_weekday_saturday),
-        "SUNDAY" to stringResource(R.string.panel_weekday_sunday),
-    )
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         CheckBoxWithExpandableTip(
             checked = config.useWeeklySchedule,
@@ -53,7 +55,8 @@ fun WeeklyScheduleSection(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.padding(start = 4.dp)
             ) {
-                weekDays.forEach { (key, display) ->
+                DayOfWeek.entries.forEach { day ->
+                    val key = day.name
                     val selected = config.weeklySchedule[key] != false
                     Surface(
                         onClick = {
@@ -75,7 +78,7 @@ fun WeeklyScheduleSection(
                         )
                     ) {
                         Text(
-                            text = display,
+                            text = dayOfWeekLabel(day),
                             style = MaterialTheme.typography.bodySmall,
                             color = if (selected)
                                 MaterialTheme.colorScheme.onPrimaryContainer

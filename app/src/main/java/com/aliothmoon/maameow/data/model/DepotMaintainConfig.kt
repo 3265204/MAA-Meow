@@ -127,7 +127,7 @@ data class DepotMaintainConfig(
         }
 
         val chosen = if (onlyFirstInsufficientPlan) runnable.take(1) else runnable
-        stageSkippedPlans(ctx, decisions, chosenIndex = chosen.firstOrNull()?.index)
+        stageSkippedPlans(ctx, decisions.filter { it.index <= logUpTo })
         for (d in chosen) {
             val listIndex = params.size
             val target = d.target(ctx)
@@ -145,20 +145,10 @@ data class DepotMaintainConfig(
         return params
     }
 
-    /**
-     * 登记预检时已充足的计划，本轮仓库识别后复查
-     *
-     * 仅首个模式只看主计划之前的：之后的本来就不会跑，实际不足也不算漏刷
-     */
-    private fun stageSkippedPlans(
-        ctx: TaskParamContext,
-        decisions: List<PlanDecision>,
-        chosenIndex: Int?,
-    ) {
+    private fun stageSkippedPlans(ctx: TaskParamContext, decisions: List<PlanDecision>) {
         val plans = decisions
             .filter { d ->
                 d.outcome == DepotPlanOutcome.Enough &&
-                        (!onlyFirstInsufficientPlan || chosenIndex == null || d.index < chosenIndex) &&
                         // 当作库存为 0 再判一次，关卡缺失或今天不开放的不收
                         depotPlanOutcome(d.plan, 0) { ctx.activityManager.isStageOpen(it) } ==
                         DepotPlanOutcome.Runnable

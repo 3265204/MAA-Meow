@@ -211,7 +211,7 @@ data class InfrastConfig(
 
     /** 周计划，迁移自 WPF InfrastTask.UseWeeklySchedule / WeeklySchedule */
     override val useWeeklySchedule: Boolean = false,
-    override val weeklySchedule: Map<String, Boolean> = WeeklySchedule.ALL_DAYS,
+    override val weeklySchedule: Map<String, Boolean> = WeeklyScheduled.ALL_DAYS,
 
     /**
      * 自定义基建计划的时间段数据（不参与序列化）
