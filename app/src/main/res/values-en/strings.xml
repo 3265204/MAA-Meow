@@ -950,15 +950,15 @@
     <string name="panel_fight_annihilation_chernobog">Chernobog</string>
     <string name="panel_fight_annihilation_outskirts">Lungmen Outskirts</string>
     <string name="panel_fight_annihilation_downtown">Lungmen Downtown</string>
-    <string name="panel_fight_weekday_monday">Monday</string>
-    <string name="panel_fight_weekday_tuesday">Tuesday</string>
-    <string name="panel_fight_weekday_wednesday">Wednesday</string>
-    <string name="panel_fight_weekday_thursday">Thursday</string>
-    <string name="panel_fight_weekday_friday">Friday</string>
-    <string name="panel_fight_weekday_saturday">Saturday</string>
-    <string name="panel_fight_weekday_sunday">Sunday</string>
-    <string name="panel_fight_weekly_schedule">Weekly Schedule</string>
-    <string name="panel_fight_weekly_schedule_tip">When enabled, this task only runs on selected days (based on server time, with reset at 04:00).</string>
+    <string name="panel_weekday_monday">Monday</string>
+    <string name="panel_weekday_tuesday">Tuesday</string>
+    <string name="panel_weekday_wednesday">Wednesday</string>
+    <string name="panel_weekday_thursday">Thursday</string>
+    <string name="panel_weekday_friday">Friday</string>
+    <string name="panel_weekday_saturday">Saturday</string>
+    <string name="panel_weekday_sunday">Sunday</string>
+    <string name="panel_weekly_schedule">Weekly Schedule</string>
+    <string name="panel_weekly_schedule_tip">When enabled, this task only runs on selected days (based on server time, with reset at 04:00).</string>
 
     <!-- panel: stone -->
     <string name="panel_stone_allow_save">Save \"Use Originium\"</string>
@@ -2692,6 +2692,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="panel_depot_only_first_insufficient_plan">Only run the first insufficient plan</string>
     <string name="panel_depot_only_first_insufficient_plan_tip">Use the inventory saved at startup to select the first plan with insufficient stock and an available stage. Later plans are considered on the next run.</string>
     <string name="runlog_append_task_failed">Failed to add task to the queue: %1$s</string>
+    <string name="runlog_weekly_schedule_skipped">%1$s: not selected for today in the weekly schedule, skipped</string>
     <string name="runlog_no_task_appended">No task was added to the queue; start cancelled</string>
     <string name="runlog_task_with_detail">%1$s (%2$s)</string>
     <string name="task_type_switch_theme">Switch Theme</string>

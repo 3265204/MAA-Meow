@@ -6,7 +6,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -56,6 +55,7 @@ import com.aliothmoon.maameow.domain.enums.UiUsageConstants
 import com.aliothmoon.maameow.presentation.components.CheckBoxWithExpandableTip
 import com.aliothmoon.maameow.presentation.components.CheckBoxWithLabel
 import com.aliothmoon.maameow.presentation.components.INumericField
+import com.aliothmoon.maameow.presentation.components.WeeklyScheduleSection
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipContent
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipIcon
 import com.aliothmoon.maameow.presentation.view.panel.common.GroupedStageButtonGroup
@@ -377,7 +377,11 @@ fun FightConfigPanel(
                             )
                         }
                         item {
-                            WeeklyScheduleSection(config, onConfigChange)
+                            WeeklyScheduleSection(
+                                config = config,
+                                onEnabledChange = { onConfigChange(config.copy(useWeeklySchedule = it)) },
+                                onScheduleChange = { onConfigChange(config.copy(weeklySchedule = it)) },
+                            )
                         }
                     }
                 }
@@ -827,74 +831,4 @@ private fun localizedAnnihilationOptions(): List<Pair<String, String>> {
         stringResource(R.string.panel_fight_annihilation_outskirts) to "LungmenOutskirts@Annihilation",
         stringResource(R.string.panel_fight_annihilation_downtown) to "LungmenDowntown@Annihilation",
     )
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun WeeklyScheduleSection(
-    config: FightConfig,
-    onConfigChange: (FightConfig) -> Unit
-) {
-    val weekDays = listOf(
-        "MONDAY" to stringResource(R.string.panel_fight_weekday_monday),
-        "TUESDAY" to stringResource(R.string.panel_fight_weekday_tuesday),
-        "WEDNESDAY" to stringResource(R.string.panel_fight_weekday_wednesday),
-        "THURSDAY" to stringResource(R.string.panel_fight_weekday_thursday),
-        "FRIDAY" to stringResource(R.string.panel_fight_weekday_friday),
-        "SATURDAY" to stringResource(R.string.panel_fight_weekday_saturday),
-        "SUNDAY" to stringResource(R.string.panel_fight_weekday_sunday),
-    )
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        CheckBoxWithExpandableTip(
-            checked = config.useWeeklySchedule,
-            onCheckedChange = { onConfigChange(config.copy(useWeeklySchedule = it)) },
-            label = stringResource(R.string.panel_fight_weekly_schedule),
-            tipText = stringResource(R.string.panel_fight_weekly_schedule_tip)
-        )
-        MaaAnimatedVisibility(
-            visible = config.useWeeklySchedule,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(start = 4.dp)
-            ) {
-                weekDays.forEach { (key, display) ->
-                    val selected = config.weeklySchedule[key] != false
-                    Surface(
-                        onClick = {
-                            val updated = config.weeklySchedule.toMutableMap()
-                            updated[key] = !selected
-                            onConfigChange(config.copy(weeklySchedule = updated))
-                        },
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (selected)
-                            MaterialTheme.colorScheme.primaryContainer
-                        else
-                            MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = if (selected)
-                                MaterialTheme.colorScheme.primary
-                            else
-                                MaterialTheme.colorScheme.outlineVariant
-                        )
-                    ) {
-                        Text(
-                            text = display,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (selected)
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            else
-                                MaterialTheme.colorScheme.onSurface,
-                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
 }

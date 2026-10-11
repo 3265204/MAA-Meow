@@ -1004,15 +1004,15 @@
     <string name="panel_fight_annihilation_chernobog">切尔诺伯格</string>
     <string name="panel_fight_annihilation_outskirts">龙门外环</string>
     <string name="panel_fight_annihilation_downtown">龙门市区</string>
-    <string name="panel_fight_weekday_monday">周一</string>
-    <string name="panel_fight_weekday_tuesday">周二</string>
-    <string name="panel_fight_weekday_wednesday">周三</string>
-    <string name="panel_fight_weekday_thursday">周四</string>
-    <string name="panel_fight_weekday_friday">周五</string>
-    <string name="panel_fight_weekday_saturday">周六</string>
-    <string name="panel_fight_weekday_sunday">周日</string>
-    <string name="panel_fight_weekly_schedule">启用周计划</string>
-    <string name="panel_fight_weekly_schedule_tip">启用后仅在勾选的日期执行该任务（使用游戏服务器时间，04:00 换日）</string>
+    <string name="panel_weekday_monday">周一</string>
+    <string name="panel_weekday_tuesday">周二</string>
+    <string name="panel_weekday_wednesday">周三</string>
+    <string name="panel_weekday_thursday">周四</string>
+    <string name="panel_weekday_friday">周五</string>
+    <string name="panel_weekday_saturday">周六</string>
+    <string name="panel_weekday_sunday">周日</string>
+    <string name="panel_weekly_schedule">启用周计划</string>
+    <string name="panel_weekly_schedule_tip">启用后仅在勾选的日期执行该任务（使用游戏服务器时间，04:00 换日）</string>
 
     <!-- panel: stone -->
     <string name="panel_stone_allow_save">允许保存源石使用</string>
@@ -2749,6 +2749,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="panel_depot_only_first_insufficient_plan">仅执行第一个库存不足的计划</string>
     <string name="panel_depot_only_first_insufficient_plan_tip">按启动时已有库存，选择第一个库存不足且关卡开放的计划。本次只执行此计划，后续计划留到下次运行。</string>
     <string name="runlog_append_task_failed">任务加入队列失败：%1$s</string>
+    <string name="runlog_weekly_schedule_skipped">%1$s：周计划今日未勾选，已跳过</string>
     <string name="runlog_no_task_appended">没有任务成功加入队列，已取消启动</string>
     <string name="runlog_task_with_detail">%1$s（%2$s）</string>
     <string name="task_type_switch_theme">更换主题</string>

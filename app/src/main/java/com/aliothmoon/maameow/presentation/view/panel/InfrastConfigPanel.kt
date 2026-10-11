@@ -69,6 +69,7 @@ import com.aliothmoon.maameow.domain.enums.InfrastRoomType
 import com.aliothmoon.maameow.domain.enums.UiUsageConstants
 import com.aliothmoon.maameow.presentation.LocalFloatingWindowContext
 import com.aliothmoon.maameow.presentation.components.CheckBoxWithExpandableTip
+import com.aliothmoon.maameow.presentation.components.WeeklyScheduleSection
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipContent
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipIcon
 import com.aliothmoon.maameow.theme.MaaAnimatedVisibility
@@ -266,6 +267,13 @@ fun InfrastConfigPanel(
                             ) {
                                 CrossFacilityTeamsSection(config, onConfigChange)
                             }
+                        }
+                        item {
+                            WeeklyScheduleSection(
+                                config = config,
+                                onEnabledChange = { onConfigChange(config.copy(useWeeklySchedule = it)) },
+                                onScheduleChange = { onConfigChange(config.copy(weeklySchedule = it)) },
+                            )
                         }
                     }
                 }
