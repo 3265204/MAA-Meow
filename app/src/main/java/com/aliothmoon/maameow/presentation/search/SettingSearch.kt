@@ -82,6 +82,11 @@ object SettingSearchIndex {
         path = listOf(R.string.bottom_nav_schedule, R.string.schedule_wake_unlock_title),
     )
 
+    private val appBlacklistPage = SettingLocation.Page(
+        route = Routes.SCHEDULE_APP_BLACKLIST,
+        path = listOf(R.string.bottom_nav_schedule, R.string.schedule_app_blacklist_title),
+    )
+
     val entries: List<SettingSearchEntry> = listOf(
         SettingSearchEntry(R.string.settings_reinit_resource_title, update, R.string.settings_reinit_resource_desc),
         SettingSearchEntry(R.string.settings_auto_check_update_title, update, R.string.settings_auto_check_update_desc),
@@ -144,6 +149,10 @@ object SettingSearchIndex {
         SettingSearchEntry(
             R.string.settings_wake_unlock_type, wakeUnlockPage,
             R.string.schedule_wake_unlock_desc, R.string.search_keywords_wake_unlock,
+        ),
+        SettingSearchEntry(
+            R.string.schedule_app_blacklist_title, appBlacklistPage,
+            R.string.schedule_app_blacklist_desc, R.string.search_keywords_app_blacklist,
         ),
 
         SettingSearchEntry(R.string.bg_auto_mute_on_launch, SettingLocation.BackgroundActions, keywordsRes = R.string.search_keywords_mute),

@@ -17,6 +17,8 @@ import java.util.concurrent.atomic.AtomicReference
 class TaskEndRegistry(
     private val compositionService: MaaCompositionService,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    /** 全局「任务自动结束时关闭游戏」；放进程级，没拉起界面的轮次也要关 */
+    private val closeGameOnEnd: () -> Boolean = { false },
 ) {
     enum class Reason {
         /** RUNNING → IDLE/ERROR */
@@ -87,6 +89,17 @@ class TaskEndRegistry(
     private suspend fun dispatch(reason: Reason) {
         Timber.i("TaskEndRegistry: task ended, reason=%s", reason)
         runPending(reason)
+        // 手动停止不关游戏，其余结束（自然完成 / 掉线中止 / 到达时长上限）都关
+        if (reason != Reason.MANUAL && closeGameOnEnd()) {
+            Timber.i("TaskEndRegistry: auto closing game")
+            try {
+                compositionService.stopVirtualDisplay()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.e(e, "TaskEndRegistry: close game failed")
+            }
+        }
         _taskEnded.tryEmit(reason)
     }
 

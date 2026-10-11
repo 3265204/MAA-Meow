@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.BasicAlertDialog
@@ -66,12 +67,15 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.aliothmoon.maameow.R
+import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.manager.PermissionManager
 import com.aliothmoon.maameow.presentation.LocalToaster
+import com.aliothmoon.maameow.presentation.components.AdaptiveTaskPromptDialog
 import com.aliothmoon.maameow.presentation.components.SectionHeader
 import com.aliothmoon.maameow.presentation.components.TopAppBar
 import com.aliothmoon.maameow.presentation.components.WheelTimeFormatToggle
 import com.aliothmoon.maameow.presentation.components.WheelTimePicker
+import com.aliothmoon.maameow.presentation.components.dayOfWeekLabel
 import com.aliothmoon.maameow.presentation.components.rememberWheelTimePickerState
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipContent
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipIcon
@@ -105,6 +109,8 @@ fun ScheduleEditView(
     val toaster = LocalToaster.current
     var showTimePicker by remember { mutableStateOf(false) }
     var editingTime by remember { mutableStateOf<LocalTime?>(null) }
+    var showSilentStartRisk by remember { mutableStateOf(false) }
+    val runMode by viewModel.runMode.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var use24HourPicker by rememberSaveable { mutableStateOf(DateFormat.is24HourFormat(context)) }
@@ -288,7 +294,7 @@ fun ScheduleEditView(
                                 FilterChip(
                                     selected = day in state.daysOfWeek,
                                     onClick = { viewModel.onToggleDay(day) },
-                                    label = { Text(scheduleDayChipLabel(day)) },
+                                    label = { Text(dayOfWeekLabel(day)) },
                                     colors = chipColors
                                 )
                             }
@@ -596,6 +602,49 @@ fun ScheduleEditView(
                 )
             }
 
+            item(key = "silent-start") {
+                val (silentExpanded, setSilentExpanded) = remember { mutableStateOf(false) }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            stringResource(R.string.schedule_silent_start),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        ExpandableTipIcon(
+                            modifier = Modifier.padding(start = 8.dp),
+                            expanded = silentExpanded,
+                            onExpandedChange = { setSilentExpanded(it) })
+                    }
+                    Switch(
+                        checked = state.silentStartWhenInUse,
+                        onCheckedChange = { checked ->
+                            if (checked) showSilentStartRisk = true
+                            else viewModel.onSilentStartWhenInUseChanged(false)
+                        }
+                    )
+                }
+                if (runMode == RunMode.FOREGROUND) {
+                    Text(
+                        text = stringResource(R.string.schedule_close_game_effect_foreground),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = MaaDesignTokens.Spacing.sm)
+                    )
+                }
+                ExpandableTipContent(
+                    visible = silentExpanded,
+                    tipText = stringResource(R.string.schedule_silent_start_tip),
+                )
+            }
+
             item(key = "auto-sleep") {
                 val (sleepExpanded, setSleepExpanded) = remember { mutableStateOf(false) }
                 Row(
@@ -723,6 +772,19 @@ fun ScheduleEditView(
             }
         )
     }
+
+    AdaptiveTaskPromptDialog(
+        visible = showSilentStartRisk,
+        title = stringResource(R.string.schedule_silent_start_risk_title),
+        message = stringResource(R.string.schedule_silent_start_risk_body),
+        onConfirm = {
+            showSilentStartRisk = false
+            viewModel.onSilentStartWhenInUseChanged(true)
+        },
+        onDismissRequest = { showSilentStartRisk = false },
+        confirmText = stringResource(R.string.schedule_silent_start_risk_confirm),
+        icon = Icons.Rounded.Warning,
+    )
 
     if (showWizard) {
         val current = state.wizardPending.first()

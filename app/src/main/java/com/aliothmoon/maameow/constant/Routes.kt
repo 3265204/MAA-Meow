@@ -12,6 +12,7 @@ object Routes {
     const val SCHEDULE_EDIT = "schedule_edit/{strategyId}"
     const val SCHEDULE_TRIGGER_LOG = "schedule_trigger_log"
     const val SCHEDULE_WAKE_UNLOCK = "schedule_wake_unlock"
+    const val SCHEDULE_APP_BLACKLIST = "schedule_app_blacklist"
     const val NOTIFICATION = "notification"
     const val LIVE_UPDATE = "live_update"
     const val WALLPAPER = "wallpaper"

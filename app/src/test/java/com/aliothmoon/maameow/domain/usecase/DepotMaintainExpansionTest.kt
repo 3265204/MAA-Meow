@@ -11,8 +11,10 @@ import com.aliothmoon.maameow.data.repository.DepotRepository
 import com.aliothmoon.maameow.data.resource.ActivityManager
 import com.aliothmoon.maameow.data.resource.ItemHelper
 import com.aliothmoon.maameow.data.resource.ItemInfo
+import com.aliothmoon.maameow.domain.models.SkippedDepotPlans
 import com.aliothmoon.maameow.domain.models.TaskCandidate
 import com.aliothmoon.maameow.domain.models.TaskFallbackChain
+import com.aliothmoon.maameow.domain.service.FightDropsRefresher
 import com.aliothmoon.maameow.maa.task.MaaTaskParams
 import com.aliothmoon.maameow.maa.task.MaaTaskType
 import com.aliothmoon.maameow.utils.i18n.UiText
@@ -38,11 +40,13 @@ class DepotMaintainExpansionTest {
     private val depotRepository: DepotRepository = mockk()
     private val activityManager: ActivityManager = mockk()
     private val itemHelper: ItemHelper = mockk()
+    private val dropsRefresher: FightDropsRefresher = mockk(relaxed = true)
 
     private data class Expansion(
         val params: List<MaaTaskParams>,
         val logs: List<Pair<UiText, LogLevel>>,
         val fallbacks: Map<Int, TaskFallbackChain> = emptyMap(),
+        val skipped: SkippedDepotPlans? = null,
     )
 
     private fun DepotMaintainConfig.expand(
@@ -66,10 +70,13 @@ class DepotMaintainExpansionTest {
             activityManager = activityManager,
             depotRepository = depotRepository,
             itemHelper = itemHelper,
+            dropsRefresher = dropsRefresher,
             logSink = sink,
         )
+        val staged = mutableListOf<SkippedDepotPlans>()
+        every { dropsRefresher.stageSkipped(capture(staged)) } returns Unit
         val params = toTaskParams(context)
-        return Expansion(params, sink.entries, context.fallbacks)
+        return Expansion(params, sink.entries, context.fallbacks, staged.singleOrNull())
     }
 
     private fun plan(
@@ -601,6 +608,39 @@ class DepotMaintainExpansionTest {
         assertEquals(listOf<Any?>(3), logArgsOf(result.logs, R.string.runlog_depot_plan_invalid_drop))
     }
 
+    // ---- 预检跳过的计划登记复查（上游 70d1f06bb8） ----
+
+    @Test
+    fun enoughPlans_withPlayableStage_areStagedForReview() {
+        val result = config(
+            plan(dropCount = 10),               // #1 够 → 登记
+            plan(),                             // #2 不够 → 下发，不登记
+            plan(stage = "", dropCount = 10),   // #3 够但没关卡 → 不登记
+            plan(stage = "9-9", dropCount = 10), // #4 够但没开放 → 不登记
+        ).expand(inventory = mapOf(ITEM to 20))
+
+        assertEquals(
+            SkippedDepotPlans(
+                taskName = "材料补货",
+                plans = listOf(SkippedDepotPlans.Plan(no = 1, dropId = ITEM, dropCount = 10)),
+                firstOnly = false,
+            ),
+            result.skipped,
+        )
+    }
+
+    @Test
+    fun onlyFirstMode_stagesOnlyPlansBeforeTheChosenOne() {
+        val result = config(
+            plan(dropCount = 10),               // #1 够 → 登记
+            plan(stage = "4-4"),                // #2 不够 → 主任务
+            plan(stage = "5-5", dropCount = 10), // #3 够，但排在主任务后 → 不登记
+        ).copy(onlyFirstInsufficientPlan = true)
+            .expand(inventory = mapOf(ITEM to 20), openStages = setOf(STAGE, "4-4", "5-5"))
+
+        assertEquals(listOf(1), result.skipped?.plans?.map { it.no })
+        assertEquals(true, result.skipped?.firstOnly)
+    }
     private companion object {
         const val STAGE = "1-7"
         const val ITEM = "30011"

@@ -1,6 +1,7 @@
 package com.aliothmoon.maameow.domain.service
 
 import com.aliothmoon.maameow.domain.state.MaaExecutionState
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -120,5 +121,26 @@ class TaskEndRegistryTest {
     fun startingToIdle_emitsNothing() = runBlocking<Unit> {
         drive(MaaExecutionState.STARTING, MaaExecutionState.IDLE)
         assertEquals(emptyList<TaskEndRegistry.Reason>(), emitted)
+    }
+
+    @Test
+    fun closeGameOn_naturalEnd_stopsVirtualDisplay() = runBlocking<Unit> {
+        TaskEndRegistry(composition, scope, closeGameOnEnd = { true }).start()
+        drive(MaaExecutionState.RUNNING, MaaExecutionState.IDLE)
+        coVerify(exactly = 1) { composition.stopVirtualDisplay() }
+    }
+
+    @Test
+    fun closeGameOn_manualStop_keepsGame() = runBlocking<Unit> {
+        TaskEndRegistry(composition, scope, closeGameOnEnd = { true }).start()
+        stopOrigin = MaaCompositionService.StopOrigin.USER
+        drive(MaaExecutionState.RUNNING, MaaExecutionState.STOPPING, MaaExecutionState.IDLE)
+        coVerify(exactly = 0) { composition.stopVirtualDisplay() }
+    }
+
+    @Test
+    fun closeGameOff_naturalEnd_keepsGame() = runBlocking<Unit> {
+        drive(MaaExecutionState.RUNNING, MaaExecutionState.IDLE)
+        coVerify(exactly = 0) { composition.stopVirtualDisplay() }
     }
 }

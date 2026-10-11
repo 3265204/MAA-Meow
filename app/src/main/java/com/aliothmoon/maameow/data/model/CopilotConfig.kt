@@ -17,4 +17,5 @@ data class CopilotConfig(
     val addUserAdditional: Boolean = false,  // 是否追加自定义干员
     val userAdditional: String = "",         // 自定义干员 JSON
     val useCopilotList: Boolean = false,     // 战斗列表模式（用户偏好，是否生效见 CopilotUiState.listModeActive）
+    val useOperBoxAssist: Boolean = false,   // 一图流数据辅助编队（用户偏好，数据不可用时不生效）
 )

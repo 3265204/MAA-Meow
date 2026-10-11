@@ -239,7 +239,7 @@ data class FightConfig(
      * 迁移自 WPF FightTask.UseWeeklySchedule
      * 启用后仅在 weeklySchedule 中勾选的日期执行该任务
      */
-    val useWeeklySchedule: Boolean = false,
+    override val useWeeklySchedule: Boolean = false,
 
     /**
      * 周计划配置
@@ -247,16 +247,8 @@ data class FightConfig(
      * 迁移自 WPF FightTask.WeeklySchedule
      * key 为 DayOfWeek 枚举名（MONDAY~SUNDAY），value 为是否启用
      */
-    val weeklySchedule: Map<String, Boolean> = mapOf(
-        "MONDAY" to true,
-        "TUESDAY" to true,
-        "WEDNESDAY" to true,
-        "THURSDAY" to true,
-        "FRIDAY" to true,
-        "SATURDAY" to true,
-        "SUNDAY" to true,
-    )
-) : TaskParamProvider {
+    override val weeklySchedule: Map<String, Boolean> = WeeklyScheduled.ALL_DAYS,
+) : TaskParamProvider, WeeklyScheduled {
     /**
      * 获取实际使用的关卡
      *

@@ -20,6 +20,7 @@
     <string name="maa_combat_error">战斗出错</string>
     <string name="maa_start_task">开始任务: </string>
     <string name="maa_complete_task">完成任务: </string>
+    <string name="maa_task_time">\n(用时 %1$s)</string>
     <string name="maa_task_stopped">任务已停止</string>
     <string name="maa_all_tasks_complete">任务已全部完成！</string>
     <string name="maa_task_completed_with_errors">任务已结束，以下任务出现错误:\n%1$s</string>
@@ -61,6 +62,8 @@
     <string name="maa_penguin_upload_unknown_drops">未识别掉落物</string>
     <string name="maa_missing_operators">以下干员组中没有符合本次作业要求的干员（未拥有或属性未达标）：</string>
     <string name="maa_copilot_user_additional_name_invalid">追加自定干员名称无效: %1$s，请检查拼写</string>
+    <string name="maa_copilot_operbox_data_parse_failed">干员识别数据解析失败</string>
+    <string name="maa_depot_template_load_error">仓库识别模板加载失败（%1$s），已停止识别；资源文件可能已损坏，可在「设置 → 更新管理 → 重新初始化资源」修复后重试</string>
 
     <!-- subtask_start -->
     <string name="maa_mission_start">已开始行动</string>
@@ -166,6 +169,8 @@
     <string name="maa_battle_formation_parse_failed">编队解析失败</string>
     <string name="maa_battle_formation_selected">选择干员: </string>
     <string name="maa_battle_formation_oper_unavailable">干员不可用: %1$s, 原因: %2$s</string>
+    <string name="maa_battle_formation_operbox_matched">预匹配的干员（组）：</string>
+    <string name="maa_battle_formation_operbox1_unmatched">干员（组）%1$s 没有匹配的干员，需要借助战（预匹配建议 %2$s，实际按助战列表选择）</string>
     <string name="maa_current_steps">当前步骤: %1$s %2$s</string>
     <string name="maa_elapsed_time">当前计时器: %1$sms</string>
     <string name="maa_current_stage">当前关卡: %1$s</string>
@@ -258,6 +263,7 @@
     <string name="search_keywords_resolution">分辨率 虚拟屏 虚拟显示器 1080 720 画质</string>
     <string name="search_keywords_pip">画中画 小窗 悬浮 PiP</string>
     <string name="search_keywords_wake_unlock">锁屏 解锁 唤醒 密码 PIN 手势 定时</string>
+    <string name="search_keywords_app_blacklist">黑名单 屏蔽 跳过 前台 游戏 打扰 定时</string>
     <string name="search_keywords_mute">静音 声音 音量</string>
     <string name="search_keywords_run_duration">时长 限时 超时 运行时间</string>
     <string name="search_keywords_screen_off">熄屏 息屏 黑屏 关屏 锁屏 省电</string>
@@ -387,6 +393,7 @@
     <string name="settings_yituliu_open_api_token">OpenAPI Token</string>
     <string name="settings_yituliu_open_api_token_hint">一图流个人中心生成，建议只给读取权限</string>
     <string name="settings_yituliu_token_verify">验证</string>
+    <string name="settings_yituliu_get_token">获取 Token</string>
     <string name="settings_yituliu_token_empty">请先填写 Token</string>
     <string name="settings_yituliu_token_valid">Token 有效，共 %1$d 名干员</string>
     <string name="settings_yituliu_token_valid_no_data">Token 有效，但账号暂无干员练度数据</string>
@@ -635,6 +642,8 @@
     <string name="copilot_file_read_error">读取文件失败！</string>
     <string name="copilot_file_read_error_with_detail">读取文件失败：%1$s</string>
     <string name="copilot_status_started">自动战斗已启动</string>
+    <string name="copilot_start_failed">自动战斗启动失败</string>
+    <string name="copilot_operbox_assist_write_failed">干员练度数据写入失败，无法辅助编队</string>
     <string name="copilot_empty_load_first">作业为空，请先读取作业</string>
     <string name="copilot_type_mismatch">当前选择的作业与页签不匹配</string>
     <string name="copilot_empty_list">正在使用 ｢多作业模式｣, 但未添加任何作业</string>
@@ -877,9 +886,21 @@
     <string name="panel_autobattle_read_single">读取作业</string>
     <string name="panel_autobattle_operator_header">干员</string>
     <string name="panel_autobattle_source_web">作业站 #%1$d</string>
+    <string name="panel_autobattle_source_web_unnumbered">作业站</string>
     <string name="panel_autobattle_source_local">本地作业</string>
-    <string name="panel_autobattle_group_header">干员组: %1$s</string>
-    <string name="panel_autobattle_summary_count">共 %1$d 名干员/组</string>
+    <string name="panel_autobattle_group_header">干员组 · %1$s</string>
+    <string name="panel_autobattle_oper_elite_0">精零</string>
+    <string name="panel_autobattle_oper_elite_1">精一</string>
+    <string name="panel_autobattle_oper_elite_2">精二</string>
+    <string name="panel_autobattle_oper_promotion">%1$s %2$d</string>
+    <string name="panel_autobattle_oper_skill">S%1$d</string>
+    <string name="panel_autobattle_oper_no_skill">不带技能</string>
+    <string name="panel_autobattle_oper_skill_level">Lv.%1$d</string>
+    <string name="panel_autobattle_oper_mastery_1">专一</string>
+    <string name="panel_autobattle_oper_mastery_2">专二</string>
+    <string name="panel_autobattle_oper_mastery_3">专三</string>
+    <string name="panel_autobattle_oper_module">模组 %1$s</string>
+    <string name="panel_autobattle_oper_no_module">无模组</string>
     <string name="panel_autobattle_auto_formation">自动编队</string>
     <string name="panel_autobattle_auto_formation_tip">自动编队可能无法识别带有 ｢特别关注｣ 标记的干员</string>
     <string name="panel_autobattle_use_formation">使用编队</string>
@@ -890,6 +911,9 @@
     <string name="panel_autobattle_support_fill_gaps">补漏</string>
     <string name="panel_autobattle_support_random">随机</string>
     <string name="panel_autobattle_add_trust">补充低信赖干员</string>
+    <string name="panel_autobattle_operbox_assist">使用一图流数据辅助编队</string>
+    <string name="panel_autobattle_operbox_assist_tip">自动编队前，按一图流干员练度（含技能与模组）预匹配作业编队，配不齐时不开打\n需先在「设置 → 三方服务」填写一图流 Token、开启「干员识别从一图流获取」，并同步一次数据</string>
+    <string name="panel_autobattle_operbox_sync">同步</string>
     <string name="panel_autobattle_battle_list">多作业模式</string>
     <string name="panel_autobattle_battle_list_tip">仅支持以下模式:\n  1. 主线: 同一章节内导航\n  2. SideStory: 当前页面内导航（普通/EX/S 不能互跳）\n  3. 故事集: 当前页面内导航\n  4. 悖论模拟: 从干员列表启动\n请在对应界面启动，不支持跨章节导航\n\n当 ｢多作业模式｣ 启用后, 选择单个作业时会自动添加到 ｢作业列表｣</string>
     <string name="panel_autobattle_copilot_list">作业列表</string>
@@ -982,15 +1006,8 @@
     <string name="panel_fight_annihilation_chernobog">切尔诺伯格</string>
     <string name="panel_fight_annihilation_outskirts">龙门外环</string>
     <string name="panel_fight_annihilation_downtown">龙门市区</string>
-    <string name="panel_fight_weekday_monday">周一</string>
-    <string name="panel_fight_weekday_tuesday">周二</string>
-    <string name="panel_fight_weekday_wednesday">周三</string>
-    <string name="panel_fight_weekday_thursday">周四</string>
-    <string name="panel_fight_weekday_friday">周五</string>
-    <string name="panel_fight_weekday_saturday">周六</string>
-    <string name="panel_fight_weekday_sunday">周日</string>
-    <string name="panel_fight_weekly_schedule">启用周计划</string>
-    <string name="panel_fight_weekly_schedule_tip">启用后仅在勾选的日期执行该任务（使用游戏服务器时间，04:00 换日）</string>
+    <string name="panel_weekly_schedule">启用周计划</string>
+    <string name="panel_weekly_schedule_tip">启用后仅在勾选的日期执行该任务（使用游戏服务器时间，04:00 换日）</string>
 
     <!-- panel: stone -->
     <string name="panel_stone_allow_save">允许保存源石使用</string>
@@ -1335,7 +1352,7 @@
 
     <!-- panel: depot maintain -->
     <string name="panel_depot_update_before_start">任务开始前更新库存数据</string>
-    <string name="panel_depot_update_before_start_tip">任务开始时先执行一次仓库识别刷新库存数据；每条计划开始时都会按最新库存重算缺口，本次识别结果立即生效</string>
+    <string name="panel_depot_update_before_start_tip">任务开始时先执行一次仓库识别刷新库存数据，已加入队列的计划开始时按最新库存重算缺口。开跑前就判定已充足的计划不会加入队列，识别后若实际不足只在日志提示，重新运行即可刷取</string>
     <string name="panel_depot_use_auto_series">AUTO 代理倍率</string>
     <string name="panel_depot_use_auto_series_tip">未勾选时以 1 倍代理；勾选后按当前理智允许的最大倍率代理，单次掉落可能超过目标库存上限。</string>
     <string name="panel_depot_skip_during_activity">活动期间跳过</string>
@@ -1786,7 +1803,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="virtual_display_idle">待机</string>
 
     <!-- i18n: task start -->
-    <string name="task_start_warning_game_not_running">检测到游戏未运行，且未启用「开始唤醒」任务，继续执行可能直接失败。请启用「开始唤醒」任务后再启动，是否仍然启动？</string>
+    <string name="task_start_warning_game_not_running">检测到游戏未运行，且本次任务不会自动启动游戏。请启用「开始唤醒」任务并勾选其中的「启动游戏」后再启动，否则任务可能失败。是否仍然启动？</string>
     <string name="task_start_warning_wake_up_skipped">检测到游戏未运行，且本次从中途开始、跳过了「开始唤醒」任务，继续执行可能直接失败。是否仍然启动？</string>
     <string name="task_start_warning_game_not_installed">未检测到当前客户端类型对应的游戏安装包，请检查「开始唤醒」中的客户端类型设置是否正确。是否仍要启动？</string>
     <string name="task_start_warning_eye_protection_enabled">检测到设备已开启护眼/夜光模式，可能会影响图像色彩识别准确度。是否仍然启动？</string>
@@ -1843,6 +1860,10 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="schedule_trigger_log_title">触发日志</string>
     <string name="schedule_wake_unlock_title">唤醒解锁</string>
     <string name="schedule_wake_unlock_desc">定时任务触发时若设备已锁屏，会按下面的方式自动解锁；手动启动的任务不受影响</string>
+    <string name="schedule_app_blacklist_title">应用黑名单</string>
+    <string name="schedule_app_blacklist_desc">仅后台模式生效。定时触发时正在使用勾选的应用，则跳过本次执行并通知</string>
+    <string name="schedule_app_blacklist_foreground_inactive">当前运行模式为前台，黑名单不生效</string>
+    <string name="schedule_app_blacklist_selected">已选（%1$d）</string>
     <string name="schedule_create_strategy">新建策略</string>
     <string name="schedule_empty_state">暂无定时策略</string>
     <string name="schedule_empty_hint_add">点击右上角添加</string>
@@ -1889,6 +1910,11 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="schedule_force_start_tip">强制启动任务，会中断正在运行的游戏和任务</string>
     <string name="schedule_auto_screen_saver">运行期间启用屏保</string>
     <string name="schedule_auto_screen_saver_tip">仅后台模式生效。倒计时开始前就启用屏保遮住画面并把亮度压到最低，任务结束后自动关闭。触发时你正在用手机（已亮屏且已解锁）则不启用</string>
+    <string name="schedule_silent_start">静默启动</string>
+    <string name="schedule_silent_start_tip">仅后台模式生效。触发时你正在用手机（已亮屏且已解锁）则不弹出界面，改在通知栏倒计时；设备待机时仍照常拉起界面。MaaMeow 不在前台时无法保持亮屏，运行中自动锁屏会中断任务</string>
+    <string name="schedule_silent_start_risk_title">开启静默启动？</string>
+    <string name="schedule_silent_start_risk_body">触发时若你正在用手机（已亮屏且已解锁），本策略不再弹出 MaaMeow 界面，只在通知栏倒计时，可在通知里取消或立即开始。设备待机时仍照常拉起界面\n\n开启前请了解：\n• 只有 MaaMeow 在前台时才能保持屏幕常亮。任务运行中手机若自动熄屏锁屏，锁屏会占住后台虚拟显示器，任务会中断或识别出错\n• 游戏会和你正在用的应用同时运行，可能卡顿、发热、耗电增加\n• 没有弹窗提醒，倒计时只在通知栏，容易错过；关闭通知权限后无法在倒计时内取消\n\n建议调长系统自动锁屏时间；中途要放下手机时，打开 MaaMeow 即可保持亮屏</string>
+    <string name="schedule_silent_start_risk_confirm">我已了解，开启</string>
     <string name="schedule_auto_sleep_after_task">任务结束后自动熄屏</string>
     <string name="schedule_auto_sleep_tip">定时任务执行完成后自动熄屏，节省电量</string>
     <string name="schedule_skip_auto_sleep_if_awake">启动时已亮屏则不熄屏</string>
@@ -1975,6 +2001,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="schedule_result_failed_ui_launch">拉起界面失败</string>
     <string name="schedule_result_skipped_busy">系统繁忙</string>
     <string name="schedule_result_skipped_locked">锁屏跳过</string>
+    <string name="schedule_result_skipped_blacklist">黑名单跳过</string>
     <string name="schedule_result_cancelled">已取消</string>
     <string name="schedule_interval_every_days_hours">每 %1$d 天 %2$d 小时</string>
     <string name="schedule_interval_every_days">每 %1$d 天</string>
@@ -2004,6 +2031,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="notification_schedule_title">定时任务</string>
     <string name="notification_schedule_skipped">定时任务已跳过</string>
     <string name="notification_schedule_failed">定时任务未能启动</string>
+    <string name="notification_schedule_silent_countdown">「%1$s」即将在后台静默启动，可在此取消或立即开始</string>
     <string name="notification_schedule_preparing">正在准备拉起界面…</string>
     <string name="notification_schedule_device_locked">设备处于锁屏状态</string>
     <string name="notification_schedule_pin_required">已跳过：设备有锁屏密码。请在「定时 → 唤醒解锁」中配置 PIN 或录制解锁手势，或用「任务 → 快捷选项 → 熄屏挂机」代替系统锁屏</string>
@@ -2016,6 +2044,9 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <!-- i18n: schedule trigger journal (pipeline) -->
     <string name="schedule_log_received">收到启动请求: %1$s</string>
     <string name="schedule_log_skipped_busy">已有定时任务正在处理中</string>
+    <string name="schedule_log_silent_start">正在使用手机，静默启动：不拉起界面，改在通知栏倒计时</string>
+    <string name="schedule_log_blacklist_hit">前台应用「%1$s」在黑名单中，已跳过</string>
+    <string name="schedule_log_blacklist_unknown">无法判断前台应用，黑名单未生效</string>
     <string name="schedule_log_task_running_busy">有任务正在运行</string>
     <string name="schedule_log_backend_connecting">连接服务…</string>
     <string name="schedule_log_backend_connect_cause">服务启动失败原因: %1$s</string>
@@ -2470,6 +2501,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="runlog_fight_stage_unavailable">%1$s：无今日开放的关卡（首选 %2$s），已跳过理智作战</string>
     <string name="runlog_depot_set_params_failed">%1$s：更新任务参数失败，将按原参数执行</string>
     <string name="runlog_depot_plan_sanity_insufficient">%1$s：理智不足（预估 %2$d，低于关卡消耗 %3$d），已跳过</string>
+    <string name="runlog_depot_plan_stale_skipped">%1$s #%2$d：%3$s 实际 %4$d/%5$d 不足，预检时已跳过的计划无法在运行中补上，重新运行即可刷取</string>
     <string name="runlog_depot_skipped_activity">当前有活动进行中，已跳过库存保持</string>
     <string name="runlog_depot_skipped_resource">当前处于资源收集限时全天开放期间，已跳过库存保持</string>
     <string name="runlog_copilot_start">开始执行自动战斗</string>
@@ -2713,6 +2745,8 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="panel_depot_only_first_insufficient_plan">仅执行第一个库存不足的计划</string>
     <string name="panel_depot_only_first_insufficient_plan_tip">按启动时已有库存，选择第一个库存不足且关卡开放的计划。本次只执行此计划，后续计划留到下次运行。</string>
     <string name="runlog_append_task_failed">任务加入队列失败：%1$s</string>
+    <string name="runlog_weekly_schedule_skipped">%1$s：周计划今日未勾选，已跳过</string>
+    <string name="runlog_no_task_appended">没有任务成功加入队列，已取消启动</string>
     <string name="runlog_task_with_detail">%1$s（%2$s）</string>
     <string name="task_type_switch_theme">更换主题</string>
     <string name="panel_task_type_switch_theme">更换主题</string>

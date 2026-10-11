@@ -13,6 +13,7 @@ import com.aliothmoon.maameow.data.model.TaskTypeInfo
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.data.preferences.TaskChainState
 import com.aliothmoon.maameow.domain.launch.LaunchPipeline
+import com.aliothmoon.maameow.domain.launch.LaunchPresentation
 import com.aliothmoon.maameow.domain.launch.PlanSideTaskRunner
 import com.aliothmoon.maameow.domain.launch.LaunchRequest
 import com.aliothmoon.maameow.domain.launch.LaunchSession
@@ -81,14 +82,14 @@ class BackgroundTaskViewModel(
         .stateIn(viewModelScope, SharingStarted.Eagerly, CountdownState.Idle)
 
     /**
-     * 导航用：仅 [LaunchSession.InFlight.presentUi] 为 true（后台 Dialog 倒计时）时置位
+     * 导航用：仅后台 Dialog 倒计时时置位
      * 前台无倒计时不导航，避免强行拉回主 Tab
      */
     val pendingNavigateRequestId: StateFlow<String?> = launchPipeline.session
         .map { session ->
             when (session) {
                 is LaunchSession.InFlight -> {
-                    if (!session.presentUi) null
+                    if (session.presentation != LaunchPresentation.DIALOG) null
                     else when (session.phase) {
                         is LaunchSession.Phase.Counting,
                         LaunchSession.Phase.Preparing,
@@ -199,13 +200,11 @@ class BackgroundTaskViewModel(
     private fun observeTaskEnd() {
         viewModelScope.launch {
             taskEndRegistry.taskEnded.collect { reason ->
-                // 手动停止不关游戏，其余结束（自然完成 / 掉线中止 / 到达时长上限）都关
+                // 关游戏由 TaskEndRegistry 做，这里只提示
                 if (reason != TaskEndRegistry.Reason.MANUAL
                     && appSettingsManager.closeAppOnTaskEnd.value
                 ) {
-                    Timber.i("Task ended (%s), auto closing app", reason)
                     _effects.send(UiEffect.toast(R.string.bg_toast_auto_closed_on_end))
-                    compositionService.stopVirtualDisplay()
                 }
             }
         }

@@ -23,6 +23,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -62,6 +63,9 @@ class LaunchPipeline(
     private val activityLauncher: suspend (LaunchRequest) -> Boolean,
     /** 提权后端用不了的原因，null = 已连上；会申请授权、等连接 */
     private val remoteAccessBlocker: suspend () -> BackendBlock?,
+    /** 主屏顶层应用包名，判不出为 null */
+    private val foregroundPackage: suspend () -> String?,
+    private val appLabel: (String) -> String,
 ) {
     private val _session = MutableStateFlow<LaunchSession>(LaunchSession.Idle)
     val session: StateFlow<LaunchSession> = _session.asStateFlow()
@@ -108,6 +112,15 @@ class LaunchPipeline(
         }
     }
 
+    /** 通知按钮用：留在通知栏的旧按钮不能误伤下一轮 */
+    fun submit(event: LaunchUserEvent, requestId: String) {
+        if (activeRequestId.get() != requestId) {
+            Timber.i("LaunchPipeline: stale %s for %s", event, requestId)
+            return
+        }
+        submit(event)
+    }
+
     private suspend fun runPipeline(request: LaunchRequest) {
         cancelRequested.set(false)
         startNowRequested.set(false)
@@ -118,6 +131,13 @@ class LaunchPipeline(
                 remoteAccessBlocker()?.let {
                     finishWithoutHold(request, ExecutionResult.FAILED_START, it.reason)
                     return
+                }
+                // 命中黑名单也别抢占在途的
+                if (inUseBackgroundSchedule(request)) {
+                    (checkForeground() as? ForegroundCheck.Blacklisted)?.let {
+                        finishWithoutHold(request, ExecutionResult.SKIPPED_BLACKLIST, it.message)
+                        return
+                    }
                 }
                 preemptInFlight(request)
                 mutex.forceAcquire(request.requestId)
@@ -134,7 +154,7 @@ class LaunchPipeline(
         activeRequestId.set(request.requestId)
         var terminalResult: ExecutionResult? = null
         var terminalMessage: UiText? = null
-        var presentUi = true
+        var presentation = LaunchPresentation.DIALOG
         // finally 要用，声明在 try 外
         val outcome = RunOutcome()
         val log = triggerLogger.open(
@@ -145,7 +165,7 @@ class LaunchPipeline(
         )
 
         try {
-            setPhase(request, LaunchSession.Phase.DevicePrep, presentUi = true)
+            setPhase(request, LaunchSession.Phase.DevicePrep, presentation)
             log.append(uiTextOf(R.string.schedule_log_received, request.displayName))
 
             val state = compositionService.state.value
@@ -168,15 +188,31 @@ class LaunchPipeline(
                 return
             }
 
+            // 须在唤醒前采样；无锁屏时熄屏也不上锁，亮屏与 keyguard 都看
+            outcome.tookOverIdleDevice = !screenInteractive() || keyguardLocked()
+            val isForeground = appSettingsManager.runMode.value == RunMode.FOREGROUND
+            val inUseSchedule = inUseBackgroundSchedule(request)
+
+            // 先于强制启动的接管，命中就别把在跑的停了
+            if (inUseSchedule) {
+                when (val check = checkForeground()) {
+                    is ForegroundCheck.Blacklisted -> {
+                        terminalResult = ExecutionResult.SKIPPED_BLACKLIST
+                        terminalMessage = check.message
+                        return
+                    }
+
+                    ForegroundCheck.Unknown -> log.append(uiTextOf(R.string.schedule_log_blacklist_unknown))
+                    ForegroundCheck.Clear -> Unit
+                }
+            }
+
             if (busy) {
                 log.append(uiTextOf(R.string.schedule_log_force_stop_running))
                 takeOverFromPreviousRun()
                 compositionService.stop()
                 compositionService.stopVirtualDisplay()
             }
-
-            // 须在唤醒前采样；无锁屏时熄屏也不上锁，亮屏与 keyguard 都看
-            outcome.tookOverIdleDevice = !screenInteractive() || keyguardLocked()
 
             if (request.source == LaunchSource.Schedule) {
                 val unlockType = appSettingsManager.wakeUnlockType.value
@@ -237,10 +273,18 @@ class LaunchPipeline(
             }
 
             // 前台无倒计时；后台 Dialog 倒计时，控制层需用户曾手动启动
-            val isForeground = appSettingsManager.runMode.value == RunMode.FOREGROUND
-            presentUi = !isForeground
+            // 静默只在用手机时：待机没人碰屏幕，要靠拉起的界面保持常亮
+            presentation = when {
+                isForeground -> LaunchPresentation.NONE
+                inUseSchedule && request.silentStartWhenInUse -> LaunchPresentation.NOTIFICATION
+                else -> LaunchPresentation.DIALOG
+            }
             outcome.backgroundRun = !isForeground
-            val needsActivityLaunch = request.source == LaunchSource.Schedule && presentUi
+            val needsActivityLaunch = request.source == LaunchSource.Schedule
+                    && presentation == LaunchPresentation.DIALOG
+            if (presentation == LaunchPresentation.NOTIFICATION) {
+                log.append(uiTextOf(R.string.schedule_log_silent_start))
+            }
 
             // 后台 + 待机才盖；用户已开的熄屏挂机不收走，好连跑多轮
             if (request.autoScreenSaver && outcome.backgroundRun && outcome.tookOverIdleDevice) {
@@ -275,7 +319,7 @@ class LaunchPipeline(
                 val startNow = countdownUI.await(
                     request = request,
                     onTick = { remaining ->
-                        setPhase(request, LaunchSession.Phase.Counting(remaining), presentUi)
+                        setPhase(request, LaunchSession.Phase.Counting(remaining), presentation)
                     },
                     shouldAbort = {
                         cancelRequested.get() || startNowRequested.get()
@@ -295,8 +339,8 @@ class LaunchPipeline(
                 }
             }
 
-            setPhase(request, LaunchSession.Phase.Preparing, presentUi)
-            setPhase(request, LaunchSession.Phase.Starting, presentUi)
+            setPhase(request, LaunchSession.Phase.Preparing, presentation)
+            setPhase(request, LaunchSession.Phase.Starting, presentation)
             log.append(uiTextOf(R.string.schedule_log_starting_tasks, enabled.size))
 
             when (
@@ -390,7 +434,7 @@ class LaunchPipeline(
                     cur
                 }
             }
-            // 全局关游戏由后台任务页处理，这里不重复
+            // 全局关游戏由 TaskEndRegistry 处理，这里不重复
             val closeGame = outcome.backgroundRun
                     && request.closeGameAfterTask
                     && !appSettingsManager.closeAppOnTaskEnd.value
@@ -423,6 +467,42 @@ class LaunchPipeline(
         compositionService.stopVirtualDisplay()
         mutex.releaseAny()
         Timber.i("LaunchPipeline: force preempt for %s", incoming.requestId)
+    }
+
+    private fun inUseBackgroundSchedule(request: LaunchRequest): Boolean =
+        request.source == LaunchSource.Schedule
+                && appSettingsManager.runMode.value != RunMode.FOREGROUND
+                && screenInteractive() && !keyguardLocked()
+
+    private sealed interface ForegroundCheck {
+        data object Clear : ForegroundCheck
+        data object Unknown : ForegroundCheck
+        data class Blacklisted(val message: UiText) : ForegroundCheck
+    }
+
+    private suspend fun checkForeground(): ForegroundCheck {
+        val blacklist = appSettingsManager.scheduleAppBlacklist.value
+        if (blacklist.isEmpty()) return ForegroundCheck.Clear
+        val pkg = try {
+            foregroundPackage()
+        } catch (e: TimeoutCancellationException) {
+            // 探测超时不是被抢占，按判不出处理
+            Timber.w(e, "LaunchPipeline: foreground probe timed out")
+            null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "LaunchPipeline: foreground probe failed")
+            null
+        }
+        return when (pkg) {
+            null -> ForegroundCheck.Unknown
+            in blacklist -> ForegroundCheck.Blacklisted(
+                uiTextOf(R.string.schedule_log_blacklist_hit, appLabel(pkg)),
+            )
+
+            else -> ForegroundCheck.Clear
+        }
     }
 
     /** 抢占前撤掉上一轮收尾与屏保，避免 stop 边沿触发旧 autoSleep */
@@ -461,16 +541,16 @@ class LaunchPipeline(
     private fun setPhase(
         request: LaunchRequest,
         phase: LaunchSession.Phase,
-        presentUi: Boolean,
+        presentation: LaunchPresentation,
     ) {
         _session.update { cur ->
             when {
                 cur is LaunchSession.Idle ->
-                    LaunchSession.InFlight(request, phase, presentUi)
+                    LaunchSession.InFlight(request, phase, presentation)
 
                 cur is LaunchSession.InFlight
                         && cur.request.requestId == request.requestId ->
-                    LaunchSession.InFlight(request, phase, presentUi)
+                    LaunchSession.InFlight(request, phase, presentation)
 
                 else -> cur
             }
