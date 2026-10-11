@@ -584,6 +584,7 @@
     <string name="maa_combat_error">Combat error</string>
     <string name="maa_start_task">Start task: </string>
     <string name="maa_complete_task">Complete task: </string>
+    <string name="maa_task_time">\n(in %1$s)</string>
     <string name="maa_task_stopped">Has stopped</string>
     <string name="maa_all_tasks_complete">All task(s) completed!</string>
     <string name="maa_task_completed_with_errors">Tasks finished, but errors occurred in the following tasks:\n%1$s</string>
