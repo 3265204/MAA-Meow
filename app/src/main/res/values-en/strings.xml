@@ -1323,6 +1323,9 @@
     <string name="panel_depot_preset_skill_summary">Skill Summary - III</string>
     <string name="panel_depot_preset_plan_count">%1$d plans</string>
     <string name="panel_depot_preset_apply">Add</string>
+    <string name="panel_depot_preset_group_permanent">Permanent Stages</string>
+    <string name="panel_depot_preset_group_activity">Current Event</string>
+    <string name="panel_depot_preset_activity_skip_conflict">\"%1$s\" is enabled, so imported plans will not run while the event is open</string>
     <string name="panel_depot_clear_plans">Clear</string>
     <string name="panel_depot_clear_plans_confirm">Clear all %1$d plans? This cannot be undone.</string>
     <string name="panel_depot_group_task_behavior">Task behavior</string>

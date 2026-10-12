@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -132,7 +133,12 @@ fun DepotMaintainConfigPanel(
     val expandedIndices = remember { mutableStateListOf<Int>() }
     var presetPanelExpanded by remember { mutableStateOf(false) }
     // 只在展开期间有效，应用或取消后清掉
-    var selectedPreset by remember { mutableStateOf<DepotMaintainPreset?>(null) }
+    var selectedPreset by remember { mutableStateOf<DepotPresetOption?>(null) }
+    val knownItems by itemHelper.items.collectAsStateWithLifecycle()
+    // 活动起止不触发数据刷新，每次展开按当下时刻重算，对齐上游 PresetDropDownVisibilityChanged
+    val activityPresets = remember(activityStages, knownItems, presetPanelExpanded) {
+        buildActivityPresets(activityStages, { it in knownItems }, System.currentTimeMillis())
+    }
     var showClearConfirm by remember { mutableStateOf(false) }
 
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
@@ -213,6 +219,7 @@ fun DepotMaintainConfigPanel(
                         expandedIndices = expandedIndices,
                         presetPanelExpanded = presetPanelExpanded,
                         onPresetPanelExpandedChange = { presetPanelExpanded = it },
+                        activityPresets = activityPresets,
                         selectedPreset = selectedPreset,
                         onSelectedPresetChange = { selectedPreset = it },
                         showClearConfirm = showClearConfirm,
@@ -369,8 +376,9 @@ private fun ColumnScope.GeneralTab(
     expandedIndices: MutableList<Int>,
     presetPanelExpanded: Boolean,
     onPresetPanelExpandedChange: (Boolean) -> Unit,
-    selectedPreset: DepotMaintainPreset?,
-    onSelectedPresetChange: (DepotMaintainPreset?) -> Unit,
+    activityPresets: List<DepotActivityPreset>,
+    selectedPreset: DepotPresetOption?,
+    onSelectedPresetChange: (DepotPresetOption?) -> Unit,
     showClearConfirm: Boolean,
     onShowClearConfirmChange: (Boolean) -> Unit,
 ) {
@@ -450,6 +458,8 @@ private fun ColumnScope.GeneralTab(
             onPresetPanelExpandedChange(it)
             if (it) onShowClearConfirmChange(false)
         },
+        activityPresets = activityPresets,
+        skipDuringActivity = config.skipDuringActivity,
         selected = selectedPreset,
         onSelectedChange = onSelectedPresetChange,
         onApply = { preset ->
@@ -510,14 +520,20 @@ private fun ColumnScope.GeneralTab(
     }
 }
 
-/** 预设选择器：点开后就地展开单选组，选中再确认才追加计划 */
+/**
+ * 预设选择器：点开后就地展开单选组，选中再确认才追加计划
+ *
+ * 有进行中的活动时分「常驻关卡」「当前活动」两组，否则不显示分组标题
+ */
 @Composable
 private fun ColumnScope.PresetPicker(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    selected: DepotMaintainPreset?,
-    onSelectedChange: (DepotMaintainPreset?) -> Unit,
-    onApply: (DepotMaintainPreset) -> Unit,
+    activityPresets: List<DepotActivityPreset>,
+    skipDuringActivity: Boolean,
+    selected: DepotPresetOption?,
+    onSelectedChange: (DepotPresetOption?) -> Unit,
+    onApply: (DepotPresetOption) -> Unit,
 ) {
     val arrowRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
@@ -554,33 +570,48 @@ private fun ColumnScope.PresetPicker(
             shape = RoundedCornerShape(8.dp),
         ) {
             Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                val grouped = activityPresets.isNotEmpty()
+                if (grouped) PresetGroupLabel(stringResource(R.string.panel_depot_preset_group_permanent))
                 DepotMaintainPreset.entries.forEach { preset ->
-                    val selected = selected == preset
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = selected,
-                                role = Role.RadioButton,
-                            ) { onSelectedChange(preset) }
-                            .padding(horizontal = 8.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(selected = selected, onClick = null)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = stringResource(preset.labelRes),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f),
+                    PresetOptionRow(
+                        label = stringResource(preset.labelRes),
+                        planCount = preset.plans.size,
+                        selected = selected == preset,
+                        onSelect = { onSelectedChange(preset) },
+                    )
+                }
+                if (grouped) {
+                    PresetGroupLabel(stringResource(R.string.panel_depot_preset_group_activity))
+                    activityPresets.forEach { preset ->
+                        PresetOptionRow(
+                            label = preset.name,
+                            planCount = preset.plans.size,
+                            selected = selected == preset,
+                            onSelect = { onSelectedChange(preset) },
                         )
-                        // 提前告知会加几条，芯片预设一次进 8 条
+                    }
+                }
+                // 导入不改运行语义，只在确认前提示，对齐上游 DepotPresetActivitySkipConflict
+                if (selected is DepotActivityPreset && skipDuringActivity) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.WarningAmber,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier
+                                .padding(top = 1.dp)
+                                .size(16.dp),
+                        )
                         Text(
                             text = stringResource(
-                                R.string.panel_depot_preset_plan_count,
-                                preset.plans.size,
+                                R.string.panel_depot_preset_activity_skip_conflict,
+                                stringResource(R.string.panel_depot_skip_during_activity),
                             ),
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.error,
                         )
                     }
                 }
@@ -601,6 +632,51 @@ private fun ColumnScope.PresetPicker(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PresetGroupLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 2.dp),
+    )
+}
+
+@Composable
+private fun PresetOptionRow(
+    label: String,
+    planCount: Int,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onSelect,
+            )
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        // 提前告知会加几条，芯片预设一次进 8 条
+        Text(
+            text = stringResource(R.string.panel_depot_preset_plan_count, planCount),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
