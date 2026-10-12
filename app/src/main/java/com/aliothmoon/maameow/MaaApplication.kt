@@ -1,6 +1,7 @@
 package com.aliothmoon.maameow
 
 import android.app.Application
+import android.content.res.Configuration
 import com.aliothmoon.maameow.data.config.MaaPathConfig
 import com.aliothmoon.maameow.data.datasource.AppDownloader
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
@@ -75,7 +76,7 @@ class MaaApplication : Application() {
 
         applicationScope.launch(Dispatchers.Main) {
             appSettingsManager.awaitLoaded()
-            LocaleBootstrap.applyPersisted(appSettingsManager)
+            LocaleBootstrap.applyPersisted(app, appSettingsManager)
             NightModeBootstrap.follow(app, applicationScope, appSettingsManager)
             // 背景图解码与后续初始化并行，首帧就能带上
             if (appSettingsManager.customBackgroundEnabled.value) get<BackgroundImageStore>()
@@ -84,6 +85,12 @@ class MaaApplication : Application() {
         }.invokeOnCompletion { cause ->
             if (cause != null) initialization.completeExceptionally(cause)
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // 系统配置变化会重置回系统语言
+        LocaleBootstrap.syncApplicationResources(this)
     }
 
     private fun postCreateApplication() {

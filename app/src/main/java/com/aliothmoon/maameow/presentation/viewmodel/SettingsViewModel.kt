@@ -3,7 +3,6 @@ package com.aliothmoon.maameow.presentation.viewmodel
 import android.app.Application
 import android.graphics.Bitmap
 import android.net.Uri
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -32,8 +31,8 @@ import com.aliothmoon.maameow.domain.usecase.SwitchCoreDataLocationUseCase
 import com.aliothmoon.maameow.manager.PermissionManager
 import com.aliothmoon.maameow.manager.RemoteServiceManager
 import com.aliothmoon.maameow.utils.Misc
+import com.aliothmoon.maameow.utils.i18n.LocaleBootstrap
 import com.aliothmoon.maameow.utils.i18n.LocaleBootstrap.resolveSelectedLanguage
-import com.aliothmoon.maameow.utils.i18n.LocaleBootstrap.toLocaleList
 import com.aliothmoon.maameow.utils.i18n.UiText
 import com.aliothmoon.maameow.utils.i18n.uiTextOf
 import kotlinx.coroutines.Dispatchers
@@ -435,7 +434,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             val resolved = resolveSelectedLanguage(lang)
             appSettingsManager.setLanguage(resolved)
-            AppCompatDelegate.setApplicationLocales(resolved.toLocaleList())
+            LocaleBootstrap.applyLanguage(app, resolved)
             resourceDataManager.refreshDisplayLanguage(
                 clientType = taskChainState.clientType,
                 displayLanguage = ResourceDataManager.displayLanguageCode(resolved)
