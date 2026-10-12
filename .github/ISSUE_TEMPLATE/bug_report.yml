@@ -63,15 +63,6 @@ body:
     validations:
       required: true
 
-  - type: input
-    id: app-version
-    attributes:
-      label: MAA Meow 版本
-      description: "设置 → 关于 → 版本"
-      placeholder: "v0.23.0"
-    validations:
-      required: true
-
   - type: dropdown
     id: backend
     attributes:
