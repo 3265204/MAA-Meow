@@ -26,7 +26,7 @@ internal enum class DepotMaintainPreset(
     CHIP_2(
         labelRes = R.string.panel_depot_preset_chip_2,
         plans = buildPresetPlans(
-            defaultCount = 20,
+            defaultCount = 32,
             "PR-A-2" to listOf("3262", "3232"),
             "PR-B-2" to listOf("3252", "3242"),
             "PR-C-2" to listOf("3212", "3272"),
@@ -36,21 +36,21 @@ internal enum class DepotMaintainPreset(
     LMD(
         labelRes = R.string.panel_depot_preset_lmd,
         plans = buildPresetPlans(
-            defaultCount = 2_000_000,
+            defaultCount = 5_000_000,
             "CE-6" to listOf("4001"),
         ),
     ),
     PURCHASE_CERTIFICATE(
         labelRes = R.string.panel_depot_preset_certificate,
         plans = buildPresetPlans(
-            defaultCount = 5_000,
+            defaultCount = 8_000,
             "AP-5" to listOf("4006"),
         ),
     ),
     SKILL_SUMMARY_3(
         labelRes = R.string.panel_depot_preset_skill_summary,
         plans = buildPresetPlans(
-            defaultCount = 200,
+            defaultCount = 400,
             "CA-5" to listOf("3303"),
         ),
     ),
