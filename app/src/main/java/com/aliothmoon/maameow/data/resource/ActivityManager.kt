@@ -271,7 +271,7 @@ class ActivityManager(
             val isOpen = mergedInfo?.isStageOpen(today) ?: stage.isOpenOn(today)
             StageItem(
                 code = stage.code,
-                displayName = stage.displayName,
+                displayName = stage.displayName(context),
                 isActivityStage = false,
                 isOpenToday = isOpen,
                 dropGroups = stage.dropGroups
@@ -362,10 +362,10 @@ class ActivityManager(
                 val activity = if (isResourceStage(stage.code)) resourceCollection else null
                 result[stage.code] = MergedStageInfo(
                     code = stage.code,
-                    displayName = stage.displayName,
+                    displayName = stage.displayName(context),
                     openDays = stage.openDays,
                     activity = activity,
-                    tip = stage.tip,
+                    tipRes = stage.tipRes,
                     dropGroups = stage.dropGroups
                 )
             }
@@ -578,9 +578,7 @@ class ActivityManager(
             }
 
             // 4. 常规关卡提示
-            if (stageInfo.tip.isNotEmpty()) {
-                lines.add(stageInfo.tip)
-            }
+            stageInfo.tipRes?.let { lines.add(context.getString(it)) }
 
             // 5. 分组库存（技能书、芯片等），格式同 WPF DropGroups，缺失项口径见 hasSyncedInventory
             if (stageInfo.dropGroups.any { group -> group.any { inventoryCount(it) != null } }) {
