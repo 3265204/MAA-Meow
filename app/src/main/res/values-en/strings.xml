@@ -2458,6 +2458,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="runlog_depot_plan_stale_skipped">%1$s #%2$d: %3$s is actually %4$d/%5$d, insufficient. Plans skipped at the pre-check can\'t be added mid-run; run again to farm it</string>
     <string name="runlog_depot_skipped_activity">An event is in progress; Depot Maintain skipped</string>
     <string name="runlog_depot_skipped_resource">The resource collection event is active; Depot Maintain skipped</string>
+    <string name="runlog_depot_sorted_by_progress">Plans queued in ascending order of inventory progress</string>
     <string name="runlog_copilot_start">Starting auto-battle</string>
     <string name="runlog_copilot_started">Auto-battle started</string>
     <string name="runlog_service_connecting">Service is starting, please try again later</string>
@@ -2698,6 +2699,8 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="blackflow_termination_unknown">To report this, go to Settings → About → Report an Issue</string>
     <string name="panel_depot_only_first_insufficient_plan">Only run the first insufficient plan</string>
     <string name="panel_depot_only_first_insufficient_plan_tip">Use the inventory saved at startup to select the first plan with insufficient stock and an available stage. Later plans are considered on the next run.</string>
+    <string name="panel_depot_sort_by_progress">Run in order of inventory progress</string>
+    <string name="panel_depot_sort_by_progress_tip">Uses the inventory saved at startup to compute progress (current/target) and runs plans from lowest to highest, so the plan with the largest shortfall ratio gets sanity first. The list order shown here is unchanged. Combined with \"Only run the first insufficient plan\", only the open plan with the lowest progress runs.</string>
     <string name="runlog_append_task_failed">Failed to add task to the queue: %1$s</string>
     <string name="runlog_weekly_schedule_skipped">%1$s: not selected for today in the weekly schedule, skipped</string>
     <string name="runlog_no_task_appended">No task was added to the queue; start cancelled</string>

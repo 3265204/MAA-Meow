@@ -63,6 +63,8 @@ fun depotPlanOutcome(
 data class DepotMaintainConfig(
     val updateDepot: Boolean = true,
     val onlyFirstInsufficientPlan: Boolean = false,
+    /** 按库存达成率升序下发，只改执行顺序不动列表，对齐 WPF SortByProgress */
+    val sortByProgress: Boolean = false,
     val customStageCode: Boolean = false,
     /** false→series=1；true→series=0（AUTO）。对齐 WPF UseAutoSeries。 */
     val useAutoSeries: Boolean = false,
@@ -104,7 +106,7 @@ data class DepotMaintainConfig(
         }
 
         // 预先评估后备计划，暂不输出日志
-        val decisions = plans.mapIndexed { index, plan ->
+        val evaluated = plans.mapIndexed { index, plan ->
             val current = ctx.depotRepository.countOf(plan.dropId)
             PlanDecision(
                 index = index,
@@ -113,21 +115,26 @@ data class DepotMaintainConfig(
                 outcome = depotPlanOutcome(plan, current) { ctx.activityManager.isStageOpen(it) },
             )
         }
+        // 以下按执行顺序处理，序号仍取原位置；sortedBy 稳定，同达成率保持列表顺序
+        val decisions = if (sortByProgress) evaluated.sortedBy { it.progress } else evaluated
+        if (sortByProgress && plans.size > 1) {
+            ctx.appendLog(uiTextOf(R.string.runlog_depot_sorted_by_progress), LogLevel.INFO)
+        }
         val runnable = decisions.filter { it.outcome == DepotPlanOutcome.Runnable }
 
         // 仅首个模式的预检日志止于主计划
-        val logUpTo = if (onlyFirstInsufficientPlan) {
-            runnable.firstOrNull()?.index ?: decisions.lastIndex
+        val logged = if (onlyFirstInsufficientPlan) {
+            val first = decisions.indexOfFirst { it.outcome == DepotPlanOutcome.Runnable }
+            if (first >= 0) decisions.take(first + 1) else decisions
         } else {
-            decisions.lastIndex
+            decisions
         }
-        for (d in decisions) {
-            if (d.index > logUpTo) break
+        for (d in logged) {
             ctx.appendLog(d.logText(ctx), d.logLevel())
         }
 
         val chosen = if (onlyFirstInsufficientPlan) runnable.take(1) else runnable
-        stageSkippedPlans(ctx, decisions.filter { it.index <= logUpTo })
+        stageSkippedPlans(ctx, logged)
         for (d in chosen) {
             val listIndex = params.size
             val target = d.target(ctx)
@@ -138,7 +145,8 @@ data class DepotMaintainConfig(
                 logName = d.logName(ctx),
             )
             if (onlyFirstInsufficientPlan) {
-                ctx.registerFallbacks(listIndex, buildFallbacks(ctx, decisions, after = d.index))
+                // 主计划即 logged 末项，其后按执行顺序作后备
+                ctx.registerFallbacks(listIndex, buildFallbacks(ctx, decisions.drop(logged.size)))
             }
         }
 
@@ -162,13 +170,11 @@ data class DepotMaintainConfig(
     /** 后备候选携带其前方的跳过原因，尾部日志留到全部失败后输出 */
     private fun buildFallbacks(
         ctx: TaskParamContext,
-        decisions: List<PlanDecision>,
-        after: Int,
+        rest: List<PlanDecision>,
     ): TaskFallbackChain {
         val candidates = mutableListOf<TaskCandidate>()
         var pending = mutableListOf<Pair<UiText, LogLevel>>()
-        for (d in decisions) {
-            if (d.index <= after) continue
+        for (d in rest) {
             if (d.outcome != DepotPlanOutcome.Runnable) {
                 pending += d.logText(ctx) to d.logLevel()
                 continue
@@ -195,6 +201,14 @@ data class DepotMaintainConfig(
     ) {
         val no: Int get() = index + 1
         val need: Int get() = plan.dropCount - current
+
+        /** 库存达成率，无效计划排最后；无库存记录按 0 计，与预检一致 */
+        val progress: Double
+            get() = if (plan.dropId.isBlank() || plan.dropCount <= 0) {
+                Double.MAX_VALUE
+            } else {
+                current.toDouble() / plan.dropCount
+            }
 
         fun logName(ctx: TaskParamContext): UiText = UiText.Dynamic("${ctx.node.name} #$no")
 

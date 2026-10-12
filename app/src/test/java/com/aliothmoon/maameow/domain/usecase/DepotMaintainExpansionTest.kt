@@ -641,6 +641,107 @@ class DepotMaintainExpansionTest {
         assertEquals(listOf(1), result.skipped?.plans?.map { it.no })
         assertEquals(true, result.skipped?.firstOnly)
     }
+
+    // ---- 按库存达成率排序（上游 a7ee2c2bf7） ----
+
+    @Test
+    fun sortByProgress_queuesLowestProgressFirst_andKeepsOriginalNumbers() {
+        val result = config(
+            plan(dropId = "A"), // #1 50/100
+            plan(dropId = "B"), // #2 10/100
+            plan(dropId = "C"), // #3 90/100
+        ).copy(sortByProgress = true)
+            .expand(inventory = mapOf("A" to 50, "B" to 10, "C" to 90))
+
+        assertEquals(
+            listOf("#2", "#1", "#3").map { UiText.Dynamic("材料补货 $it") },
+            result.params.map { it.logName },
+        )
+        assertEquals(
+            listOf(R.string.runlog_depot_sorted_by_progress) +
+                    List(3) { R.string.runlog_depot_plan_inventory_insufficient },
+            result.logs.resIds(),
+        )
+        assertEquals(
+            listOf("#2", "#1", "#3"),
+            result.logs.planLogs().drop(1).map { (it.first as UiText.Resource).args.first() },
+        )
+    }
+
+    @Test
+    fun sortByProgress_putsInvalidPlansLast_inListOrder() {
+        val result = config(
+            plan(dropId = ""),   // #1 无效
+            plan(dropCount = 0), // #2 无效
+            plan(),              // #3 可执行
+        ).copy(sortByProgress = true).expand()
+
+        assertEquals(
+            listOf(
+                R.string.runlog_depot_sorted_by_progress,
+                R.string.runlog_depot_plan_inventory_insufficient,
+                R.string.runlog_depot_plan_invalid_drop,
+                R.string.runlog_depot_plan_zero_count,
+            ),
+            result.logs.resIds(),
+        )
+    }
+
+    @Test
+    fun sortByProgress_singlePlan_logsNoSortNotice() {
+        val result = config(plan()).copy(sortByProgress = true).expand()
+        assertEquals(listOf(R.string.runlog_depot_plan_inventory_insufficient), result.logs.resIds())
+    }
+
+    @Test
+    fun sortByProgress_withOnlyFirst_runsLowestProgressAndFallsBackInSortedOrder() {
+        val result = config(
+            plan(dropId = "A"),                // #1 50/100 → 后备二
+            plan(dropId = "B", stage = "4-4"), // #2 10/100 → 主任务
+            plan(dropId = "C", stage = "5-5"), // #3 30/100 → 后备一
+        ).copy(sortByProgress = true, onlyFirstInsufficientPlan = true).expand(
+            inventory = mapOf("A" to 50, "B" to 10, "C" to 30),
+            openStages = setOf(STAGE, "4-4", "5-5"),
+        )
+
+        assertEquals(listOf(UiText.Dynamic("材料补货 #2")), result.params.map { it.logName })
+        assertEquals(
+            listOf(
+                R.string.runlog_depot_sorted_by_progress,
+                R.string.runlog_depot_plan_inventory_insufficient,
+            ),
+            result.logs.resIds(),
+        )
+        assertEquals(
+            listOf("5-5", STAGE),
+            result.fallbacks.getValue(0).candidates.map { it.stage() },
+        )
+    }
+
+    @Test
+    fun sortByProgress_stagesEnoughPlansInExecutionOrder() {
+        val result = config(
+            plan(dropId = "A"), // #1 150/100
+            plan(dropId = "B"), // #2 120/100
+        ).copy(sortByProgress = true)
+            .expand(inventory = mapOf("A" to 150, "B" to 120))
+
+        assertEquals(listOf(2, 1), result.skipped?.plans?.map { it.no })
+    }
+
+    /** 已充足的计划达成率 ≥ 1，必排在不足计划之后；仅首个模式下落在主计划后面，不登记复查 */
+    @Test
+    fun sortByProgress_withOnlyFirst_stagesNoEnoughPlanBehindTheChosenOne() {
+        val result = config(
+            plan(dropId = "A", dropCount = 10), // #1 20/10 够
+            plan(dropId = "B"),                 // #2 0/100 → 主任务
+        ).copy(sortByProgress = true, onlyFirstInsufficientPlan = true)
+            .expand(inventory = mapOf("A" to 20))
+
+        assertEquals(listOf(UiText.Dynamic("材料补货 #2")), result.params.map { it.logName })
+        assertEquals(emptyList<SkippedDepotPlans.Plan>(), result.skipped?.plans)
+    }
+
     private companion object {
         const val STAGE = "1-7"
         const val ITEM = "30011"

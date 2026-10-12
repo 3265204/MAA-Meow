@@ -632,6 +632,13 @@ private fun ColumnScope.AdvancedTab(
         tipText = stringResource(R.string.panel_depot_only_first_insufficient_plan_tip),
     )
 
+    CheckBoxWithExpandableTip(
+        checked = config.sortByProgress,
+        onCheckedChange = { onConfigChange(config.copy(sortByProgress = it)) },
+        label = stringResource(R.string.panel_depot_sort_by_progress),
+        tipText = stringResource(R.string.panel_depot_sort_by_progress_tip),
+    )
+
     CheckBoxWithLabel(
         checked = config.skipDuringResourceCollection,
         onCheckedChange = { onConfigChange(config.copy(skipDuringResourceCollection = it)) },

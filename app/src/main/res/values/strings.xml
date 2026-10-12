@@ -2515,6 +2515,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="runlog_depot_plan_stale_skipped">%1$s #%2$d：%3$s 实际 %4$d/%5$d 不足，预检时已跳过的计划无法在运行中补上，重新运行即可刷取</string>
     <string name="runlog_depot_skipped_activity">当前有活动进行中，已跳过库存保持</string>
     <string name="runlog_depot_skipped_resource">当前处于资源收集限时全天开放期间，已跳过库存保持</string>
+    <string name="runlog_depot_sorted_by_progress">已按库存达成率从低到高排序执行</string>
     <string name="runlog_copilot_start">开始执行自动战斗</string>
     <string name="runlog_copilot_started">自动战斗开始运行</string>
     <string name="runlog_service_connecting">服务正在启动中，请稍后再试</string>
@@ -2755,6 +2756,8 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="blackflow_termination_unknown">如需反馈请前往「设置 → 关于 → 问题反馈」</string>
     <string name="panel_depot_only_first_insufficient_plan">仅执行第一个库存不足的计划</string>
     <string name="panel_depot_only_first_insufficient_plan_tip">按启动时已有库存，选择第一个库存不足且关卡开放的计划。本次只执行此计划，后续计划留到下次运行。</string>
+    <string name="panel_depot_sort_by_progress">按库存达成率排序执行</string>
+    <string name="panel_depot_sort_by_progress_tip">按启动时已有库存计算达成率（当前/目标），从低到高执行，缺口比例最大的计划优先获得理智；列表显示顺序不变。与「仅执行第一个库存不足的计划」同时开启时，只执行达成率最低且关卡开放的计划。</string>
     <string name="runlog_append_task_failed">任务加入队列失败：%1$s</string>
     <string name="runlog_weekly_schedule_skipped">%1$s：周计划今日未勾选，已跳过</string>
     <string name="runlog_no_task_appended">没有任务成功加入队列，已取消启动</string>
