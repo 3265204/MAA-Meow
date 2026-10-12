@@ -629,17 +629,27 @@ class DepotMaintainExpansionTest {
         )
     }
 
+    /** 登记不随日志截断，排在主计划前后由复查按主计划判断 */
     @Test
-    fun onlyFirstMode_stagesOnlyPlansBeforeTheChosenOne() {
+    fun onlyFirstMode_stagesEveryEnoughPlan_withTheChosenOneAsCutoff() {
         val result = config(
             plan(dropCount = 10),               // #1 够 → 登记
             plan(stage = "4-4"),                // #2 不够 → 主任务
-            plan(stage = "5-5", dropCount = 10), // #3 够，但排在主任务后 → 不登记
+            plan(stage = "5-5", dropCount = 10), // #3 够 → 登记，复查时排在主任务后不提示
         ).copy(onlyFirstInsufficientPlan = true)
             .expand(inventory = mapOf(ITEM to 20), openStages = setOf(STAGE, "4-4", "5-5"))
 
-        assertEquals(listOf(1), result.skipped?.plans?.map { it.no })
+        assertEquals(listOf(1, 3), result.skipped?.plans?.map { it.no })
+        assertEquals(SkippedDepotPlans.Plan(no = 2, dropId = ITEM, dropCount = 100), result.skipped?.chosen)
         assertEquals(true, result.skipped?.firstOnly)
+    }
+
+    @Test
+    fun allPlansMode_stagesWithoutCutoff() {
+        val result = config(plan(dropCount = 10), plan())
+            .expand(inventory = mapOf(ITEM to 20))
+
+        assertEquals(null, result.skipped?.chosen)
     }
 
     // ---- 按库存达成率排序（上游 a7ee2c2bf7） ----
@@ -729,9 +739,9 @@ class DepotMaintainExpansionTest {
         assertEquals(listOf(2, 1), result.skipped?.plans?.map { it.no })
     }
 
-    /** 已充足的计划达成率 ≥ 1，必排在不足计划之后；仅首个模式下落在主计划后面，不登记复查 */
+    /** 已充足的计划达成率 ≥ 1，排序后必在主计划之后，仍须登记，识别后可能翻到前面 */
     @Test
-    fun sortByProgress_withOnlyFirst_stagesNoEnoughPlanBehindTheChosenOne() {
+    fun sortByProgress_withOnlyFirst_stillStagesEnoughPlansBehindTheChosenOne() {
         val result = config(
             plan(dropId = "A", dropCount = 10), // #1 20/10 够
             plan(dropId = "B"),                 // #2 0/100 → 主任务
@@ -739,7 +749,17 @@ class DepotMaintainExpansionTest {
             .expand(inventory = mapOf("A" to 20))
 
         assertEquals(listOf(UiText.Dynamic("材料补货 #2")), result.params.map { it.logName })
-        assertEquals(emptyList<SkippedDepotPlans.Plan>(), result.skipped?.plans)
+        // 日志仍止于主计划
+        assertEquals(
+            listOf(
+                R.string.runlog_depot_sorted_by_progress,
+                R.string.runlog_depot_plan_inventory_insufficient,
+            ),
+            result.logs.resIds(),
+        )
+        assertEquals(listOf(1), result.skipped?.plans?.map { it.no })
+        assertEquals(2, result.skipped?.chosen?.no)
+        assertEquals(true, result.skipped?.sortByProgress)
     }
 
     private companion object {

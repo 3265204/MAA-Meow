@@ -72,9 +72,7 @@ class FightDropsRefresher(
         val groups = skippedPlans.toList()
         skippedPlans.removeAll(groups.toSet())
         return groups.flatMap { group ->
-            val stale = group.plans.mapNotNull { plan ->
-                val current = depotRepository.countOf(plan.dropId)
-                if (current >= plan.dropCount) return@mapNotNull null
+            group.stale(depotRepository::countOf).map { (plan, current) ->
                 StaleSkippedPlan(
                     taskName = group.taskName,
                     no = plan.no,
@@ -83,7 +81,6 @@ class FightDropsRefresher(
                     target = plan.dropCount,
                 )
             }
-            if (group.firstOnly) stale.take(1) else stale
         }
     }
 

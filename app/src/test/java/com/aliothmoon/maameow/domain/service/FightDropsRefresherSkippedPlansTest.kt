@@ -81,6 +81,95 @@ class FightDropsRefresherSkippedPlansTest {
     }
 
     @Test
+    fun firstOnlyMode_ignoresFlipsBehindTheChosenPlan() {
+        refresher.stageSkipped(skipped(firstOnly = true).copy(chosen = SkippedDepotPlans.Plan(2, OTHER, 100)))
+        startRun()
+        inventory[DEVICE] = 0 // #3 排在主计划 #2 之后，本就留到下次运行
+
+        assertEquals(emptyList<StaleSkippedPlan>(), refresher.reviewSkippedPlans())
+    }
+
+    @Test
+    fun firstOnlyMode_reportsFlipAheadOfTheChosenPlan() {
+        refresher.stageSkipped(skipped(firstOnly = true).copy(chosen = SkippedDepotPlans.Plan(2, OTHER, 100)))
+        startRun()
+        inventory[ROCK] = 0
+        inventory[DEVICE] = 0
+
+        assertEquals(listOf(1), refresher.reviewSkippedPlans().map { it.no })
+    }
+
+    // ---- 按达成率排序 ----
+
+    private fun sorted(
+        vararg plans: SkippedDepotPlans.Plan,
+        firstOnly: Boolean = false,
+        chosen: SkippedDepotPlans.Plan? = null,
+    ) = SkippedDepotPlans(
+        taskName = "材料补货",
+        plans = plans.toList(),
+        firstOnly = firstOnly,
+        sortByProgress = true,
+        chosen = chosen,
+    )
+
+    /** 缓存 A=10/100 被选为主计划、B=100/100 跳过；识别后 B=0，按真实数据 B 应先执行 */
+    @Test
+    fun sorted_reportsFlipThatWouldHaveRunBeforeTheChosenPlan() {
+        inventory[OTHER] = 10
+        refresher.stageSkipped(
+            sorted(SkippedDepotPlans.Plan(2, ROCK, 100), firstOnly = true, chosen = SkippedDepotPlans.Plan(1, OTHER, 100))
+        )
+        startRun()
+        inventory[ROCK] = 0
+
+        assertEquals(listOf(2), refresher.reviewSkippedPlans().map { it.no })
+    }
+
+    /** B 翻到 50/100，仍高于主计划 A 的 10/100，即便数据准确也轮不到它 */
+    @Test
+    fun sorted_ignoresFlipThatStillRanksBehindTheChosenPlan() {
+        inventory[OTHER] = 10
+        refresher.stageSkipped(
+            sorted(SkippedDepotPlans.Plan(2, ROCK, 100), firstOnly = true, chosen = SkippedDepotPlans.Plan(1, OTHER, 100))
+        )
+        startRun()
+        inventory[ROCK] = 50
+
+        assertEquals(emptyList<StaleSkippedPlan>(), refresher.reviewSkippedPlans())
+    }
+
+    /** 登记时 A=100/100 排在 B=200/100 前；识别后 A=90、B=10，按最新达成率应先提示 B */
+    @Test
+    fun sorted_firstOnly_picksLowestLatestProgress() {
+        refresher.stageSkipped(
+            sorted(SkippedDepotPlans.Plan(1, ROCK, 100), SkippedDepotPlans.Plan(2, DEVICE, 100), firstOnly = true)
+        )
+        startRun()
+        inventory[ROCK] = 90
+        inventory[DEVICE] = 10
+
+        assertEquals(listOf(2), refresher.reviewSkippedPlans().map { it.no })
+    }
+
+    @Test
+    fun sorted_allPlans_reportInLatestProgressOrder_tiesByNumber() {
+        refresher.stageSkipped(
+            sorted(
+                SkippedDepotPlans.Plan(1, ROCK, 100),
+                SkippedDepotPlans.Plan(2, DEVICE, 100),
+                SkippedDepotPlans.Plan(3, OTHER, 100),
+            )
+        )
+        startRun()
+        inventory[ROCK] = 90
+        inventory[DEVICE] = 10
+        inventory[OTHER] = 90
+
+        assertEquals(listOf(2, 1, 3), refresher.reviewSkippedPlans().map { it.no })
+    }
+
+    @Test
     fun analysedButNotStarted_isNotReviewed() {
         // 只分析没开跑，期间工具箱的仓库识别不该带出提示
         refresher.stageSkipped(skipped())
@@ -103,5 +192,6 @@ class FightDropsRefresherSkippedPlansTest {
     private companion object {
         const val ROCK = "30011"
         const val DEVICE = "30061"
+        const val OTHER = "30012"
     }
 }
