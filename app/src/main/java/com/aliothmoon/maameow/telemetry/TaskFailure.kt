@@ -72,6 +72,8 @@ internal data class TaskFailure(
     override val tags: Map<String, String>,
     /** 事件靠它的上下文挂回所在的 Trace */
     val span: ISpan,
+    /** 本轮在它之前第一条失败的任务链；有的话它多半是被连累的 */
+    val priorFailure: String? = null,
 ) : Incident {
 
     override val reason: String get() = "task_failure"
@@ -123,8 +125,9 @@ internal data class TaskFailure(
                 "failure.pre_task" to node?.preTask.orEmpty(),
                 "failure.what" to terminal?.what.orEmpty(),
                 "failure.exception" to exception.orEmpty(),
+                PRIOR_FAILURE_KEY to (priorFailure ?: NO_PRIOR_FAILURE),
                 "result" to "failure",
-            )
+            ) + options.filterKeys { it in TAGGED_OPTIONS }.mapKeys { "option.${it.key}" }
         )
 
         event.setExtra("task.id", taskId)
@@ -343,6 +346,13 @@ private const val SHIZUKU_DOWN_FINGERPRINT = "maameow-shizuku-down"
 
 /** 任务链没报过子任务错误就失败时的占位，与 MaaFwApp 同名 */
 internal const val UNOBSERVED_SUBTASK = "terminal_failure"
+
+/** 本轮先失败的任务链，失败事件与任务 Span 上同名；筛 [NO_PRIOR_FAILURE] 只看根因 */
+internal const val PRIOR_FAILURE_KEY = "run.prior_failure"
+internal const val NO_PRIOR_FAILURE = "none"
+
+/** 决定走哪条流程的参数提成 tag，好在 Issues 里筛和看分布；全量参数仍在 extra */
+private val TAGGED_OPTIONS = setOf("stage", "theme", "mode")
 
 /** Sentry 对 tag 值的长度上限 */
 private const val MAX_TAG_VALUE_LENGTH = 200

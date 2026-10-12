@@ -75,6 +75,21 @@ class TaskFailureTest {
     }
 
     @Test
+    fun `连锁失败标出本轮先失败的任务链，决定流程的参数进 tag`() {
+        val event = failure.copy(
+            priorFailure = "StartUp",
+            options = mapOf("stage" to "1-7", "medicine" to "999"),
+        ).toSentryEvent()
+
+        assertEquals("StartUp", event.tags?.get("run.prior_failure"))
+        assertEquals("1-7", event.tags?.get("option.stage"))
+        assertNull(event.tags?.get("option.medicine"))
+        // 全量参数仍在 extra
+        assertEquals("1-7", event.extras?.get("option.stage"))
+        assertEquals("999", event.extras?.get("option.medicine"))
+    }
+
+    @Test
     fun `任务名去掉实例地址，普通任务名不动`() {
         assertEquals("SSSBegin", stripTaskAddress("0xb400007401ddbb10@SSSBegin"))
         assertEquals("Sarkaz@Roguelike@Begin", stripTaskAddress("Sarkaz@Roguelike@Begin"))
@@ -92,6 +107,7 @@ class TaskFailureTest {
                 "task.chain" to "Depot",
                 "failure.subtask" to "DepotRecognitionTask",
                 "failure.node" to "DepotBegin",
+                "run.prior_failure" to "none",
                 "result" to "failure",
             ),
             event.tags,
