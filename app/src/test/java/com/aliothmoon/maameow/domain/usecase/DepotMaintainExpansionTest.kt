@@ -60,6 +60,9 @@ class DepotMaintainExpansionTest {
         every { activityManager.isActivityOpen() } returns activityOpen
         every { activityManager.isResourceCollectionOpen() } returns resourceCollectionOpen
         every { activityManager.isStageOpen(any()) } answers { firstArg<String>() in openStages }
+        every { activityManager.getStageDisplayName(any()) } answers {
+            if (firstArg<String>() == "CE-6") "龙门币-6/5" else firstArg()
+        }
         every { itemHelper.getItemInfo(any()) } answers {
             if (firstArg<String>() == ITEM) ItemInfo(id = ITEM, name = "源岩") else null
         }
@@ -369,8 +372,9 @@ class DepotMaintainExpansionTest {
         assertTrue(result.params.isEmpty())
         assertEquals(listOf(R.string.runlog_depot_plan_stage_not_open), result.logs.resIds())
         assertEquals(LogLevel.TRACE, result.logs.planLogs()[0].second)
+        // 日志写显示名，不露关卡代码
         assertEquals(
-            listOf<Any?>(1, "CE-6"),
+            listOf<Any?>(1, "龙门币-6/5"),
             logArgsOf(result.logs, R.string.runlog_depot_plan_stage_not_open),
         )
     }

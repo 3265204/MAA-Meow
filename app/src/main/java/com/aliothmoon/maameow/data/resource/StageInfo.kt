@@ -19,7 +19,7 @@ data class StageInfo(
 ) {
     /** UI 显示名，迁移自 WPF 以关卡代码为 key 的本地化项；没有映射的直接显示代码 */
     fun displayName(context: Context): String =
-        STAGE_DISPLAY_NAMES[code]?.let(context::getString) ?: code
+        displayNameRes(code)?.let(context::getString) ?: code
 
     /**
      * 检查关卡在指定日期是否开放
@@ -37,6 +37,18 @@ data class StageInfo(
     }
 
     companion object {
+        /** 自定义剿灭的可选关卡，顺序即选项顺序 */
+        val ANNIHILATION_CODES = listOf(
+            "Annihilation",
+            "Chernobog@Annihilation",
+            "LungmenOutskirts@Annihilation",
+            "LungmenDowntown@Annihilation",
+        )
+
+        /** 常驻与剿灭关卡的显示名资源，所有关卡显示名都经这里兜底 */
+        @StringRes
+        fun displayNameRes(code: String): Int? = STAGE_DISPLAY_NAMES[code]
+
         /** 关卡代码到显示名称资源的映射 */
         private val STAGE_DISPLAY_NAMES = mapOf(
             // 资源本

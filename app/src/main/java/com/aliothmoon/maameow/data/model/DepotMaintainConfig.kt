@@ -246,7 +246,11 @@ data class DepotMaintainConfig(
                 DepotPlanOutcome.ZeroTarget -> uiTextOf(R.string.runlog_depot_plan_zero_count, no)
                 DepotPlanOutcome.StageRequired -> uiTextOf(R.string.runlog_depot_plan_no_stage, no)
                 DepotPlanOutcome.StageClosed ->
-                    uiTextOf(R.string.runlog_depot_plan_stage_not_open, no, plan.stage)
+                    uiTextOf(
+                        R.string.runlog_depot_plan_stage_not_open,
+                        no,
+                        ctx.activityManager.getStageDisplayName(plan.stage),
+                    )
 
                 DepotPlanOutcome.Enough -> uiTextOf(
                     R.string.runlog_depot_plan_inventory_enough,

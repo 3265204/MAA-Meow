@@ -307,6 +307,14 @@ class ActivityManager(
         return getMergedStageGroups(filterByToday).flatMap { it.stages }
     }
 
+    /** 关卡代码 → 显示名，供日志等非界面处使用；界面走 stageDisplayName */
+    fun getStageDisplayName(code: String): String = when {
+        code.isEmpty() -> context.getString(R.string.panel_fight_stage_reset_current)
+        else -> _activityStages.value.firstOrNull { it.value == code }?.display
+            ?: StageInfo.displayNameRes(code)?.let(context::getString)
+            ?: code
+    }
+
     /**
      * 判断是否为资源本（受资源收集活动影响）
      */

@@ -36,6 +36,13 @@ class StageInfoTest {
         assertEquals("12-17-HARD", StageInfo(stageId = "12-17-HARD", code = "12-17-HARD").displayName(context))
     }
 
+    @Test
+    fun everyAnnihilationOption_hasDisplayName() {
+        StageInfo.ANNIHILATION_CODES.forEach { code ->
+            assertEquals(code, true, StageInfo.displayNameRes(code) != null)
+        }
+    }
+
     /** 资源本与芯片本带提示，PR-X-2 不单独出，同上游 */
     @Test
     fun permanentStages_withTips_matchUpstream() {

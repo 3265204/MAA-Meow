@@ -51,6 +51,7 @@ import com.aliothmoon.maameow.data.repository.DepotRepository
 import com.aliothmoon.maameow.data.resource.ActivityManager
 import com.aliothmoon.maameow.data.resource.ItemHelper
 import com.aliothmoon.maameow.data.resource.StageGroup
+import com.aliothmoon.maameow.data.resource.StageInfo
 import com.aliothmoon.maameow.domain.enums.UiUsageConstants
 import com.aliothmoon.maameow.presentation.components.CheckBoxWithExpandableTip
 import com.aliothmoon.maameow.presentation.components.CheckBoxWithLabel
@@ -62,6 +63,7 @@ import com.aliothmoon.maameow.presentation.view.panel.common.GroupedStageButtonG
 import com.aliothmoon.maameow.presentation.view.panel.common.StageBadge
 import com.aliothmoon.maameow.presentation.view.panel.common.StageInputField
 import com.aliothmoon.maameow.presentation.view.panel.common.StageRow
+import com.aliothmoon.maameow.presentation.view.panel.common.stageDisplayName
 import com.aliothmoon.maameow.theme.MaaAnimatedVisibility
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -539,7 +541,7 @@ private fun GroupedStageSelectionSection(
     // 首选关卡今日是否开放：经 activityManager.isStageOpen（getStageInfo 兜底）判定，对齐 WPF
     // StageManager.IsStageOpen —— 主线关卡等不在候选列表中的关卡按常规关卡处理，视为开放；空关卡视为开放
     val stage1Open = config.stage1.isBlank() || activityManager.isStageOpen(config.stage1)
-    val annihilationOptions = localizedAnnihilationOptions()
+    val stage1Display = stageDisplayName(config.stage1, stageGroups)
 
     // 当前执行关卡：直接复用 config.getActiveStage(activityManager)，与实际下发 core 的选关完全一致
     // （对齐 WPF：tip 与 SerializeTask 共用 GetFightStage，避免「显示」与「执行」分叉）
@@ -550,7 +552,10 @@ private fun GroupedStageSelectionSection(
     ) {
         config.getActiveStage(activityManager)
     }
-    val defaultStageLabel = stringResource(R.string.panel_fight_stage_reset_current)
+    // 显示套上剿灭替换，与 getExecutingStage 下发的同一关
+    val executingDisplay = executingStage?.let {
+        stageDisplayName(config.resolveAnnihilation(it), stageGroups)
+    }
 
     // 备选关卡是否会被常驻/当前关卡静默阻断（对齐 WPF PermanentStageBlocksStages）。
     // getActiveStage 选关为「从上往下取第一个今日开放」，常驻关卡每天都开放、stage1 为空（当前/上次）
@@ -586,10 +591,10 @@ private fun GroupedStageSelectionSection(
             stringResource(R.string.panel_fight_permanent_stage_blocks_alternate)
 
         config.stage1.isNotBlank() && executingStage == null ->
-            stringResource(R.string.panel_fight_stage_all_closed, config.stage1)
+            stringResource(R.string.panel_fight_stage_all_closed, stage1Display)
 
         !stage1Open && config.stage1.isNotBlank() && config.useAlternateStage ->
-            stringResource(R.string.panel_fight_primary_stage_closed_with_alternate, config.stage1)
+            stringResource(R.string.panel_fight_primary_stage_closed_with_alternate, stage1Display)
 
         else -> null
     }
@@ -636,7 +641,7 @@ private fun GroupedStageSelectionSection(
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                     StageBadge(
-                        text = executingStage?.ifEmpty { defaultStageLabel }
+                        text = executingDisplay
                             ?: stringResource(R.string.panel_fight_no_executable_stage)
                     )
                 }
@@ -669,11 +674,7 @@ private fun GroupedStageSelectionSection(
                 selectedValue = config.stage1,
                 stageGroups = stageGroups,
                 onItemSelected = { onConfigChange(config.copy(stage1 = it)) },
-                annihilationDisplayName = if (config.useCustomAnnihilation) {
-                    annihilationOptions
-                        .firstOrNull { it.second == config.annihilationStage }
-                        ?.first
-                } else null
+                resolveStage = config::resolveAnnihilation,
             )
         }
 
@@ -721,6 +722,7 @@ private fun GroupedStageSelectionSection(
                         selectedValue = stage,
                         stageGroups = stageGroups,
                         onItemSelected = { updateAlternate(index, it) },
+                        resolveStage = config::resolveAnnihilation,
                         onRemove = { removeAlternate(index) }
                     )
                 }
@@ -824,11 +826,5 @@ private fun CustomAnnihilationSection(
 }
 
 @Composable
-private fun localizedAnnihilationOptions(): List<Pair<String, String>> {
-    return listOf(
-        stringResource(R.string.panel_fight_annihilation_current) to "Annihilation",
-        stringResource(R.string.panel_fight_annihilation_chernobog) to "Chernobog@Annihilation",
-        stringResource(R.string.panel_fight_annihilation_outskirts) to "LungmenOutskirts@Annihilation",
-        stringResource(R.string.panel_fight_annihilation_downtown) to "LungmenDowntown@Annihilation",
-    )
-}
+private fun localizedAnnihilationOptions(): List<Pair<String, String>> =
+    StageInfo.ANNIHILATION_CODES.map { stageDisplayName(it, emptyList()) to it }
