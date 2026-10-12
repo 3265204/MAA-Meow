@@ -10,6 +10,7 @@ import com.aliothmoon.maameow.remote.CoreDataDir
 import com.aliothmoon.maameow.root.BootstrapRegistry
 import com.aliothmoon.maameow.root.RootServiceBootstrapRegistry
 import com.aliothmoon.maameow.root.RemoteServiceStarter
+import com.aliothmoon.maameow.root.RootUserService.RemoteProcessServiceEntry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -53,7 +54,7 @@ abstract class ProcessServiceConnectorBackend(
     /** 同时是残留清理的匹配键 */
     protected abstract val processNameSuffix: String
 
-    protected abstract val serviceClass: Class<*>
+    protected abstract val serviceClass: Class<out RemoteProcessServiceEntry>
 
     /** 各连接器独立，launcher O_TRUNC 打开，共用会互相覆盖 */
     protected abstract val logFileName: String

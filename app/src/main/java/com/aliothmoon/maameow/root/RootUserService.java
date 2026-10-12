@@ -19,6 +19,13 @@ public final class RootUserService {
     private RootUserService() {
     }
 
+    /**
+     * Marks Binder services instantiated reflectively by this launcher.
+     * Implementations must provide a public (Context) or a no-arg constructor of any visibility.
+     */
+    public interface RemoteProcessServiceEntry extends IBinder {
+    }
+
     public static CreatedService create(String[] args) {
         ParsedArgs parsed = ParsedArgs.parse(args);
         if (parsed == null) {
@@ -129,6 +136,35 @@ public final class RootUserService {
     }
 
     private static IBinder instantiateService(Class<?> serviceClass, Context context) throws Exception {
+        // launcher 由 app_process 以 CLASSPATH=<apk> 启动，RootUserService 由启动期的
+        // PathClassLoader(apk) 加载；服务类经 package Context 的 ClassLoader 加载。
+        // 同名接口由不同 ClassLoader 定义时是不同的 Class，因此用服务类自身的
+        // ClassLoader 解析同名接口，保证族谱判定一致（混淆后两侧名字相同）。
+        ClassLoader serviceLoader = serviceClass.getClassLoader();
+        String loaderDescription = serviceLoader == null
+                ? "bootstrap (null ClassLoader)" : serviceLoader.toString();
+        if (serviceLoader == null) {
+            throw new IllegalArgumentException(
+                    serviceClass.getName() + " cannot resolve "
+                            + RemoteProcessServiceEntry.class.getName()
+                            + " with loader " + loaderDescription);
+        }
+        Class<?> entryContract;
+        try {
+            entryContract = Class.forName(
+                    RemoteProcessServiceEntry.class.getName(), false, serviceLoader);
+        } catch (ClassNotFoundException e) {
+            throw new IllegalArgumentException(
+                    serviceClass.getName() + " cannot resolve "
+                            + RemoteProcessServiceEntry.class.getName()
+                            + " with loader " + loaderDescription, e);
+        }
+        if (!entryContract.isAssignableFrom(serviceClass)) {
+            throw new IllegalArgumentException(
+                    serviceClass.getName() + " must implement "
+                            + RemoteProcessServiceEntry.class.getName()
+            );
+        }
         try {
             Constructor<?> constructor = serviceClass.getConstructor(Context.class);
             return (IBinder) constructor.newInstance(context);

@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.IBinder
 import com.aliothmoon.maameow.domain.models.RemoteBackend
 import com.aliothmoon.maameow.root.BootstrapRegistry
+import com.aliothmoon.maameow.root.RootUserService.RemoteProcessServiceEntry
 import io.mockk.CapturingSlot
 import io.mockk.justRun
 import io.mockk.mockk
@@ -79,6 +80,8 @@ class ProcessServiceConnectorBehaviorTest {
         fun killCount(): Int = kills.size
     }
 
+    private class FakeEntry : android.os.Binder(), RemoteProcessServiceEntry
+
     private class FakeConnector(
         spawner: ProcessSpawner,
         registry: BootstrapRegistry,
@@ -88,7 +91,7 @@ class ProcessServiceConnectorBehaviorTest {
         override val backend = RemoteBackend.ROOT
         override val eventPrefix = "FAKE"
         override val processNameSuffix = "fake"
-        override val serviceClass: Class<*> = Any::class.java
+        override val serviceClass: Class<out RemoteProcessServiceEntry> = FakeEntry::class.java
         override val logFileName = "fake.log"
         override val spawnTimeoutMs = timeoutMs
 

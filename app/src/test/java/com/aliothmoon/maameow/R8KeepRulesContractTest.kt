@@ -1,5 +1,7 @@
 package com.aliothmoon.maameow
 
+import android.content.Context
+import com.aliothmoon.maameow.root.RootUserService.RemoteProcessServiceEntry
 import java.io.File
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -30,8 +32,9 @@ class R8KeepRulesContractTest {
             "com.sun.jna.*",
             "com.sun.jna.Structure",
             "com.sun.jna.Callback",
-            "com.aliothmoon.maameow.remote.RemoteServiceImpl",
-            "com.aliothmoon.maameow.remote.LogcatCaptureServiceImpl",
+            "-keep,allowobfuscation interface com.aliothmoon.maameow.root.RootUserService\$RemoteProcessServiceEntry",
+            "-keep,allowobfuscation class * implements com.aliothmoon.maameow.root.RootUserService\$RemoteProcessServiceEntry",
+            "<init>(...)",
             "com.aliothmoon.maameow.root.RemoteServiceStarter",
             "touchDown",
             "startApp",
@@ -53,12 +56,36 @@ class R8KeepRulesContractTest {
             "acquireProvider(",
             "com.xzakota.hyper.notification.**",
         ).forEach { token ->
-            assertTrue("missing keep token: $token", rules.contains(token))
+            assertTrue("missing keep token: $token", activeRules.any { it.contains(token) })
         }
 
         val keepXml = resolve("src/main/res/raw/keep.xml").readText()
         assertTrue(keepXml.contains("@string/maa_*"))
         assertTrue(keepXml.contains("@string/achievement_*"))
+    }
+
+    @Test
+    fun reflectiveProcessServicesDeclareTheEntryContractAndSupportedConstructor() {
+        // launcher 会把反射构造出的实例强转为 IBinder；在编译期钉住 marker 的继承关系，避免只在 release 真机暴露错误。
+        val markerIsIBinder: Class<out android.os.IBinder> = RemoteProcessServiceEntry::class.java
+        // 唯一必须人工同步的清单：构造器形态无法用类型表达；新增反射入口时在此追加
+        listOf(
+            com.aliothmoon.maameow.remote.RemoteServiceImpl::class.java,
+            com.aliothmoon.maameow.remote.LogcatCaptureServiceImpl::class.java,
+        ).forEach { serviceClass ->
+            assertTrue(
+                "${serviceClass.name} must implement RemoteProcessServiceEntry",
+                markerIsIBinder.isAssignableFrom(serviceClass),
+            )
+            assertTrue(
+                "${serviceClass.name} needs a no-arg or Context constructor",
+                serviceClass.declaredConstructors.any { constructor ->
+                    constructor.parameterTypes.isEmpty()
+                } || serviceClass.constructors.any { constructor ->
+                    constructor.parameterTypes.contentEquals(arrayOf(Context::class.java))
+                },
+            )
+        }
     }
 
     private fun resolve(relativePath: String): File {
