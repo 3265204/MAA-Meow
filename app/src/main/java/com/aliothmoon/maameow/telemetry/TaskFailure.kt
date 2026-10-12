@@ -28,6 +28,12 @@ internal data class FailureSignal(
         }
 }
 
+/** Core 给部分任务名带的实例地址前缀，如 SSS 的 `0xb4000074…@SSSBegin`，每次运行都不一样 */
+private val TASK_ADDRESS_PREFIX = Regex("0x[0-9a-fA-F]+@")
+
+/** 去掉实例地址，同一个任务跨运行才对得上 */
+internal fun stripTaskAddress(name: String): String = TASK_ADDRESS_PREFIX.replace(name, "")
+
 internal sealed interface Incident {
     val runId: String?
     val tags: Map<String, String>
@@ -72,17 +78,16 @@ internal data class TaskFailure(
 
     private val subtask: String get() = terminal?.subtask ?: UNOBSERVED_SUBTASK
 
-    private val nodeLabel: String?
-        get() = node?.let { if (it.preTask.isNullOrBlank()) it.first else "${it.first}, after ${it.preTask}" }
-
-    /** Sentry 归组用的指纹；同一轮里也靠它认是不是同一个失败 */
+    /**
+     * Sentry 归组用的指纹；同一轮里也靠它认是不是同一个失败
+     * 不带 `pre_task`：卡住前走到哪一步每次都可能不同，带上会把同一个失败拆成一堆，它留在 tag 里筛
+     */
     val fingerprint: List<String>
         get() = listOf(
             TASK_FAILURE_FINGERPRINT,
             taskChain,
             subtask,
             node?.first.orEmpty(),
-            node?.preTask.orEmpty(),
             terminal?.what.orEmpty(),
             exception.orEmpty(),
         )
@@ -104,7 +109,8 @@ internal data class TaskFailure(
                 append("Maa task failed: ").append(taskChain)
                 // 异常没有子任务可指，不硬凑一个占位
                 if (terminal != null || exception == null) append(" at ").append(subtask)
-                (exception ?: nodeLabel ?: terminal?.what)?.let { append(" (").append(it).append(')') }
+                // 不带 pre_task，同组事件标题一致
+                (exception ?: node?.first ?: terminal?.what)?.let { append(" (").append(it).append(')') }
             }
         }
         event.fingerprints = fingerprint

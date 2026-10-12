@@ -137,6 +137,18 @@ class RunTracerTest {
     }
 
     @Test
+    fun `SSS 任务名里的实例地址在入口就去掉`() {
+        start(1, "SSSCopilot")
+        processError(1, "SSSCopilot", first = "0xb400007401ddbb10@SSSBegin", preTask = "0xb40000784f028880@SSSStart")
+        emit(AsstMsg.TaskChainError, """{"taskchain":"SSSCopilot","taskid":1}""")
+
+        val failure = failures.single()
+        assertEquals("SSSBegin", failure.node?.first)
+        assertEquals("SSSStart", failure.node?.preTask)
+        assertEquals("SSSBegin", transaction.children.single().children.single().data["first"])
+    }
+
+    @Test
     fun `隔得久的 ProcessTask 错误不算在致命子任务头上`() {
         start(1, "Recruit")
         processError(1, "Recruit", first = "RecruitProbe")

@@ -59,21 +59,26 @@ class TaskFailureTest {
         assertEquals(SentryLevel.ERROR, event.level)
         assertEquals(TASK_FAILURE_TRANSACTION, event.transaction)
         assertEquals(
-            listOf("maameow-task-failure", "Depot", "DepotRecognitionTask", "DepotBegin", "", "", ""),
+            listOf("maameow-task-failure", "Depot", "DepotRecognitionTask", "DepotBegin", "", ""),
             event.fingerprints,
         )
     }
 
     @Test
-    fun `节点卡在某个任务之后时标题带上它`() {
+    fun `卡在哪一步之后只进 tag，不拆组也不进标题`() {
         val stuck = node.copy(preTask = "DepotAllTab")
         val event = failure.copy(node = stuck).toSentryEvent()
 
-        assertEquals(
-            "Maa task failed: Depot at DepotRecognitionTask (DepotBegin, after DepotAllTab)",
-            event.message?.formatted,
-        )
+        assertEquals(failure.toSentryEvent().fingerprints, event.fingerprints)
+        assertEquals("Maa task failed: Depot at DepotRecognitionTask (DepotBegin)", event.message?.formatted)
         assertEquals("DepotAllTab", event.tags?.get("failure.pre_task"))
+    }
+
+    @Test
+    fun `任务名去掉实例地址，普通任务名不动`() {
+        assertEquals("SSSBegin", stripTaskAddress("0xb400007401ddbb10@SSSBegin"))
+        assertEquals("Sarkaz@Roguelike@Begin", stripTaskAddress("Sarkaz@Roguelike@Begin"))
+        assertEquals("", stripTaskAddress(""))
     }
 
     @Test

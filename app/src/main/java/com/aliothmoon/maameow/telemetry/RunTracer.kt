@@ -126,8 +126,8 @@ internal class RunTracer(
         val signal = FailureSignal(
             subtask = subtask,
             className = details.getString("class"),
-            first = details.getJSONArray("first")?.let { it.firstOrNull()?.toString().orEmpty() },
-            preTask = details.getString("pre_task"),
+            first = details.getJSONArray("first")?.let { stripTaskAddress(it.firstOrNull()?.toString().orEmpty()) },
+            preTask = details.getString("pre_task")?.let(::stripTaskAddress),
             what = details.getString("what") ?: inner?.getString("what"),
             why = details.getString("why") ?: inner?.getString("why"),
             atMs = clock(),
