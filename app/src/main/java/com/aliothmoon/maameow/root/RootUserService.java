@@ -20,6 +20,10 @@ public final class RootUserService {
     private RootUserService() {
     }
 
+    /** Marks Binder services instantiated reflectively by this launcher. */
+    public interface RemoteProcessServiceEntry {
+    }
+
     public static CreatedService create(String[] args) {
         ParsedArgs parsed = ParsedArgs.parse(args);
         if (parsed == null) {
@@ -141,6 +145,18 @@ public final class RootUserService {
     }
 
     private static IBinder instantiateService(Class<?> serviceClass, Context context) throws Exception {
+        // launcher 经系统 ClassLoader 加载 RootUserService，而服务类经 package Context 的
+        // ClassLoader 加载；同名接口在两个 ClassLoader 下是不同的 Class，直接用
+        // RemoteProcessServiceEntry.class.isAssignableFrom 会恒为 false。改用服务类自身的
+        // ClassLoader 解析同名接口，保证族谱判定一致（混淆后两侧名字相同）。
+        Class<?> entryContract = Class.forName(
+                RemoteProcessServiceEntry.class.getName(), false, serviceClass.getClassLoader());
+        if (!entryContract.isAssignableFrom(serviceClass)) {
+            throw new IllegalArgumentException(
+                    serviceClass.getName() + " must implement "
+                            + RemoteProcessServiceEntry.class.getName()
+            );
+        }
         try {
             Constructor<?> constructor = serviceClass.getConstructor(Context.class);
             return (IBinder) constructor.newInstance(context);

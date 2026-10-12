@@ -7,17 +7,18 @@ import com.aliothmoon.maameow.VdmShellService
 import com.aliothmoon.maameow.domain.models.RemoteBackend
 import com.aliothmoon.maameow.remote.RemoteServiceImpl
 import com.aliothmoon.maameow.remote.VdmShellServiceImpl
+import com.aliothmoon.maameow.root.RootUserService.RemoteProcessServiceEntry
 
 object RootRemoteServiceConnector : ProcessServiceConnectorBackend(SuSpawner) {
 
     override val backend = RemoteBackend.ROOT
     override val eventPrefix = "ROOT"
     override val processNameSuffix = "root_service"
-    override val serviceClass: Class<*> = RemoteServiceImpl::class.java
+    override val serviceClass: Class<out RemoteProcessServiceEntry> = RemoteServiceImpl::class.java
     override val logFileName = "root_launch_debug.log"
     override val keepRoot: Boolean get() = keepRootForInputInjection
 
-    override val sidecarServiceClass: Class<*>?
+    override val sidecarServiceClass: Class<out RemoteProcessServiceEntry>?
         get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             VdmShellServiceImpl::class.java
         } else {

@@ -35,6 +35,7 @@ import com.aliothmoon.maameow.remote.internal.UserDirProbe
 import com.aliothmoon.maameow.remote.internal.display.VirtualDisplayManager
 import com.aliothmoon.maameow.remote.internal.WakeUnlockController
 import com.aliothmoon.maameow.remote.internal.XmsfFirewall
+import com.aliothmoon.maameow.root.RootUserService.RemoteProcessServiceEntry
 import com.aliothmoon.maameow.third.Command
 import com.aliothmoon.maameow.third.FakeContext
 import com.aliothmoon.maameow.third.Ln
@@ -49,7 +50,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.system.exitProcess
 
-class RemoteServiceImpl : RemoteService.Stub() {
+class RemoteServiceImpl : RemoteService.Stub(), RemoteProcessServiceEntry {
 
     companion object {
         private const val TAG = "RemoteService"

@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.IBinder
 import com.aliothmoon.maameow.domain.models.RemoteBackend
 import com.aliothmoon.maameow.root.BootstrapRegistry
+import com.aliothmoon.maameow.root.RootUserService.RemoteProcessServiceEntry
 import io.mockk.CapturingSlot
 import io.mockk.every
 import io.mockk.justRun
@@ -29,6 +30,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * 进程连接器基座行为：IPC 状态机高变更区，失败 / 竞态路径必须有真行为测试兜底
  */
 class ProcessServiceConnectorBehaviorTest {
+
+    private class FakeServiceEntry : RemoteProcessServiceEntry
 
     private val logFile = File.createTempFile("connector", ".log").apply { delete() }
 
@@ -91,10 +94,12 @@ class ProcessServiceConnectorBehaviorTest {
         override val backend = RemoteBackend.ROOT
         override val eventPrefix = "FAKE"
         override val processNameSuffix = "fake"
-        override val serviceClass: Class<*> = Any::class.java
+        override val serviceClass: Class<out RemoteProcessServiceEntry> =
+            FakeServiceEntry::class.java
         override val logFileName = "fake.log"
         override val spawnTimeoutMs = timeoutMs
-        override val sidecarServiceClass: Class<*>? = Any::class.java.takeIf { enableSidecar }
+        override val sidecarServiceClass: Class<out RemoteProcessServiceEntry>? =
+            FakeServiceEntry::class.java.takeIf { enableSidecar }
 
         private val tokens = LinkedBlockingQueue<String>()
         val attachedSidecars = LinkedBlockingQueue<Pair<IBinder, IBinder>>()

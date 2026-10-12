@@ -10,6 +10,7 @@ import com.aliothmoon.maameow.VdmShellService
 import com.aliothmoon.maameow.remote.internal.display.CompanionAssociation
 import com.aliothmoon.maameow.remote.internal.display.VdmDisplayFactory
 import com.aliothmoon.maameow.remote.internal.display.VdmDisplaySession
+import com.aliothmoon.maameow.root.RootUserService.RemoteProcessServiceEntry
 import com.aliothmoon.maameow.third.Ln
 import com.aliothmoon.maameow.third.Workarounds
 import java.util.concurrent.atomic.AtomicReference
@@ -22,7 +23,7 @@ import kotlin.system.exitProcess
  * native 任务运行期间切换 euid。
  */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-class VdmShellServiceImpl : VdmShellService.Stub() {
+class VdmShellServiceImpl : VdmShellService.Stub(), RemoteProcessServiceEntry {
     private val session = AtomicReference<VdmDisplaySession?>()
     private val owner = AtomicReference<IBinder?>()
     private val ownerDeath = IBinder.DeathRecipient {

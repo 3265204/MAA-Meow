@@ -8,6 +8,7 @@ import com.aliothmoon.maameow.BuildConfig
 import com.aliothmoon.maameow.RemoteService
 import com.aliothmoon.maameow.remote.CoreDataDir
 import com.aliothmoon.maameow.root.BootstrapRegistry
+import com.aliothmoon.maameow.root.RootUserService.RemoteProcessServiceEntry
 import com.aliothmoon.maameow.root.RootServiceBootstrapRegistry
 import com.aliothmoon.maameow.root.RemoteServiceStarter
 import kotlinx.coroutines.CoroutineScope
@@ -57,7 +58,7 @@ abstract class ProcessServiceConnectorBackend(
     /** 同时是残留清理的匹配键 */
     protected abstract val processNameSuffix: String
 
-    protected abstract val serviceClass: Class<*>
+    protected abstract val serviceClass: Class<out RemoteProcessServiceEntry>
 
     /** 各连接器独立，launcher O_TRUNC 打开，共用会互相覆盖 */
     protected abstract val logFileName: String
@@ -65,7 +66,7 @@ abstract class ProcessServiceConnectorBackend(
     protected open val keepRoot: Boolean get() = false
 
     /** 可选的永久降权辅助进程；主 Binder 对外发布前完成挂载。 */
-    protected open val sidecarServiceClass: Class<*>? get() = null
+    protected open val sidecarServiceClass: Class<out RemoteProcessServiceEntry>? get() = null
     protected open val sidecarProcessNameSuffix: String get() = "${processNameSuffix}_sidecar"
     protected open val sidecarLogFileName: String get() = "${sidecarProcessNameSuffix}_launch_debug.log"
     protected open val sidecarKeepRoot: Boolean get() = false
