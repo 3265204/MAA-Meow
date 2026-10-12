@@ -2,9 +2,11 @@ package com.aliothmoon.maameow
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
 import android.view.ViewTreeObserver
 import android.view.WindowManager
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -27,6 +29,7 @@ import com.aliothmoon.maameow.data.achievement.AchievementRepository
 import com.aliothmoon.maameow.data.achievement.PallasDrunkState
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
+import com.aliothmoon.maameow.domain.service.TaskRemovalCoordinator
 import com.aliothmoon.maameow.domain.state.MaaExecutionState
 import com.aliothmoon.maameow.overlay.screensaver.ScreenSaverOverlayManager
 import com.aliothmoon.maameow.presentation.PallasDrunkHost
@@ -57,6 +60,8 @@ class MainActivity : AppCompatActivity(), PipHost {
     }
 
     private var launchDispatched = false
+    private var explicitBackExit = false
+    private lateinit var rootBackCallback: OnBackPressedCallback
 
     @Volatile
     private var isUiReady: Boolean = false
@@ -73,6 +78,7 @@ class MainActivity : AppCompatActivity(), PipHost {
     private val appSettingsManager: AppSettingsManager by inject()
     private val achievementRepository: AchievementRepository by inject()
     private val compositionService: MaaCompositionService by inject()
+    private val taskRemovalCoordinator: TaskRemovalCoordinator by inject()
     private val screenSaverManager: ScreenSaverOverlayManager by inject()
     private val pallasDrunkState: PallasDrunkState by inject()
     private val backgroundTaskViewModel: BackgroundTaskViewModel by viewModel()
@@ -81,6 +87,15 @@ class MainActivity : AppCompatActivity(), PipHost {
         val splash = installSplashScreen()
         splash.setKeepOnScreenCondition { !isUiReady }
         super.onCreate(savedInstanceState)
+        // Compose 的 BackHandler 后注册、优先处理页面内返回；这里只标记根页面显式返回。
+        rootBackCallback = object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                explicitBackExit = true
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        }
+        onBackPressedDispatcher.addCallback(this, rootBackCallback)
         lifecycleScope.launch(Dispatchers.IO) {
             val eyeProtection = EyeProtectionDetector.detect(this@MainActivity)
             Timber.i("isEyeProtectionEnabled: %s (source=%s)", eyeProtection.isEnabled, eyeProtection.source)
@@ -157,6 +172,28 @@ class MainActivity : AppCompatActivity(), PipHost {
         super.onSaveInstanceState(outState)
     }
 
+    override fun onStart() {
+        super.onStart()
+        explicitBackExit = false
+        rootBackCallback.isEnabled = true
+        taskRemovalCoordinator.onAppForeground()
+    }
+
+    override fun onStop() {
+        taskRemovalCoordinator.onAppBackground()
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        // 运行中由 FGS.onTaskRemoved 主路径处理；这里覆盖 FGS 被拒及空闲远端连接。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+            isFinishing && !isChangingConfigurations && !explicitBackExit
+        ) {
+            taskRemovalCoordinator.requestTaskRemoval()
+        }
+        super.onDestroy()
+    }
+
     /** API 28~30 没有 auto-enter，只能在这里手动进画中画 */
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
@@ -231,9 +268,5 @@ class MainActivity : AppCompatActivity(), PipHost {
                 }
             }
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
     }
 }

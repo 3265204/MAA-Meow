@@ -56,6 +56,7 @@ class RemoteServiceImpl : RemoteService.Stub() {
         private const val HEARTBEAT_INTERVAL_MS = 5_000L
         private const val JPEG_MAX_EDGE = 1280
         private const val PREVIEW_SHUTDOWN_TIMEOUT_MS = 1_000L
+        private const val DESTROY_HARD_EXIT_TIMEOUT_MS = 12_000L
 
         @JvmStatic
         fun performEmergencyCleanup() {
@@ -112,21 +113,42 @@ class RemoteServiceImpl : RemoteService.Stub() {
             return
         }
         Ln.i("$TAG: destroy()")
-        // 从这里开始，辅助进程退出属于正常清理流程，不能再按崩溃处理。
-        val shellConnection = synchronized(vdmShellLock) {
-            val current = vdmShellConnection
-            vdmShellConnection = null
-            current
+        Thread {
+            try {
+                Thread.sleep(DESTROY_HARD_EXIT_TIMEOUT_MS)
+                Ln.e("$TAG: destroy cleanup timed out, forcing process exit")
+                // System.exit/exitProcess 会等待可能同样卡死的 shutdown hook；这里必须走 SIGKILL。
+                Process.killProcess(Process.myPid())
+            } catch (_: InterruptedException) {
+                // 正常清理完成。
+            }
+        }.apply {
+            name = "remote-destroy-watchdog"
+            isDaemon = true
+            start()
         }
-        shellConnection?.let { connection ->
-            runCatching { connection.binder.unlinkToDeath(connection.deathRecipient, 0) }
+        try {
+            // 从这里开始，辅助进程退出属于正常清理流程，不能再按崩溃处理。
+            val shellConnection = synchronized(vdmShellLock) {
+                val current = vdmShellConnection
+                vdmShellConnection = null
+                current
+            }
+            shellConnection?.let { connection ->
+                runCatching { connection.binder.unlinkToDeath(connection.deathRecipient, 0) }
+            }
+            InputControlUtils.setTouchCallback(null)
+            GameFpsMonitor.stop()
+            StaleFrameGuard.stop()
+            shutdownPreview()
+            performEmergencyCleanup()
+        } catch (e: Exception) {
+            Ln.e("$TAG: destroy cleanup failed: ${e.message}")
+        } finally {
+            // destroyed=true 后看门狗不会再兜底；无论清理哪一步失败都必须结束提权进程。
+            // 保留 hardExitWatchdog：exitProcess 会等 shutdown hook，hook 再次清理卡住时仍需 SIGKILL。
+            exitProcess(0)
         }
-        InputControlUtils.setTouchCallback(null)
-        GameFpsMonitor.stop()
-        StaleFrameGuard.stop()
-        shutdownPreview()
-        performEmergencyCleanup()
-        exitProcess(0)
     }
 
     /**

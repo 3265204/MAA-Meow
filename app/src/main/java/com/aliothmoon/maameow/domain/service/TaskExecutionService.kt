@@ -63,6 +63,7 @@ class TaskExecutionService : Service() {
     }
 
     private val compositionService: MaaCompositionService by inject()
+    private val taskRemovalCoordinator: TaskRemovalCoordinator by inject()
     private val sessionLogger: MaaSessionLogger by inject()
     private val taskChainStatusTracker: TaskChainStatusTracker by inject()
     private val liveCoordinator: LiveSessionCoordinator by inject()
@@ -124,6 +125,13 @@ class TaskExecutionService : Service() {
         removeActiveNotification(boundToken)
         serviceScope.cancel()
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        taskRemovalCoordinator.requestTaskRemoval { cleaned ->
+            if (cleaned) stopSelf()
+        }
     }
 
     private fun bindToken() {

@@ -97,6 +97,7 @@ import com.aliothmoon.maameow.domain.service.ResourceInitService
 import com.aliothmoon.maameow.domain.service.RunTelemetry
 import com.aliothmoon.maameow.domain.service.ScreenSaverController
 import com.aliothmoon.maameow.domain.service.TaskEndRegistry
+import com.aliothmoon.maameow.domain.service.TaskRemovalCoordinator
 import com.aliothmoon.maameow.domain.service.ToolboxExportService
 import com.aliothmoon.maameow.domain.service.UnifiedStateDispatcher
 import com.aliothmoon.maameow.domain.service.UnlockGestureReader
@@ -355,6 +356,7 @@ val appModule = module {
     // 调用时才取 OverlayController：它依赖 MaaCompositionService，构造期取会成环
     single<ForegroundScreenGate> { ForegroundScreenGate { get<OverlayController>().awaitPanelCleared() } }
     singleOf(::MaaCompositionService)
+    single { TaskRemovalCoordinator(get(), get()) }
     single<MaaExecutionStateHolder> { get<MaaCompositionService>() }
     single { GameMuteCoordinator(get(), RemoteGameAudioAdapter) }
     single<FrameSnapshotter> { RemoteFrameSnapshotter() }

@@ -274,6 +274,16 @@ class SettingsViewModel(
         }
     }
 
+    val continueTaskAfterTaskRemoved: StateFlow<Boolean> =
+        appSettingsManager.continueTaskAfterTaskRemoved
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    fun setContinueTaskAfterTaskRemoved(enabled: Boolean) {
+        viewModelScope.launch {
+            appSettingsManager.setContinueTaskAfterTaskRemoved(enabled)
+        }
+    }
+
     val telemetryEnabled: StateFlow<Boolean> = appSettingsManager.telemetryEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
