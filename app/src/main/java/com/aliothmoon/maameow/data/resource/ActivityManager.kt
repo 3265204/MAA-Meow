@@ -178,6 +178,9 @@ class ActivityManager(
         // 解析支线活动
         return activity.sideStoryStage?.flatMap { (key, entry) ->
             val groupMinReq = entry.minimumRequired
+            val groupActivityInfo = entry.activity?.let { info ->
+                StageActivityInfo.fromActivityInfo(key, info)
+            }
             val result = entry.stages?.mapNotNull { stageRaw ->
                 // Per-stage MinimumRequired，fallback 到分组级别 (WPF: stageObj["MinimumRequired"] ?? groupMinReqStr)
                 val minReq = stageRaw.minimumRequired ?: groupMinReq
@@ -189,11 +192,9 @@ class ActivityManager(
                 // Per-stage Activity override (WPF: stageObj["Activity"] ?? activityToken)
                 val stageActivityInfo = stageRaw.activity?.let { info ->
                     StageActivityInfo.fromActivityInfo(key, info)
-                } ?: entry.activity?.let { info ->
-                    StageActivityInfo.fromActivityInfo(key, info)
-                }
+                } ?: groupActivityInfo
 
-                ActivityStage.fromRaw(stageRaw, stageActivityInfo, key)
+                ActivityStage.fromRaw(stageRaw, stageActivityInfo, key, groupActivityInfo)
             }
             result ?: emptyList()
         } ?: emptyList()

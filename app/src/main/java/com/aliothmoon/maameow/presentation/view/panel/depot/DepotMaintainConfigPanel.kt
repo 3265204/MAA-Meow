@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,6 +71,7 @@ import com.aliothmoon.maameow.data.resource.ActivityManager
 import com.aliothmoon.maameow.data.resource.ItemHelper
 import com.aliothmoon.maameow.data.resource.StageGroup
 import com.aliothmoon.maameow.domain.enums.UiUsageConstants
+import com.aliothmoon.maameow.domain.models.DepotActivityPreset
 import com.aliothmoon.maameow.presentation.components.CheckBoxWithExpandableTip
 import com.aliothmoon.maameow.presentation.components.CheckBoxWithLabel
 import com.aliothmoon.maameow.presentation.components.INumericField
@@ -133,11 +135,29 @@ fun DepotMaintainConfigPanel(
     val expandedIndices = remember { mutableStateListOf<Int>() }
     var presetPanelExpanded by remember { mutableStateOf(false) }
     // 只在展开期间有效，应用或取消后清掉
-    var selectedPreset by remember { mutableStateOf<DepotPresetOption?>(null) }
-    val knownItems by itemHelper.items.collectAsStateWithLifecycle()
-    // 活动起止不触发数据刷新，每次展开按当下时刻重算，对齐上游 PresetDropDownVisibilityChanged
-    val activityPresets = remember(activityStages, knownItems, presetPanelExpanded) {
-        buildActivityPresets(activityStages, { it in knownItems }, System.currentTimeMillis())
+    var selectedPreset by remember { mutableStateOf<DepotPresetSelection?>(null) }
+    val knownItemIds = itemHelper.items.collectAsStateWithLifecycle().value.keys
+    // 展开或导入落空时以当下时刻重算，对齐上游 PresetDropDownVisibilityChanged
+    var presetClock by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val activityPresets = remember(activityStages, knownItemIds, presetClock) {
+        DepotActivityPreset.listOpen(activityStages, knownItemIds, presetClock)
+    }
+    // 选中的活动已不在最新列表就视为未选，确认键随之置灰
+    val validPresetSelection = selectedPreset?.takeIf { selection ->
+        selection !is DepotPresetSelection.Activity || activityPresets.any { it.key == selection.key }
+    }
+    // 活动按 key 现查，面板开着期间到期或被移除就不导入，转而刷新列表
+    val applyPreset: (DepotPresetSelection) -> Boolean = { selection ->
+        val now = System.currentTimeMillis()
+        val plans = when (selection) {
+            is DepotPresetSelection.Builtin -> appendDepotMaintainPreset(config.plans, selection.preset)
+            is DepotPresetSelection.Activity ->
+                DepotActivityPreset.listOpen(activityStages, knownItemIds, now)
+                    .firstOrNull { it.key == selection.key }
+                    ?.let { config.plans + it.plans }
+        }
+        if (plans != null) onConfigChange(config.copy(plans = plans)) else presetClock = now
+        plans != null
     }
     var showClearConfirm by remember { mutableStateOf(false) }
 
@@ -218,10 +238,14 @@ fun DepotMaintainConfigPanel(
                         inventorySynced = snapshot.syncTimeMillis != 0L,
                         expandedIndices = expandedIndices,
                         presetPanelExpanded = presetPanelExpanded,
-                        onPresetPanelExpandedChange = { presetPanelExpanded = it },
+                        onPresetPanelExpandedChange = {
+                            presetPanelExpanded = it
+                            if (it) presetClock = System.currentTimeMillis()
+                        },
                         activityPresets = activityPresets,
-                        selectedPreset = selectedPreset,
+                        selectedPreset = validPresetSelection,
                         onSelectedPresetChange = { selectedPreset = it },
+                        onApplyPreset = applyPreset,
                         showClearConfirm = showClearConfirm,
                         onShowClearConfirmChange = { showClearConfirm = it },
                     )
@@ -377,18 +401,12 @@ private fun ColumnScope.GeneralTab(
     presetPanelExpanded: Boolean,
     onPresetPanelExpandedChange: (Boolean) -> Unit,
     activityPresets: List<DepotActivityPreset>,
-    selectedPreset: DepotPresetOption?,
-    onSelectedPresetChange: (DepotPresetOption?) -> Unit,
+    selectedPreset: DepotPresetSelection?,
+    onSelectedPresetChange: (DepotPresetSelection?) -> Unit,
+    onApplyPreset: (DepotPresetSelection) -> Boolean,
     showClearConfirm: Boolean,
     onShowClearConfirmChange: (Boolean) -> Unit,
 ) {
-    val reduceMotion = LocalReduceMotion.current
-    val presetArrowRotation by animateFloatAsState(
-        targetValue = if (presetPanelExpanded) 180f else 0f,
-        animationSpec = MaaMotion.spec(reduceMotion, MaaMotion.Fast),
-        label = "presetArrow",
-    )
-
     if (config.plans.isNotEmpty()) {
         PlanSummary(
             plans = config.plans,
@@ -462,9 +480,7 @@ private fun ColumnScope.GeneralTab(
         skipDuringActivity = config.skipDuringActivity,
         selected = selectedPreset,
         onSelectedChange = onSelectedPresetChange,
-        onApply = { preset ->
-            onConfigChange(config.copy(plans = appendDepotMaintainPreset(config.plans, preset)))
-        },
+        onApply = onApplyPreset,
     )
     InlineConfirmPanel(
         visible = showClearConfirm && config.plans.isNotEmpty(),
@@ -531,9 +547,10 @@ private fun ColumnScope.PresetPicker(
     onExpandedChange: (Boolean) -> Unit,
     activityPresets: List<DepotActivityPreset>,
     skipDuringActivity: Boolean,
-    selected: DepotPresetOption?,
-    onSelectedChange: (DepotPresetOption?) -> Unit,
-    onApply: (DepotPresetOption) -> Unit,
+    selected: DepotPresetSelection?,
+    onSelectedChange: (DepotPresetSelection?) -> Unit,
+    /** 返回 false 表示所选活动已失效，未导入 */
+    onApply: (DepotPresetSelection) -> Boolean,
 ) {
     val arrowRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
@@ -571,28 +588,33 @@ private fun ColumnScope.PresetPicker(
         ) {
             Column(modifier = Modifier.padding(vertical = 4.dp)) {
                 val grouped = activityPresets.isNotEmpty()
-                if (grouped) PresetGroupLabel(stringResource(R.string.panel_depot_preset_group_permanent))
+                val groupHeaderModifier = Modifier.padding(start = 12.dp, top = 4.dp)
+                if (grouped) {
+                    SectionHeader(stringResource(R.string.panel_fight_stage_group_permanent), groupHeaderModifier)
+                }
                 DepotMaintainPreset.entries.forEach { preset ->
+                    val option = DepotPresetSelection.Builtin(preset)
                     PresetOptionRow(
                         label = stringResource(preset.labelRes),
                         planCount = preset.plans.size,
-                        selected = selected == preset,
-                        onSelect = { onSelectedChange(preset) },
+                        selected = selected == option,
+                        onSelect = { onSelectedChange(option) },
                     )
                 }
                 if (grouped) {
-                    PresetGroupLabel(stringResource(R.string.panel_depot_preset_group_activity))
+                    SectionHeader(stringResource(R.string.panel_depot_preset_group_activity), groupHeaderModifier)
                     activityPresets.forEach { preset ->
+                        val option = DepotPresetSelection.Activity(preset.key)
                         PresetOptionRow(
                             label = preset.name,
                             planCount = preset.plans.size,
-                            selected = selected == preset,
-                            onSelect = { onSelectedChange(preset) },
+                            selected = selected == option,
+                            onSelect = { onSelectedChange(option) },
                         )
                     }
                 }
                 // 导入不改运行语义，只在确认前提示，对齐上游 DepotPresetActivitySkipConflict
-                if (selected is DepotActivityPreset && skipDuringActivity) {
+                if (selected is DepotPresetSelection.Activity && skipDuringActivity) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -620,8 +642,8 @@ private fun ColumnScope.PresetPicker(
                     dismissText = stringResource(R.string.common_cancel),
                     confirmEnabled = selected != null,
                     onConfirm = {
-                        selected?.let(onApply)
-                        onExpandedChange(false)
+                        // 活动已失效时不收起，列表已随之刷新
+                        if (selected != null && onApply(selected)) onExpandedChange(false)
                         onSelectedChange(null)
                     },
                     onDismiss = {
@@ -633,17 +655,6 @@ private fun ColumnScope.PresetPicker(
             }
         }
     }
-}
-
-@Composable
-private fun PresetGroupLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 2.dp),
-    )
 }
 
 @Composable

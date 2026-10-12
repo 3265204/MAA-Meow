@@ -1378,7 +1378,6 @@
     <string name="panel_depot_preset_skill_summary">技巧概要·卷3</string>
     <string name="panel_depot_preset_plan_count">%1$d 条计划</string>
     <string name="panel_depot_preset_apply">添加</string>
-    <string name="panel_depot_preset_group_permanent">常驻关卡</string>
     <string name="panel_depot_preset_group_activity">当前活动</string>
     <string name="panel_depot_preset_activity_skip_conflict">已开启「%1$s」，导入的计划在活动期间不会执行</string>
     <string name="panel_depot_clear_plans">清空</string>
