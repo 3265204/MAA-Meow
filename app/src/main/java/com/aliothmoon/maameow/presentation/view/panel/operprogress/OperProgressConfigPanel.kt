@@ -110,6 +110,11 @@ fun OperProgressConfigPanel(
     // 应用语言标签是 "en" 不带地区，干员名要用资源语言码
     val appLanguage by appSettings.language.collectAsStateWithLifecycle()
     val language = remember(appLanguage) { appSettings.displayLanguage }
+    val operatorsByPlanKey = remember(operators) {
+        buildMap {
+            operators.values.forEach { oper -> putIfAbsent(oper.name to oper.coreRole, oper) }
+        }
+    }
     val choices = remember(operators, clientType, language) {
         operators.values.filter {
             it.supportsOperProgress && resourceDataManager.isCharacterAvailableInClient(it, clientType)
@@ -272,7 +277,7 @@ fun OperProgressConfigPanel(
             }
         }
         itemsIndexed(orderedPlans, key = { _, plan -> plan.id }) { index, plan ->
-            val oper = operators.values.firstOrNull { it.name == plan.name && it.coreRole == plan.role }
+            val oper = operatorsByPlanKey[plan.name to plan.role]
             ReorderableItem(reorderable, key = plan.id) {
                 OperProgressPlanCard(
                     plan = plan, oper = oper,

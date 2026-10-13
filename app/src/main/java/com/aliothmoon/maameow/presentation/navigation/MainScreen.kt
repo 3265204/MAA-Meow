@@ -23,10 +23,12 @@ import androidx.navigation.NavController
 import com.aliothmoon.maameow.constant.Routes
 import com.aliothmoon.maameow.presentation.LocalInputFocusManager
 import com.aliothmoon.maameow.presentation.components.LocalPageVisible
+import com.aliothmoon.maameow.presentation.components.ShizukuReadinessGate
 import com.aliothmoon.maameow.presentation.components.consumeAllPointerEvents
 import com.aliothmoon.maameow.presentation.components.rememberPageVisible
 import com.aliothmoon.maameow.presentation.components.rememberStagedBeyondViewportCount
 import com.aliothmoon.maameow.presentation.pip.LocalIsInPip
+import com.aliothmoon.maameow.presentation.onboarding.onboardingBlocksStartupDialogs
 import com.aliothmoon.maameow.presentation.view.background.BackgroundTaskView
 import com.aliothmoon.maameow.presentation.view.home.HomeView
 import com.aliothmoon.maameow.presentation.view.settings.SettingsView
@@ -166,7 +168,13 @@ fun MainScreen(
                                     isActivePage = { mainVisible.value && pagerState.targetPage == page },
                                 )
 
-                                BottomNavTab.SCHEDULE -> ScheduleListView(navController = navController)
+                                BottomNavTab.SCHEDULE -> ScheduleListView(
+                                    navController = navController,
+                                    isActivePage = {
+                                        mainVisible.value && !pagerState.isScrollInProgress &&
+                                                pagerState.settledPage == page
+                                    },
+                                )
                                 BottomNavTab.SETTINGS -> SettingsView(
                                     navController = navController,
                                     onViewAnnouncement = onViewAnnouncement,
@@ -188,4 +196,7 @@ fun MainScreen(
     }
 
     scaffoldContent()
+    if (visible && !LocalIsInPip.current && !onboardingBlocksStartupDialogs()) {
+        ShizukuReadinessGate()
+    }
 }

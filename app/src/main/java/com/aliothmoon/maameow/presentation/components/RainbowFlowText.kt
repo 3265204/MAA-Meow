@@ -1,6 +1,7 @@
 package com.aliothmoon.maameow.presentation.components
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.LocalTextStyle
@@ -11,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
@@ -26,6 +28,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.currentCoroutineContext
 
 // 渐变跨度略大于常见标题宽，配合 phase 形成流光
 private const val SPAN = 320f
@@ -49,14 +52,7 @@ fun RainbowFlowText(
 
     // 可见性只在协程里读，离屏时停住
     LaunchedEffect(pageVisible) {
-        snapshotFlow { pageVisible.value && inViewport.value }.collectLatest { active ->
-            if (!active) return@collectLatest
-            while (true) {
-                val remaining = ((1f - phase.value) * FLOW_DURATION_MS).toInt()
-                phase.animateTo(1f, tween(remaining, easing = LinearEasing))
-                phase.snapTo(0f)
-            }
-        }
+        runRainbowFlow(phase) { pageVisible.value && inViewport.value }
     }
 
     Text(
@@ -92,6 +88,22 @@ fun RainbowFlowText(
         textAlign = textAlign,
         maxLines = maxLines,
     )
+}
+
+internal suspend fun runRainbowFlow(
+    phase: Animatable<Float, AnimationVector1D>,
+    isVisible: () -> Boolean,
+) {
+    val durationScale = currentCoroutineContext()[MotionDurationScale]
+    snapshotFlow { isVisible() && (durationScale?.scaleFactor ?: 1f) > 0f }
+        .collectLatest { active ->
+            if (!active) return@collectLatest
+            while (true) {
+                val remaining = ((1f - phase.value) * FLOW_DURATION_MS).toInt()
+                phase.animateTo(1f, tween(remaining, easing = LinearEasing))
+                phase.snapTo(0f)
+            }
+        }
 }
 
 private val RainbowStops: Array<Pair<Float, Color>> = arrayOf(

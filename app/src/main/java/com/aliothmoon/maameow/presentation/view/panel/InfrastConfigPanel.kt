@@ -42,6 +42,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -73,6 +74,8 @@ import com.aliothmoon.maameow.presentation.LocalFloatingWindowContext
 import com.aliothmoon.maameow.presentation.LocalInputFocusManager
 import com.aliothmoon.maameow.presentation.components.CheckBoxWithExpandableTip
 import com.aliothmoon.maameow.presentation.components.WeeklyScheduleSection
+import com.aliothmoon.maameow.presentation.components.LocalPageVisible
+import com.aliothmoon.maameow.presentation.components.rememberPageVisible
 import com.aliothmoon.maameow.presentation.components.rememberStagedBeyondViewportCount
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipContent
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipIcon
@@ -154,134 +157,120 @@ fun InfrastConfigPanel(
                 .weight(1f),
             userScrollEnabled = true
         ) { page ->
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()
-            ) {
-                when (page) {
-                    // 常规设置 Tab
-                    0 -> {
-                        item {
-                            // 基建模式选择
-                            InfrastModeSection(config, onConfigChange)
-                        }
-                        item {
-                            // 自定义基建配置 (仅 Custom 模式显示)
-                            MaaAnimatedVisibility(
-                                visible = config.mode == InfrastMode.Custom,
-                                enter = expandVertically(),
-                                exit = shrinkVertically()
-                            ) {
-                                CustomInfrastSection(config, onConfigChange)
+            CompositionLocalProvider(LocalPageVisible provides rememberPageVisible(pagerState, page)) {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()
+                ) {
+                    when (page) {
+                        0 -> {
+                            item {
+                                InfrastModeSection(config, onConfigChange)
+                            }
+                            item {
+                                MaaAnimatedVisibility(
+                                    visible = config.mode == InfrastMode.Custom,
+                                    enter = expandVertically(),
+                                    exit = shrinkVertically()
+                                ) {
+                                    CustomInfrastSection(config, onConfigChange)
+                                }
+                            }
+                            item {
+                                MaaAnimatedVisibility(
+                                    visible = config.mode != InfrastMode.Custom,
+                                    enter = expandVertically(),
+                                    exit = shrinkVertically()
+                                ) {
+                                    UsesOfDronesSection(config, onConfigChange)
+                                }
+                            }
+                            item {
+                                MaaAnimatedVisibility(
+                                    visible = config.mode != InfrastMode.Rotation,
+                                    enter = expandVertically(),
+                                    exit = shrinkVertically()
+                                ) {
+                                    DormThresholdSection(config, onConfigChange)
+                                }
+                            }
+                            item {
+                                FacilitiesSection(config, onConfigChange)
                             }
                         }
-                        item {
-                            // 无人机用途 (Custom 模式下禁用)
-                            MaaAnimatedVisibility(
-                                visible = config.mode != InfrastMode.Custom,
-                                enter = expandVertically(),
-                                exit = shrinkVertically()
-                            ) {
-                                UsesOfDronesSection(config, onConfigChange)
-                            }
-                        }
-                        item {
-                            // 心情阈值 (仅 Normal 模式显示)
-                            MaaAnimatedVisibility(
-                                visible = config.mode != InfrastMode.Rotation,
-                                enter = expandVertically(),
-                                exit = shrinkVertically()
-                            ) {
-                                DormThresholdSection(config, onConfigChange)
-                            }
-                        }
-                        item {
-                            // 设施列表
-                            FacilitiesSection(config, onConfigChange)
-                        }
-                    }
 
-                    // 高级设置 Tab
-                    else -> {
-                        item {
-                            // 宿舍信赖模式 (仅 Normal 模式显示)
-                            MaaAnimatedVisibility(
-                                visible = config.mode != InfrastMode.Rotation,
-                                enter = expandVertically(),
-                                exit = shrinkVertically()
-                            ) {
-                                DormTrustEnabledSection(config, onConfigChange)
+                        else -> {
+                            item {
+                                MaaAnimatedVisibility(
+                                    visible = config.mode != InfrastMode.Rotation,
+                                    enter = expandVertically(),
+                                    exit = shrinkVertically()
+                                ) {
+                                    DormTrustEnabledSection(config, onConfigChange)
+                                }
                             }
-                        }
-                        item {
-                            // 不将已进驻干员放入宿舍 (仅 Normal 模式显示)
-                            MaaAnimatedVisibility(
-                                visible = config.mode != InfrastMode.Rotation,
-                                enter = expandVertically(),
-                                exit = shrinkVertically()
-                            ) {
-                                DormFilterNotStationedSection(config, onConfigChange)
+                            item {
+                                MaaAnimatedVisibility(
+                                    visible = config.mode != InfrastMode.Rotation,
+                                    enter = expandVertically(),
+                                    exit = shrinkVertically()
+                                ) {
+                                    DormFilterNotStationedSection(config, onConfigChange)
+                                }
                             }
-                        }
-                        item {
-                            // 制造站搓玉自动补货
-                            OriginiumShardAutoReplenishmentSection(config, onConfigChange)
-                        }
-                        item {
-                            // 会客室留言板领取信用
-                            ReceptionMessageBoardReceiveSection(config, onConfigChange)
-                        }
-                        item {
-                            // 会客室线索交流
-                            ReceptionClueExchangeSection(config, onConfigChange)
-                        }
-                        item {
-                            // 会客室赠送线索
-                            ReceptionSendClueSection(config, onConfigChange)
-                        }
-                        item {
-                            // 继续专精
-                            ContinueTrainingSection(config, onConfigChange)
-                        }
-                        item {
-                            // 菲亚梅塔心情恢复 + 恢复目标 (仅 Normal 模式显示)
-                            // 合并成一个 item：拆开时隐藏的那个仍占槽位，会多吃一份间距
-                            MaaAnimatedVisibility(
-                                visible = config.mode == InfrastMode.Normal,
-                                enter = expandVertically(),
-                                exit = shrinkVertically()
-                            ) {
-                                Column {
-                                    FiammettaRecoverySection(config, onConfigChange)
-                                    MaaAnimatedVisibility(
-                                        visible = config.fiammettaRecoveryEnabled,
-                                        enter = expandVertically(),
-                                        exit = shrinkVertically()
-                                    ) {
-                                        FiammettaTargetsSection(
-                                            config,
-                                            onConfigChange,
-                                            modifier = Modifier.padding(top = 12.dp)
-                                        )
+                            item {
+                                OriginiumShardAutoReplenishmentSection(config, onConfigChange)
+                            }
+                            item {
+                                ReceptionMessageBoardReceiveSection(config, onConfigChange)
+                            }
+                            item {
+                                ReceptionClueExchangeSection(config, onConfigChange)
+                            }
+                            item {
+                                ReceptionSendClueSection(config, onConfigChange)
+                            }
+                            item {
+                                ContinueTrainingSection(config, onConfigChange)
+                            }
+                            item {
+                                // 合并隐藏项，避免多出间距
+                                MaaAnimatedVisibility(
+                                    visible = config.mode == InfrastMode.Normal,
+                                    enter = expandVertically(),
+                                    exit = shrinkVertically()
+                                ) {
+                                    Column {
+                                        FiammettaRecoverySection(config, onConfigChange)
+                                        MaaAnimatedVisibility(
+                                            visible = config.fiammettaRecoveryEnabled,
+                                            enter = expandVertically(),
+                                            exit = shrinkVertically()
+                                        ) {
+                                            FiammettaTargetsSection(
+                                                config,
+                                                onConfigChange,
+                                                modifier = Modifier.padding(top = 12.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                        item {
-                            // 跨设施组合 (仅 Normal 模式显示)
-                            MaaAnimatedVisibility(
-                                visible = config.mode == InfrastMode.Normal,
-                                enter = expandVertically(),
-                                exit = shrinkVertically()
-                            ) {
-                                CrossFacilityTeamsSection(config, onConfigChange)
+                            item {
+                                MaaAnimatedVisibility(
+                                    visible = config.mode == InfrastMode.Normal,
+                                    enter = expandVertically(),
+                                    exit = shrinkVertically()
+                                ) {
+                                    CrossFacilityTeamsSection(config, onConfigChange)
+                                }
                             }
-                        }
-                        item {
-                            WeeklyScheduleSection(
-                                config = config,
-                                onEnabledChange = { onConfigChange(config.copy(useWeeklySchedule = it)) },
-                                onScheduleChange = { onConfigChange(config.copy(weeklySchedule = it)) },
-                            )
+                            item {
+                                WeeklyScheduleSection(
+                                    config = config,
+                                    onEnabledChange = { onConfigChange(config.copy(useWeeklySchedule = it)) },
+                                    onScheduleChange = { onConfigChange(config.copy(weeklySchedule = it)) },
+                                )
+                            }
                         }
                     }
                 }
@@ -601,8 +590,9 @@ private fun PlanSelectButtonGroup(
     val hasNonPeriodicPlan = plans.any { it.period.isEmpty() }
 
     var now by remember { mutableStateOf(LocalTime.now()) }
-    LaunchedEffect(hasPeriodicPlan) {
-        if (!hasPeriodicPlan) return@LaunchedEffect
+    val pageVisible by LocalPageVisible.current
+    LaunchedEffect(hasPeriodicPlan, pageVisible) {
+        if (!hasPeriodicPlan || !pageVisible) return@LaunchedEffect
         while (isActive) {
             now = LocalTime.now()
             delay(60_000L - (System.currentTimeMillis() % 60_000L))

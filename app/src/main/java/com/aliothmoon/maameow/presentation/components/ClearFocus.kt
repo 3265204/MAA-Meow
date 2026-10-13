@@ -26,9 +26,10 @@ fun Modifier.clearFocusOnBlankTap(): Modifier {
     val inputFocusManager = LocalInputFocusManager.current
     val hostView = LocalView.current
     val latestClear by rememberUpdatedState(inputFocusManager)
+    val preload = LocalPagerPreloadState.current
     var layoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
 
-    val scrollConnection = remember {
+    val scrollConnection = remember(preload) {
         object : NestedScrollConnection {
             var clearedForGesture = false
 
@@ -40,6 +41,7 @@ fun Modifier.clearFocusOnBlankTap(): Modifier {
             }
 
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available != Offset.Zero) preload?.onScroll()
                 // 每轮手势只清一次，程序滚动不清焦
                 if (available != Offset.Zero && source == NestedScrollSource.UserInput) {
                     clearOnce()
@@ -52,36 +54,41 @@ fun Modifier.clearFocusOnBlankTap(): Modifier {
     return this
         .onGloballyPositioned { layoutCoordinates = it }
         .nestedScroll(scrollConnection)
-        .pointerInput(Unit) {
-            awaitPointerEventScope {
-                while (true) {
-                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                    if (event.type == PointerEventType.Scroll ||
-                        (event.type == PointerEventType.Press && event.changes.none { it.previousPressed })
-                    ) {
-                        scrollConnection.clearedForGesture = false
-                    }
-                    if (event.type != PointerEventType.Press) continue
-                    // 仅 Android 文本编辑器 (悬浮窗 EditText); Compose TextField 的 findFocus 通常是整窗
-                    val focused = hostView.findFocus() ?: continue
-                    if (focused === hostView || !focused.onCheckIsTextEditor()) continue
-                    val change = event.changes.firstOrNull() ?: continue
-                    val coords = layoutCoordinates ?: continue
-                    if (!coords.isAttached) continue
-                    val posInWindow = coords.localToWindow(change.position)
-                    val loc = IntArray(2)
-                    focused.getLocationInWindow(loc)
-                    val x = posInWindow.x.toInt()
-                    val y = posInWindow.y.toInt()
-                    val inside = x in loc[0] until (loc[0] + focused.width) &&
-                            y in loc[1] until (loc[1] + focused.height)
-                    if (!inside) {
-                        scrollConnection.clearOnce()
+        .pointerInput(preload) {
+            try {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        preload?.onPointerInput(event.changes.any { it.pressed })
+                        if (event.type == PointerEventType.Scroll ||
+                            (event.type == PointerEventType.Press && event.changes.none { it.previousPressed })
+                        ) {
+                            scrollConnection.clearedForGesture = false
+                        }
+                        if (event.type != PointerEventType.Press) continue
+                        // 仅 Android 文本编辑器 (悬浮窗 EditText); Compose TextField 的 findFocus 通常是整窗
+                        val focused = hostView.findFocus() ?: continue
+                        if (focused === hostView || !focused.onCheckIsTextEditor()) continue
+                        val change = event.changes.firstOrNull() ?: continue
+                        val coords = layoutCoordinates ?: continue
+                        if (!coords.isAttached) continue
+                        val posInWindow = coords.localToWindow(change.position)
+                        val loc = IntArray(2)
+                        focused.getLocationInWindow(loc)
+                        val x = posInWindow.x.toInt()
+                        val y = posInWindow.y.toInt()
+                        val inside = x in loc[0] until (loc[0] + focused.width) &&
+                                y in loc[1] until (loc[1] + focused.height)
+                        if (!inside) {
+                            scrollConnection.clearOnce()
+                        }
                     }
                 }
+            } finally {
+                preload?.onPointerInput(false)
             }
         }
-        .pointerInput(Unit) {
+        .pointerInput(scrollConnection) {
             detectTapGestures {
                 scrollConnection.clearOnce()
             }
