@@ -73,7 +73,8 @@ fun FloatWindowEditText(
 
     var editTextRef by remember { mutableStateOf<ExtractModeEditText?>(null) }
     var isFocused by remember { mutableStateOf(false) }
-    var appliedCursorToEndRequest by remember { mutableIntStateOf(0) }
+    // 初始值不算请求
+    var appliedCursorToEndRequest by remember { mutableIntStateOf(cursorToEndRequest) }
 
     val currentValue by rememberUpdatedState(value)
     val currentOnValueChange by rememberUpdatedState(onValueChange)

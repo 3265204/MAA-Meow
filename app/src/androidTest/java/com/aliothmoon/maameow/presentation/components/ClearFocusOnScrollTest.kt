@@ -74,6 +74,23 @@ class ClearFocusOnScrollTest {
     }
 
     @Test
+    fun quickFlickReleasedBeforeDragDispatchStillClears() {
+        val focus = CountingFocusManager()
+        val listState = showList(focus)
+
+        composeRule.onNodeWithTag("list").performTouchInput {
+            down(center)
+            moveBy(Offset(0f, -viewConfiguration.touchSlop * 5))
+            up()
+        }
+
+        composeRule.runOnIdle {
+            assertTrue(listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0)
+            assertEquals(1, focus.clearCount)
+        }
+    }
+
+    @Test
     fun programmaticScrollDoesNotClearFocus() {
         val focus = CountingFocusManager()
         showList(focus)
@@ -177,6 +194,34 @@ class ClearFocusOnScrollTest {
         composeRule.onNodeWithTag("editor").performTouchInput { click() }
         composeRule.runOnIdle { assertTrue(editor.hasFocus()) }
         composeRule.onNodeWithTag("outside").performTouchInput { click() }
+        composeRule.runOnIdle { assertFalse(editor.hasFocus()) }
+    }
+
+    @Test
+    fun nativeEditorKeepsFocusOnlyWithinItsInputGroup() {
+        lateinit var editor: EditText
+        composeRule.setContent {
+            ProvideInputFocusManager {
+                Column(Modifier.size(300.dp, 400.dp).clearFocusOnBlankTap()) {
+                    Column(Modifier.inputFocusGroup()) {
+                        AndroidView(
+                            factory = { context -> EditText(context).also { editor = it } },
+                            modifier = Modifier.fillMaxWidth().height(56.dp).testTag("editor"),
+                        )
+                        Button(onClick = {}, modifier = Modifier.testTag("sameGroup")) { Text("same") }
+                    }
+                    Button(onClick = {}, modifier = Modifier.inputFocusGroup().testTag("otherGroup")) {
+                        Text("other")
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("editor").performTouchInput { click() }
+        composeRule.runOnIdle { assertTrue(editor.hasFocus()) }
+        composeRule.onNodeWithTag("sameGroup").performTouchInput { click() }
+        composeRule.runOnIdle { assertTrue(editor.hasFocus()) }
+        composeRule.onNodeWithTag("otherGroup").performTouchInput { click() }
         composeRule.runOnIdle { assertFalse(editor.hasFocus()) }
     }
 

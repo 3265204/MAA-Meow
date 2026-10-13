@@ -188,6 +188,8 @@ fun CoreCharSelector(
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier
                 .bringIntoViewRequester(inputAreaRequester)
+                // 悬浮窗点候选和图标不清焦
+                .inputFocusGroup()
                 .onFocusChanged { inputFocused = it.hasFocus }
         ) {
             // 头像使用生效配置，避免输入时闪烁

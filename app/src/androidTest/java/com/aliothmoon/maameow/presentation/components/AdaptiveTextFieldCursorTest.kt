@@ -91,4 +91,28 @@ class AdaptiveTextFieldCursorTest {
             assertEquals(0, (view as EditText).selectionStart)
         }
     }
+
+    @Test
+    fun nativeEditorTreatsInitialRequestAsAlreadyApplied() {
+        var request by mutableIntStateOf(3)
+        composeRule.setContent {
+            MaterialTheme {
+                ProvideInputFocusManager {
+                    CompositionLocalProvider(LocalFloatingWindowContext provides true) {
+                        Box(Modifier.size(300.dp, 100.dp)) {
+                            ITextField("abcd", {}, cursorToEndRequest = request)
+                        }
+                    }
+                }
+            }
+        }
+        lateinit var editor: EditText
+        onView(isAssignableFrom(EditText::class.java)).check { view, error ->
+            if (error != null) throw error
+            editor = view as EditText
+        }
+        composeRule.runOnIdle { assertEquals(0, editor.selectionStart) }
+        composeRule.runOnIdle { request++ }
+        composeRule.runOnIdle { assertEquals(4, editor.selectionStart) }
+    }
 }
