@@ -30,10 +30,19 @@ fun Modifier.clearFocusOnBlankTap(): Modifier {
 
     val scrollConnection = remember {
         object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // 仅用户手势滚动清焦, 避免 bringIntoView / IME relocate 等 SideEffect 误清
-                if (available != Offset.Zero && source == NestedScrollSource.UserInput) {
+            var clearedForGesture = false
+
+            fun clearOnce() {
+                if (!clearedForGesture) {
+                    clearedForGesture = true
                     latestClear.clear()
+                }
+            }
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // 每轮手势只清一次，程序滚动不清焦
+                if (available != Offset.Zero && source == NestedScrollSource.UserInput) {
+                    clearOnce()
                 }
                 return Offset.Zero
             }
@@ -47,6 +56,11 @@ fun Modifier.clearFocusOnBlankTap(): Modifier {
             awaitPointerEventScope {
                 while (true) {
                     val event = awaitPointerEvent(PointerEventPass.Initial)
+                    if (event.type == PointerEventType.Scroll ||
+                        (event.type == PointerEventType.Press && event.changes.none { it.previousPressed })
+                    ) {
+                        scrollConnection.clearedForGesture = false
+                    }
                     if (event.type != PointerEventType.Press) continue
                     // 仅 Android 文本编辑器 (悬浮窗 EditText); Compose TextField 的 findFocus 通常是整窗
                     val focused = hostView.findFocus() ?: continue
@@ -62,14 +76,14 @@ fun Modifier.clearFocusOnBlankTap(): Modifier {
                     val inside = x in loc[0] until (loc[0] + focused.width) &&
                             y in loc[1] until (loc[1] + focused.height)
                     if (!inside) {
-                        latestClear.clear()
+                        scrollConnection.clearOnce()
                     }
                 }
             }
         }
         .pointerInput(Unit) {
             detectTapGestures {
-                latestClear.clear()
+                scrollConnection.clearOnce()
             }
         }
 }

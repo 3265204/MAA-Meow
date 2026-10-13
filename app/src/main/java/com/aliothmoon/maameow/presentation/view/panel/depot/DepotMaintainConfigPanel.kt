@@ -72,6 +72,7 @@ import com.aliothmoon.maameow.data.resource.ItemHelper
 import com.aliothmoon.maameow.data.resource.StageGroup
 import com.aliothmoon.maameow.domain.enums.UiUsageConstants
 import com.aliothmoon.maameow.domain.models.DepotActivityPreset
+import com.aliothmoon.maameow.presentation.LocalInputFocusManager
 import com.aliothmoon.maameow.presentation.components.CheckBoxWithExpandableTip
 import com.aliothmoon.maameow.presentation.components.CheckBoxWithLabel
 import com.aliothmoon.maameow.presentation.components.INumericField
@@ -79,6 +80,7 @@ import com.aliothmoon.maameow.presentation.components.InlineActionRow
 import com.aliothmoon.maameow.presentation.components.InlineConfirmPanel
 import com.aliothmoon.maameow.presentation.components.ItemIcon
 import com.aliothmoon.maameow.presentation.components.SectionHeader
+import com.aliothmoon.maameow.presentation.components.rememberStagedBeyondViewportCount
 import com.aliothmoon.maameow.presentation.view.panel.common.GroupedStageButtonGroup
 import com.aliothmoon.maameow.presentation.view.panel.common.ItemButtonGroup
 import com.aliothmoon.maameow.presentation.view.panel.common.StageInputField
@@ -169,6 +171,7 @@ fun DepotMaintainConfigPanel(
         showClearConfirm = false
     }
     val coroutineScope = rememberCoroutineScope()
+    val inputFocus = LocalInputFocusManager.current
     // 两页各自记滚动位置，切页来回不跳
     val generalScrollState = rememberScrollState()
     val advancedScrollState = rememberScrollState()
@@ -203,6 +206,7 @@ fun DepotMaintainConfigPanel(
                         indication = null,
                         role = Role.Tab,
                     ) {
+                        inputFocus.clear()
                         coroutineScope.launch { pagerState.animateScrollToPage(page) }
                     }
                 )
@@ -214,6 +218,7 @@ fun DepotMaintainConfigPanel(
         HorizontalPager(
             pageSize = PageSize.Fill,
             state = pagerState,
+            beyondViewportPageCount = rememberStagedBeyondViewportCount(pagerState, 1),
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),

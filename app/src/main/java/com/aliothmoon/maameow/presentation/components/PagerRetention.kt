@@ -1,5 +1,6 @@
 package com.aliothmoon.maameow.presentation.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,6 +35,13 @@ fun rememberPageVisible(pagerState: PagerState, page: Int): State<Boolean> {
     return remember(pagerState, page, parent) {
         derivedStateOf { parent.value && (page == pagerState.currentPage || page == pagerState.targetPage) }
     }
+}
+
+/** 所在页不可见时停用，常驻的离屏页不抢返回键 */
+@Composable
+fun PageBackHandler(enabled: Boolean = true, onBack: () -> Unit) {
+    val visible by LocalPageVisible.current
+    BackHandler(enabled = enabled && visible, onBack = onBack)
 }
 
 /** 所在页不可见时停在最后一次的值，常驻页不再跟着高频数据重组 */

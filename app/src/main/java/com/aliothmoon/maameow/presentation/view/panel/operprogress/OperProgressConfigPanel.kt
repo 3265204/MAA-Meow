@@ -1,7 +1,6 @@
 package com.aliothmoon.maameow.presentation.view.panel.operprogress
 
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +67,7 @@ import com.aliothmoon.maameow.maa.callback.TaskRunStatus
 import com.aliothmoon.maameow.presentation.LocalFloatingWindowContext
 import com.aliothmoon.maameow.presentation.LocalInputFocusManager
 import com.aliothmoon.maameow.presentation.components.InlineConfirmPanel
+import com.aliothmoon.maameow.presentation.components.PageBackHandler
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipContent
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipIcon
 import com.aliothmoon.maameow.utils.Misc
@@ -149,7 +149,7 @@ fun OperProgressConfigPanel(
     }
 
     if (!LocalFloatingWindowContext.current) {
-        BackHandler(enabled = pickerVisible) { inputFocus.clear(); pickerVisible = false }
+        PageBackHandler(enabled = pickerVisible) { inputFocus.clear(); pickerVisible = false }
     }
 
     if (pickerVisible && !locked) {
