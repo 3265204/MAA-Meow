@@ -110,6 +110,7 @@ fun ScheduleEditView(
     var showTimePicker by remember { mutableStateOf(false) }
     var editingTime by remember { mutableStateOf<LocalTime?>(null) }
     var showSilentStartRisk by remember { mutableStateOf(false) }
+    var showScreenPowerRisk by remember { mutableStateOf(false) }
     val runMode by viewModel.runMode.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -600,6 +601,17 @@ fun ScheduleEditView(
                     visible = saverExpanded,
                     tipText = stringResource(R.string.schedule_auto_screen_saver_tip),
                 )
+                if (state.autoScreenSaver) {
+                    SubSwitchRow(
+                        title = stringResource(R.string.schedule_hardware_screen_off),
+                        tip = stringResource(R.string.schedule_hardware_screen_off_tip),
+                        checked = state.hardwareScreenOff,
+                        onCheckedChange = { checked ->
+                            if (checked) showScreenPowerRisk = true
+                            else viewModel.onHardwareScreenOffChanged(false)
+                        },
+                    )
+                }
             }
 
             item(key = "silent-start") {
@@ -677,29 +689,12 @@ fun ScheduleEditView(
                 )
                 // 从属于上面的开关，关掉就没有意义，直接隐藏
                 if (state.autoSleepAfterTask) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 24.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(R.string.schedule_skip_auto_sleep_if_awake),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                stringResource(R.string.schedule_skip_auto_sleep_if_awake_tip),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            checked = state.skipAutoSleepIfAwake,
-                            onCheckedChange = { viewModel.onSkipAutoSleepIfAwakeChanged(it) }
-                        )
-                    }
+                    SubSwitchRow(
+                        title = stringResource(R.string.schedule_skip_auto_sleep_if_awake),
+                        tip = stringResource(R.string.schedule_skip_auto_sleep_if_awake_tip),
+                        checked = state.skipAutoSleepIfAwake,
+                        onCheckedChange = { viewModel.onSkipAutoSleepIfAwakeChanged(it) },
+                    )
                 }
             }
 
@@ -786,6 +781,19 @@ fun ScheduleEditView(
         icon = Icons.Rounded.Warning,
     )
 
+    AdaptiveTaskPromptDialog(
+        visible = showScreenPowerRisk,
+        title = stringResource(R.string.dialog_hardware_screen_off_title),
+        message = stringResource(R.string.schedule_hardware_screen_off_confirm_body),
+        onConfirm = {
+            showScreenPowerRisk = false
+            viewModel.onHardwareScreenOffChanged(true)
+        },
+        onDismissRequest = { showScreenPowerRisk = false },
+        confirmText = stringResource(R.string.dialog_hardware_screen_off_confirm),
+        icon = Icons.Rounded.Warning,
+    )
+
     if (showWizard) {
         val current = state.wizardPending.first()
         PermissionWizardDialog(
@@ -802,6 +810,32 @@ fun ScheduleEditView(
 }
 
 /** 每次只展示当前待处理项，全部通过后自动关闭 */
+@Composable
+private fun SubSwitchRow(
+    title: String,
+    tip: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                tip,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
 @Composable
 private fun PermissionWizardDialog(
     current: ScheduleHealthIssue,

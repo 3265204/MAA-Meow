@@ -166,11 +166,16 @@ class ScheduleHealthLogicTest {
 
     // ===== overlayNeeded: 策略推导 =====
 
-    private fun strategy(enabled: Boolean, autoScreenSaver: Boolean) = ScheduleStrategy(
+    private fun strategy(
+        enabled: Boolean,
+        autoScreenSaver: Boolean,
+        hardwareScreenOff: Boolean = false,
+    ) = ScheduleStrategy(
         name = "test",
         profileId = "p",
         enabled = enabled,
         autoScreenSaver = autoScreenSaver,
+        hardwareScreenOff = hardwareScreenOff,
     )
 
     @Test
@@ -190,5 +195,12 @@ class ScheduleHealthLogicTest {
             strategy(enabled = true, autoScreenSaver = true),
         )
         assertTrue(ScheduleHealthLogic.overlayNeeded(strategies))
+    }
+
+    @Test
+    fun `overlayNeeded - hardware screen off needs no overlay`() {
+        val hardware = strategy(enabled = true, autoScreenSaver = true, hardwareScreenOff = true)
+        assertFalse(ScheduleHealthLogic.overlayNeeded(listOf(hardware)))
+        assertTrue(ScheduleHealthLogic.overlayNeeded(listOf(hardware.copy(hardwareScreenOff = false))))
     }
 }

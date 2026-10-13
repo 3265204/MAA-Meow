@@ -11,6 +11,7 @@ import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.manager.PermissionManager
 import com.aliothmoon.maameow.schedule.data.ScheduleStrategyRepository
 import com.aliothmoon.maameow.schedule.model.ExecutionResult
+import com.aliothmoon.maameow.schedule.model.ScheduleHealthIssue
 import com.aliothmoon.maameow.schedule.model.ScheduleStrategy
 import com.aliothmoon.maameow.schedule.model.ScheduleType
 import com.aliothmoon.maameow.schedule.service.ScheduleAlarmManager
@@ -258,5 +259,23 @@ class ScheduleEditViewModelTest {
         runCurrent()
         assertTrue(viewModel.state.value.saveSuccess)
         assertFalse(viewModel.state.value.isSaving)
+    }
+
+    @Test
+    fun hardwareScreenOffIsSavedAndNeedsNoOverlay() = runTest(dispatcher) {
+        coEvery { repository.update(any()) } returns Unit
+        profilesLoaded.value = true
+        strategiesLoaded.value = true
+        viewModel.loadStrategy(context, strategy.id)
+        runCurrent()
+        viewModel.refreshPermissionChecks()
+        assertTrue(ScheduleHealthIssue.OVERLAY in viewModel.state.value.wizardPending)
+
+        viewModel.onHardwareScreenOffChanged(true)
+        viewModel.onSave(context)
+        runCurrent()
+
+        coVerify(exactly = 1) { repository.update(strategy.copy(hardwareScreenOff = true)) }
+        assertFalse(ScheduleHealthIssue.OVERLAY in viewModel.state.value.wizardPending)
     }
 }

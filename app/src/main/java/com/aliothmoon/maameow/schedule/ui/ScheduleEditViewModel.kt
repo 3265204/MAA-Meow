@@ -49,6 +49,7 @@ data class ScheduleEditUiState(
     val selectedProfileId: String? = null,
     val forceStart: Boolean = false,
     val autoScreenSaver: Boolean = false,
+    val hardwareScreenOff: Boolean = false,
     val silentStartWhenInUse: Boolean = false,
     val autoSleepAfterTask: Boolean = false,
     val skipAutoSleepIfAwake: Boolean = false,
@@ -131,6 +132,7 @@ class ScheduleEditViewModel(
                         selectedProfileId = strategy.profileId,
                         forceStart = strategy.forceStart,
                         autoScreenSaver = strategy.autoScreenSaver,
+                        hardwareScreenOff = strategy.hardwareScreenOff,
                         silentStartWhenInUse = strategy.silentStartWhenInUse,
                         autoSleepAfterTask = strategy.autoSleepAfterTask,
                         skipAutoSleepIfAwake = strategy.skipAutoSleepIfAwake,
@@ -220,6 +222,10 @@ class ScheduleEditViewModel(
         _state.update { it.copy(autoScreenSaver = value) }
     }
 
+    fun onHardwareScreenOffChanged(value: Boolean) {
+        _state.update { it.copy(hardwareScreenOff = value) }
+    }
+
     fun onSilentStartWhenInUseChanged(value: Boolean) {
         _state.update { it.copy(silentStartWhenInUse = value) }
     }
@@ -298,6 +304,7 @@ class ScheduleEditViewModel(
                     profileId = current.selectedProfileId,
                     forceStart = current.forceStart,
                     autoScreenSaver = current.autoScreenSaver,
+                    hardwareScreenOff = current.hardwareScreenOff,
                     silentStartWhenInUse = current.silentStartWhenInUse,
                     autoSleepAfterTask = current.autoSleepAfterTask,
                     skipAutoSleepIfAwake = current.skipAutoSleepIfAwake,
@@ -314,6 +321,7 @@ class ScheduleEditViewModel(
                     profileId = current.selectedProfileId,
                     forceStart = current.forceStart,
                     autoScreenSaver = current.autoScreenSaver,
+                    hardwareScreenOff = current.hardwareScreenOff,
                     silentStartWhenInUse = current.silentStartWhenInUse,
                     autoSleepAfterTask = current.autoSleepAfterTask,
                     skipAutoSleepIfAwake = current.skipAutoSleepIfAwake,
@@ -352,7 +360,7 @@ class ScheduleEditViewModel(
         }
     }
 
-    /** 悬浮窗仅在策略勾选屏保时纳入，免得向导走完又被健康卡 nag 一遍 */
+    /** 悬浮窗仅在策略实际用屏保时纳入，免得向导走完又被健康卡 nag 一遍 */
     fun refreshPermissionChecks() {
         // 先刷新，避免依赖 onResume 回调顺序
         permissionManager.refresh()
@@ -367,7 +375,7 @@ class ScheduleEditViewModel(
                         notification = permissions.notification,
                         exactAlarmAllowed = scheduleAlarmManager.canScheduleExact(),
                         overlayGranted = permissions.overlay,
-                        overlayNeeded = it.autoScreenSaver,
+                        overlayNeeded = ScheduleHealthLogic.usesOverlay(it.autoScreenSaver, it.hardwareScreenOff),
                     )
                 )
             )

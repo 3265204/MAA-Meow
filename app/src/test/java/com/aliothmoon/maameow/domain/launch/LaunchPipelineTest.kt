@@ -9,6 +9,7 @@ import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.domain.models.UnlockCredential
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
 import com.aliothmoon.maameow.domain.service.MaaNotificationCenter
+import com.aliothmoon.maameow.domain.service.ScreenPowerController
 import com.aliothmoon.maameow.domain.service.ScreenSaverController
 import com.aliothmoon.maameow.domain.service.TaskEndRegistry
 import com.aliothmoon.maameow.domain.service.UnlockGestureReader
@@ -74,6 +75,24 @@ class LaunchPipelineTest {
     private val recorded = CopyOnWriteArrayList<ExecutionResult>()
     private val stopCalls = AtomicInteger(0)
     private val uiLaunches = AtomicInteger(0)
+    private val powerOffCalls = CopyOnWriteArrayList<ScreenPowerController.Origin>()
+
+    @Volatile
+    private var powerOffSucceeds = true
+
+    /** 同真实实现：系统没醒着标记即作废 */
+    private val screenPower = object : ScreenPowerController {
+        @Volatile
+        var mark: ScreenPowerController.Origin? = null
+
+        override val poweredOff get() = mark?.takeIf { screenInteractive.get() }
+
+        override fun powerOff(origin: ScreenPowerController.Origin): Boolean {
+            powerOffCalls.add(origin)
+            if (powerOffSucceeds) mark = origin
+            return powerOffSucceeds
+        }
+    }
 
     @Volatile
     private var remoteBlocker: BackendBlock? = null
@@ -121,7 +140,7 @@ class LaunchPipelineTest {
         }
     }
 
-    /** 进入倒计时后挂起，直到 [release] 完成。 */
+    /** 与真实倒计时一样响应取消/立即开始；[release] 模拟自然到期 */
     private fun gatedCountdown(entered: CompletableDeferred<Unit>, release: CompletableDeferred<Unit>) =
         object : CountdownUI {
             override suspend fun await(
@@ -131,7 +150,7 @@ class LaunchPipelineTest {
             ): Boolean {
                 onTick(1)
                 entered.complete(Unit)
-                release.await()
+                while (!release.isCompleted && !shouldAbort()) delay(10)
                 return false
             }
         }
@@ -143,6 +162,9 @@ class LaunchPipelineTest {
         startCalls.set(0)
         stopCalls.set(0)
         uiLaunches.set(0)
+        screenPower.mark = null
+        powerOffCalls.clear()
+        powerOffSucceeds = true
         remoteBlocker = null
         blacklist.value = emptySet()
         foregroundPkg = null
@@ -261,6 +283,7 @@ class LaunchPipelineTest {
         startTaskChain = startTaskChain,
         countdownUI = countdown,
         screenSaver = screenSaver,
+        screenPower = screenPower,
         taskEndRegistry = taskEndRegistry,
         notificationCenter = notificationCenter,
         keyguardLocked = { keyguardLocked.get() },
@@ -303,6 +326,7 @@ class LaunchPipelineTest {
         autoSleep: Boolean = false,
         skipIfAwake: Boolean = false,
         autoScreenSaver: Boolean = false,
+        hardwareScreenOff: Boolean = false,
         closeGame: Boolean = false,
         silent: Boolean = false,
     ) = LaunchRequest(
@@ -313,6 +337,7 @@ class LaunchPipelineTest {
         scheduledTimeMs = 1_000L,
         forceStart = force,
         autoScreenSaver = autoScreenSaver,
+        hardwareScreenOff = hardwareScreenOff,
         silentStartWhenInUse = silent,
         closeGameAfterTask = closeGame,
         autoSleepAfterTask = autoSleep,
@@ -320,6 +345,14 @@ class LaunchPipelineTest {
         strategyId = "strat-1",
         countdownSeconds = 1,
     )
+
+    private fun givenIdleThenWakes() {
+        screenInteractive.set(false)
+        coEvery { wake.unlock(any()) } coAnswers {
+            screenInteractive.set(true)
+            WakeUnlockEngine.WakeResult.OK
+        }
+    }
 
     /** StateFlow 合并，赋值间须留窗口 */
     private suspend fun driveTaskToEnd() {
@@ -607,6 +640,152 @@ class LaunchPipelineTest {
         pipeline().execute(scheduleRequest(autoScreenSaver = true)).join()
         driveTaskToEnd()
         delay(500)
+        coVerify(exactly = 0) { screenSaver.hide() }
+    }
+
+    @Test
+    fun hardwareScreenOff_powersOffAfterCountdown() = runBlocking<Unit> {
+        givenIdleThenWakes()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val p = pipeline(gatedCountdown(entered, release))
+        coEvery {
+            startTaskChain.invoke(chain = any(), context = any(), scheduleLabel = any())
+        } coAnswers {
+            assertEquals(listOf(ScreenPowerController.Origin.SCHEDULE), powerOffCalls.toList())
+            startCalls.incrementAndGet()
+            compositionState.value = MaaExecutionState.RUNNING
+            StartTaskChainUseCase.Result.Success
+        }
+        val job = p.execute(scheduleRequest(autoScreenSaver = true, hardwareScreenOff = true))
+        withTimeout(5_000) { entered.await() }
+        assertEquals(1, uiLaunches.get())
+        assertTrue(powerOffCalls.isEmpty())
+        release.complete(Unit)
+        job.join()
+        assertEquals(1, startCalls.get())
+        coVerify(exactly = 0) { screenSaver.show() }
+    }
+
+    @Test
+    fun hardwareScreenOff_cancelDuringCountdown_neverPowersOff() = runBlocking<Unit> {
+        givenIdleThenWakes()
+        val entered = CompletableDeferred<Unit>()
+        val p = pipeline(gatedCountdown(entered, CompletableDeferred()))
+        val job = p.execute(scheduleRequest(autoScreenSaver = true, hardwareScreenOff = true))
+        withTimeout(5_000) { entered.await() }
+        p.submit(LaunchUserEvent.Cancel)
+        withTimeout(5_000) { job.join() }
+        assertEquals(listOf(ExecutionResult.CANCELLED), recorded.toList())
+        assertTrue(powerOffCalls.isEmpty())
+        assertEquals(0, startCalls.get())
+    }
+
+    @Test
+    fun hardwareScreenOff_startNow_powersOffBeforeStart() = runBlocking<Unit> {
+        givenIdleThenWakes()
+        val entered = CompletableDeferred<Unit>()
+        val p = pipeline(gatedCountdown(entered, CompletableDeferred()))
+        val job = p.execute(scheduleRequest(autoScreenSaver = true, hardwareScreenOff = true))
+        withTimeout(5_000) { entered.await() }
+        p.submit(LaunchUserEvent.StartNow)
+        withTimeout(5_000) { job.join() }
+        assertEquals(listOf(ScreenPowerController.Origin.SCHEDULE), powerOffCalls.toList())
+        assertEquals(1, startCalls.get())
+    }
+
+    @Test
+    fun hardwareScreenOff_needsScreenOffSwitch() = runBlocking<Unit> {
+        givenIdleThenWakes()
+        pipeline().execute(scheduleRequest(hardwareScreenOff = true)).join()
+        assertTrue(powerOffCalls.isEmpty())
+        coVerify(exactly = 0) { screenSaver.show() }
+    }
+
+    @Test
+    fun hardwareScreenOff_inUseOrForeground_neverPowersOff() = runBlocking<Unit> {
+        val p = pipeline()
+        p.execute(scheduleRequest("in-use", autoScreenSaver = true, hardwareScreenOff = true)).join()
+        compositionState.value = MaaExecutionState.IDLE
+        screenInteractive.set(false)
+        runMode.value = RunMode.FOREGROUND
+        p.execute(scheduleRequest("foreground", autoScreenSaver = true, hardwareScreenOff = true)).join()
+        assertEquals(2, startCalls.get())
+        assertTrue(powerOffCalls.isEmpty())
+        coVerify(exactly = 0) { screenSaver.show() }
+    }
+
+    @Test
+    fun hardwareScreenOff_sendFails_taskStillStarts() = runBlocking<Unit> {
+        givenIdleThenWakes()
+        powerOffSucceeds = false
+        pipeline().execute(scheduleRequest(autoScreenSaver = true, hardwareScreenOff = true)).join()
+        assertEquals(listOf(ExecutionResult.STARTED), recorded.toList())
+        verify { logSession.append(uiTextOf(R.string.schedule_log_hardware_screen_off_failed)) }
+    }
+
+    @Test
+    fun hardwareScreenOff_systemSleptDuringCountdown_skipsPowerOff() = runBlocking<Unit> {
+        screenInteractive.set(false)
+        pipeline().execute(scheduleRequest(autoScreenSaver = true, hardwareScreenOff = true)).join()
+        assertTrue(powerOffCalls.isEmpty())
+        assertEquals(1, startCalls.get())
+    }
+
+    @Test
+    fun hardwareScreenOff_withAutoSleep_sleepsWithoutRestore() = runBlocking<Unit> {
+        givenIdleThenWakes()
+        pipeline().execute(
+            scheduleRequest(autoScreenSaver = true, hardwareScreenOff = true, autoSleep = true),
+        ).join()
+        driveTaskToEnd()
+        coVerify(timeout = 5_000) { wake.lockAndSleep() }
+        assertEquals(listOf(ScreenPowerController.Origin.SCHEDULE), powerOffCalls.toList())
+    }
+
+    @Test
+    fun manualScreenOff_countsAsIdle_andKeepsHang() = runBlocking<Unit> {
+        screenPower.mark = ScreenPowerController.Origin.MANUAL
+        blacklist.value = setOf("com.other")
+        pipeline().execute(
+            scheduleRequest(
+                autoScreenSaver = true,
+                hardwareScreenOff = true,
+                autoSleep = true,
+                skipIfAwake = true,
+                silent = true,
+            ),
+        ).join()
+        assertEquals(LaunchPresentation.DIALOG, lastPresentation)
+        assertEquals(0, foregroundProbes.get())
+        verify { logSession.append(uiTextOf(R.string.schedule_log_screen_off_kept)) }
+        assertTrue(powerOffCalls.isEmpty())
+        coVerify(exactly = 0) { screenSaver.show() }
+        driveTaskToEnd()
+        delay(300)
+        coVerify(exactly = 0) { wake.lockAndSleep() }
+    }
+
+    /** 上一轮定时留下的黑屏不算用户挂机，本轮的自动熄屏照做 */
+    @Test
+    fun leftoverScheduleScreenOff_isTakenOver() = runBlocking<Unit> {
+        screenPower.mark = ScreenPowerController.Origin.SCHEDULE
+        pipeline().execute(
+            scheduleRequest(autoScreenSaver = true, autoSleep = true, skipIfAwake = true),
+        ).join()
+        coVerify(exactly = 0) { screenSaver.show() }
+        assertTrue(powerOffCalls.isEmpty())
+        driveTaskToEnd()
+        coVerify(timeout = 5_000) { wake.lockAndSleep() }
+    }
+
+    @Test
+    fun hardwareScreenOff_existingUserScreenSaver_isKept() = runBlocking<Unit> {
+        givenWakeGate(interactive = false, saverShowing = true)
+        pipeline().execute(scheduleRequest(autoScreenSaver = true, hardwareScreenOff = true)).join()
+        driveTaskToEnd()
+        delay(100)
+        assertTrue(powerOffCalls.isEmpty())
         coVerify(exactly = 0) { screenSaver.hide() }
     }
 
