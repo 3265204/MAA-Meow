@@ -8,6 +8,7 @@ import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.data.repository.DepotRepository
 import com.aliothmoon.maameow.data.repository.OperBoxRepository
 import com.aliothmoon.maameow.data.resource.BackgroundImageStore
+import com.aliothmoon.maameow.data.resource.GameMetadataLoader
 import com.aliothmoon.maameow.domain.service.GameMuteCoordinator
 import com.aliothmoon.maameow.domain.service.MaaSessionLogger
 import com.aliothmoon.maameow.domain.service.TaskEndRegistry
@@ -98,6 +99,7 @@ class MaaApplication : Application() {
         RemoteServiceManager.initialize(this, appSettingsManager, pathConfig)
         overlayController.setup()
         unifiedStateDispatcher.start()
+        get<GameMetadataLoader>().start()
         taskEndRegistry.start()
         gameMuteCoordinator.startAutoRestore()
         depotRepository.start()

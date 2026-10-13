@@ -39,6 +39,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aliothmoon.maameow.R
 import com.aliothmoon.maameow.data.resource.ResourceDataManager
 import com.aliothmoon.maameow.presentation.components.tip.ExpandableTipContent
@@ -81,7 +82,9 @@ fun CoreCharSelector(
 
     var filteredSuggestions by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    val themeChars = remember(theme) { resourceDataManager.getRoguelikeCoreCharList(theme) }
+    // 元数据可能晚于界面加载，要订阅
+    val roguelikeChars by resourceDataManager.roguelikeCoreCharacters.collectAsStateWithLifecycle()
+    val themeChars = remember(theme, roguelikeChars) { roguelikeChars[theme].orEmpty() }
     LaunchedEffect(themeChars) {
         recommendedChars = themeChars
         if (inputText.isBlank()) {

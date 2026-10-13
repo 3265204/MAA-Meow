@@ -23,6 +23,7 @@ import com.aliothmoon.maameow.data.repository.OperBoxSnapshot
 import com.aliothmoon.maameow.data.resource.ResourceDataManager
 import com.aliothmoon.maameow.maa.task.MaaTaskType
 import com.aliothmoon.maameow.utils.i18n.uiTextOf
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +69,7 @@ class AnalyzeTaskChainUseCaseTest {
         itemHelper = mockk(relaxed = true),
         dropsRefresher = mockk(relaxed = true),
         appSettingsManager = appSettingsManager,
+        metadataGate = mockk { coEvery { awaitCurrent(any()) } returns true },
     )
 
     @Test

@@ -20,6 +20,7 @@ import com.aliothmoon.maameow.domain.service.CopilotCodeType
 import com.aliothmoon.maameow.domain.service.CopilotManager
 import com.aliothmoon.maameow.domain.service.CopilotOperBoxAssist
 import com.aliothmoon.maameow.domain.service.CopilotRequestException
+import com.aliothmoon.maameow.domain.service.GameMetadataGate
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
 import com.aliothmoon.maameow.domain.service.OperBoxYituliuSync
 import com.aliothmoon.maameow.domain.service.OperatorSummaryData
@@ -137,6 +138,7 @@ class CopilotViewModel(
     private val achievementRepository: AchievementRepository,
     private val operBoxAssist: CopilotOperBoxAssist,
     private val operBoxYituliuSync: OperBoxYituliuSync,
+    private val metadataGate: GameMetadataGate,
 ) : ViewModel() {
 
     companion object {
@@ -1255,6 +1257,8 @@ class CopilotViewModel(
     }
 
     private suspend fun validateStart(snapshot: CopilotUiState): Boolean {
+        // 关卡与干员校验依赖元数据，冷启动可能还没装好
+        metadataGate.awaitCurrent()
         if (snapshot.listModeActive) {
             return validateTaskListStrict(snapshot.taskList)
         }

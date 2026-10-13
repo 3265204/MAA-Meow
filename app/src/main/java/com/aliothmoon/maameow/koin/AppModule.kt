@@ -55,6 +55,7 @@ import com.aliothmoon.maameow.data.repository.OperBoxRepository
 import com.aliothmoon.maameow.data.resource.ActivityManager
 import com.aliothmoon.maameow.data.resource.BackgroundImageStore
 import com.aliothmoon.maameow.data.resource.CopilotResourceProvider
+import com.aliothmoon.maameow.data.resource.GameMetadataLoader
 import com.aliothmoon.maameow.data.resource.ItemHelper
 import com.aliothmoon.maameow.data.resource.ItemIconLoader
 import com.aliothmoon.maameow.data.resource.OperAvatarLoader
@@ -83,6 +84,7 @@ import com.aliothmoon.maameow.domain.service.FrameSnapshotter
 import com.aliothmoon.maameow.domain.service.GameDataReporter
 import com.aliothmoon.maameow.domain.service.GameFpsReader
 import com.aliothmoon.maameow.domain.service.GameFpsWatcher
+import com.aliothmoon.maameow.domain.service.GameMetadataGate
 import com.aliothmoon.maameow.domain.service.GameMuteCoordinator
 import com.aliothmoon.maameow.domain.service.LogExportService
 import com.aliothmoon.maameow.domain.service.MaaCompositionService
@@ -302,6 +304,8 @@ val appModule = module {
 
     singleOf(::ResourceInitService)
     singleOf(::MaaResourceLoader)
+    // scope 走构造默认值
+    single { GameMetadataLoader(get(), get(), get(), get(), get(), get()) } bind GameMetadataGate::class
     singleOf(::MaaSessionLogger)
 
     // 外部通知

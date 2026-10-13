@@ -15,9 +15,7 @@ import com.aliothmoon.maameow.constant.OFFICIAL_SHIZUKU_PACKAGE
 import com.aliothmoon.maameow.data.model.update.UpdateChannel
 import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.data.preferences.ConfigBackupManager
-import com.aliothmoon.maameow.data.preferences.TaskChainState
 import com.aliothmoon.maameow.data.resource.BackgroundImageStore
-import com.aliothmoon.maameow.data.resource.ResourceDataManager
 import com.aliothmoon.maameow.domain.models.CoreDataLocation
 import com.aliothmoon.maameow.domain.models.RemoteBackend
 import com.aliothmoon.maameow.domain.notification.LiveUpdatePublisher
@@ -61,8 +59,6 @@ class SettingsViewModel(
     private val appSettingsManager: AppSettingsManager,
     private val permissionManager: PermissionManager,
     private val configBackupManager: ConfigBackupManager,
-    private val taskChainState: TaskChainState,
-    private val resourceDataManager: ResourceDataManager,
     private val resourceLoader: MaaResourceLoader,
     private val achievementReporter: AchievementReporter,
     private val backgroundImageStore: BackgroundImageStore,
@@ -435,10 +431,6 @@ class SettingsViewModel(
             val resolved = resolveSelectedLanguage(lang)
             appSettingsManager.setLanguage(resolved)
             LocaleBootstrap.applyLanguage(app, resolved)
-            resourceDataManager.refreshDisplayLanguage(
-                clientType = taskChainState.clientType,
-                displayLanguage = ResourceDataManager.displayLanguageCode(resolved)
-            )
         }
     }
 

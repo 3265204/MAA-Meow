@@ -20,6 +20,7 @@ import com.aliothmoon.maameow.domain.models.MallCreditFightAvailability
 import com.aliothmoon.maameow.domain.models.PlanSideTask
 import com.aliothmoon.maameow.domain.models.ReportOptions
 import com.aliothmoon.maameow.domain.service.FightDropsRefresher
+import com.aliothmoon.maameow.domain.service.GameMetadataGate
 import com.aliothmoon.maameow.maa.task.MaaTaskParams
 import com.aliothmoon.maameow.maa.task.MaaTaskType
 import com.aliothmoon.maameow.domain.models.TaskFallbackChain
@@ -37,6 +38,7 @@ class AnalyzeTaskChainUseCase(
     private val itemHelper: ItemHelper,
     private val dropsRefresher: FightDropsRefresher,
     private val appSettingsManager: AppSettingsManager,
+    private val metadataGate: GameMetadataGate,
     private val relocatePath: (String) -> String = { it },
 ) {
     /**
@@ -72,6 +74,9 @@ class AnalyzeTaskChainUseCase(
         val info = MallCreditFightAvailability.resolve(chainNodes, activityManager)
 
         dropsRefresher.clear()
+
+        // 干员名归一与校验要用元数据，超时按缺数据降级
+        metadataGate.awaitCurrent()
 
         val clientType = taskChainState.clientType
         val report = ReportOptions.of(

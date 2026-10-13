@@ -28,7 +28,7 @@ data class OperProgressConfig(
             return emptyList()
         }
         val operators = ctx.resourceDataManager.operators.value.values
-        // 干员表要等提权服务连上才装载，冷启动的定时任务可能先分析；表空时交给 core 校验
+        // 元数据等待超时时表可能为空，交给 core 校验
         val invalid = if (operators.isEmpty()) null else active.firstOrNull { plan ->
             val oper = operators.firstOrNull { it.name == plan.name && it.coreRole == plan.role }
             oper == null || !plan.isValidFor(oper)
