@@ -32,6 +32,7 @@ fun Modifier.clearFocusOnBlankTap(): Modifier {
     val scrollConnection = remember(preload) {
         object : NestedScrollConnection {
             var clearedForGesture = false
+            var pointerScrolling = false
 
             fun clearOnce() {
                 if (!clearedForGesture) {
@@ -42,8 +43,8 @@ fun Modifier.clearFocusOnBlankTap(): Modifier {
 
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 if (available != Offset.Zero) preload?.onScroll()
-                // 每轮手势只清一次，程序滚动不清焦
-                if (available != Offset.Zero && source == NestedScrollSource.UserInput) {
+                // bringIntoView 也使用 UserInput，只在真实拖动或滚轮期间清焦
+                if (pointerScrolling && available != Offset.Zero && source == NestedScrollSource.UserInput) {
                     clearOnce()
                 }
                 return Offset.Zero
@@ -57,14 +58,27 @@ fun Modifier.clearFocusOnBlankTap(): Modifier {
         .pointerInput(preload) {
             try {
                 awaitPointerEventScope {
+                    var dragDistance = Offset.Zero
+                    var dragging = false
                     while (true) {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
-                        preload?.onPointerInput(event.changes.any { it.pressed })
+                        val pressed = event.changes.any { it.pressed }
+                        preload?.onPointerInput(pressed)
                         if (event.type == PointerEventType.Scroll ||
                             (event.type == PointerEventType.Press && event.changes.none { it.previousPressed })
                         ) {
                             scrollConnection.clearedForGesture = false
+                            dragDistance = Offset.Zero
+                            dragging = false
                         }
+                        if (event.type == PointerEventType.Move) {
+                            event.changes.firstOrNull { it.pressed && it.previousPressed }?.let {
+                                dragDistance += it.position - it.previousPosition
+                                dragging = dragging || dragDistance.getDistance() > viewConfiguration.touchSlop
+                            }
+                        }
+                        scrollConnection.pointerScrolling = event.type == PointerEventType.Scroll ||
+                                (pressed && dragging)
                         if (event.type != PointerEventType.Press) continue
                         // 仅 Android 文本编辑器 (悬浮窗 EditText); Compose TextField 的 findFocus 通常是整窗
                         val focused = hostView.findFocus() ?: continue
@@ -85,6 +99,7 @@ fun Modifier.clearFocusOnBlankTap(): Modifier {
                     }
                 }
             } finally {
+                scrollConnection.pointerScrolling = false
                 preload?.onPointerInput(false)
             }
         }
