@@ -170,6 +170,7 @@ import com.aliothmoon.maameow.presentation.viewmodel.ToolboxViewModel
 import com.aliothmoon.maameow.theme.LocalReduceMotion
 import com.aliothmoon.maameow.theme.MaaMotion
 import com.aliothmoon.maameow.theme.MaaThemeAlphas
+import com.aliothmoon.maameow.theme.OpaqueTheme
 import com.aliothmoon.maameow.theme.PagerPageSpacing
 import com.aliothmoon.maameow.theme.rememberMaaPagerFling
 import com.aliothmoon.maameow.utils.i18n.asString
@@ -1082,186 +1083,189 @@ private fun BackgroundMoreActionsOverlay(
     val overlayInteractionSource = remember { MutableInteractionSource() }
     val cardInteractionSource = remember { MutableInteractionSource() }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(
-                interactionSource = overlayInteractionSource,
-                indication = null,
-                onClick = onDismissRequest
-            )
-    ) {
-        Card(
+    // 同窗口浮层无遮罩，玻璃 surface 会透出下层任务列表
+    OpaqueTheme {
+        Box(
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, bottom = 64.dp)
+                .fillMaxSize()
                 .clickable(
-                    interactionSource = cardInteractionSource, indication = null, onClick = {}),
-            shape = RoundedCornerShape(4.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                    interactionSource = overlayInteractionSource,
+                    indication = null,
+                    onClick = onDismissRequest
+                )
         ) {
-            CompositionLocalProvider(LocalSettingRowBleed provides ActionsCardPadding) {
-                Column(modifier = Modifier.padding(ActionsCardPadding)) {
-                    // 标题与快速操作组
-                    Text(
-                        text = stringResource(R.string.bg_actions_title),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        ActionTile(
-                            icon = Icons.Filled.PowerSettingsNew,
-                            label = stringResource(R.string.bg_action_screen_off),
-                            onClick = {
-                                if (useHardwareScreenOff) onScreenOff() else onShowScreenSaver()
-                            },
-                            modifier = Modifier.weight(1f),
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onSurface
+            Card(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 64.dp)
+                    .clickable(
+                        interactionSource = cardInteractionSource, indication = null, onClick = {}),
+                shape = RoundedCornerShape(4.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+            ) {
+                CompositionLocalProvider(LocalSettingRowBleed provides ActionsCardPadding) {
+                    Column(modifier = Modifier.padding(ActionsCardPadding)) {
+                        // 标题与快速操作组
+                        Text(
+                            text = stringResource(R.string.bg_actions_title),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
                         )
-                        ActionTile(
-                            icon = Icons.AutoMirrored.Filled.ExitToApp,
-                            label = stringResource(R.string.bg_action_close_game),
-                            onClick = onCloseApp,
-                            modifier = Modifier.weight(1f),
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        ActionTile(
-                            icon = if (isGameMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                            label = if (isGameMuted) stringResource(R.string.bg_action_game_muted)
-                            else stringResource(R.string.bg_action_mute_game),
-                            onClick = {
-                                if (isGameMuted) onToggleGameSound() else pendingMuteAction = onToggleGameSound
-                            },
-                            modifier = Modifier.weight(1f),
-                            containerColor = if (isGameMuted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary,
-                            contentColor = if (isGameMuted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    // 调试模式：截图按钮，保存到 {rootDir}/debug/screenshots
-                    if (debugMode) {
-                        Spacer(modifier = Modifier.height(6.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             ActionTile(
-                                icon = Icons.Filled.Screenshot,
-                                label = stringResource(R.string.bg_action_screenshot),
-                                onClick = onCaptureScreenshot,
+                                icon = Icons.Filled.PowerSettingsNew,
+                                label = stringResource(R.string.bg_action_screen_off),
+                                onClick = {
+                                    if (useHardwareScreenOff) onScreenOff() else onShowScreenSaver()
+                                },
                                 modifier = Modifier.weight(1f),
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onSurface
                             )
+                            ActionTile(
+                                icon = Icons.AutoMirrored.Filled.ExitToApp,
+                                label = stringResource(R.string.bg_action_close_game),
+                                onClick = onCloseApp,
+                                modifier = Modifier.weight(1f),
+                                containerColor = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
-                    Text(
-                        text = stringResource(R.string.bg_auto_settings_title),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            ActionTile(
+                                icon = if (isGameMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                                label = if (isGameMuted) stringResource(R.string.bg_action_game_muted)
+                                else stringResource(R.string.bg_action_mute_game),
+                                onClick = {
+                                    if (isGameMuted) onToggleGameSound() else pendingMuteAction = onToggleGameSound
+                                },
+                                modifier = Modifier.weight(1f),
+                                containerColor = if (isGameMuted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary,
+                                contentColor = if (isGameMuted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                        // 调试模式：截图按钮，保存到 {rootDir}/debug/screenshots
+                        if (debugMode) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                ActionTile(
+                                    icon = Icons.Filled.Screenshot,
+                                    label = stringResource(R.string.bg_action_screenshot),
+                                    onClick = onCaptureScreenshot,
+                                    modifier = Modifier.weight(1f),
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
 
-                    SettingSearchTarget(R.string.bg_auto_mute_on_launch) {
-                        SettingSwitchRow(
-                            icon = Icons.Filled.NotificationsPaused,
-                            label = stringResource(R.string.bg_auto_mute_on_launch),
-                            checked = muteOnGameLaunch,
-                            onCheckedChange = { checked ->
-                                val apply = {
-                                    coroutineScope.launch { appSettingsManager.setMuteOnGameLaunch(checked) }
-                                    Unit
-                                }
-                                if (checked) pendingMuteAction = apply else apply()
-                            })
-                    }
-                    SettingSearchTarget(R.string.bg_auto_close_on_end) {
-                        SettingSwitchRow(
-                            icon = Icons.Filled.Cancel,
-                            label = stringResource(R.string.bg_auto_close_on_end),
-                            checked = closeAppOnTaskEnd,
-                            onCheckedChange = {
-                                coroutineScope.launch { appSettingsManager.setCloseAppOnTaskEnd(it) }
-                            })
-                    }
-                    // 本轮已按开始时的设置计时，运行中禁改
-                    SettingSearchTarget(R.string.bg_auto_run_duration_limit) {
-                        SettingSwitchRow(
-                            icon = Icons.Filled.Timer,
-                            label = stringResource(R.string.bg_auto_run_duration_limit),
-                            checked = runDurationLimitEnabled,
-                            enabled = !isTaskActive,
-                            onCheckedChange = {
-                                coroutineScope.launch { appSettingsManager.setRunDurationLimitEnabled(it) }
-                            })
-                    }
-                    if (runDeadline != null) {
-                        RunDurationRemainingRow(deadline = runDeadline)
-                    } else if (runDurationLimitEnabled) {
-                        RunDurationStepperRow(
-                            minutes = runDurationLimitMinutes,
-                            enabled = !isTaskActive,
-                            onMinutesChange = {
-                                coroutineScope.launch { appSettingsManager.setRunDurationLimitMinutes(it) }
-                            },
-                            onEditClick = { showRunDurationInput = true })
-                    }
-                    SettingSearchTarget(R.string.bg_auto_hardware_screen_off) {
-                        SettingSwitchRow(
-                            icon = Icons.Filled.StayCurrentPortrait,
-                            label = stringResource(R.string.bg_auto_hardware_screen_off),
-                            checked = useHardwareScreenOff,
-                            onCheckedChange = { checked ->
-                                if (checked) {
-                                    showHardwareScreenOffConfirm = true
-                                } else {
-                                    coroutineScope.launch {
-                                        appSettingsManager.setUseHardwareScreenOff(
-                                            false
-                                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = stringResource(R.string.bg_auto_settings_title),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        SettingSearchTarget(R.string.bg_auto_mute_on_launch) {
+                            SettingSwitchRow(
+                                icon = Icons.Filled.NotificationsPaused,
+                                label = stringResource(R.string.bg_auto_mute_on_launch),
+                                checked = muteOnGameLaunch,
+                                onCheckedChange = { checked ->
+                                    val apply = {
+                                        coroutineScope.launch { appSettingsManager.setMuteOnGameLaunch(checked) }
+                                        Unit
                                     }
-                                }
-                            })
-                    }
-                    SettingSearchTarget(R.string.bg_auto_show_touch_preview) {
-                        SettingSwitchRow(
-                            icon = Icons.Filled.TouchApp,
-                            label = stringResource(R.string.bg_auto_show_touch_preview),
-                            checked = showTouchPreview,
-                            onCheckedChange = {
-                                coroutineScope.launch { appSettingsManager.setShowTouchPreview(it) }
-                            })
+                                    if (checked) pendingMuteAction = apply else apply()
+                                })
+                        }
+                        SettingSearchTarget(R.string.bg_auto_close_on_end) {
+                            SettingSwitchRow(
+                                icon = Icons.Filled.Cancel,
+                                label = stringResource(R.string.bg_auto_close_on_end),
+                                checked = closeAppOnTaskEnd,
+                                onCheckedChange = {
+                                    coroutineScope.launch { appSettingsManager.setCloseAppOnTaskEnd(it) }
+                                })
+                        }
+                        // 本轮已按开始时的设置计时，运行中禁改
+                        SettingSearchTarget(R.string.bg_auto_run_duration_limit) {
+                            SettingSwitchRow(
+                                icon = Icons.Filled.Timer,
+                                label = stringResource(R.string.bg_auto_run_duration_limit),
+                                checked = runDurationLimitEnabled,
+                                enabled = !isTaskActive,
+                                onCheckedChange = {
+                                    coroutineScope.launch { appSettingsManager.setRunDurationLimitEnabled(it) }
+                                })
+                        }
+                        if (runDeadline != null) {
+                            RunDurationRemainingRow(deadline = runDeadline)
+                        } else if (runDurationLimitEnabled) {
+                            RunDurationStepperRow(
+                                minutes = runDurationLimitMinutes,
+                                enabled = !isTaskActive,
+                                onMinutesChange = {
+                                    coroutineScope.launch { appSettingsManager.setRunDurationLimitMinutes(it) }
+                                },
+                                onEditClick = { showRunDurationInput = true })
+                        }
+                        SettingSearchTarget(R.string.bg_auto_hardware_screen_off) {
+                            SettingSwitchRow(
+                                icon = Icons.Filled.StayCurrentPortrait,
+                                label = stringResource(R.string.bg_auto_hardware_screen_off),
+                                checked = useHardwareScreenOff,
+                                onCheckedChange = { checked ->
+                                    if (checked) {
+                                        showHardwareScreenOffConfirm = true
+                                    } else {
+                                        coroutineScope.launch {
+                                            appSettingsManager.setUseHardwareScreenOff(
+                                                false
+                                            )
+                                        }
+                                    }
+                                })
+                        }
+                        SettingSearchTarget(R.string.bg_auto_show_touch_preview) {
+                            SettingSwitchRow(
+                                icon = Icons.Filled.TouchApp,
+                                label = stringResource(R.string.bg_auto_show_touch_preview),
+                                checked = showTouchPreview,
+                                onCheckedChange = {
+                                    coroutineScope.launch { appSettingsManager.setShowTouchPreview(it) }
+                                })
+                        }
                     }
                 }
             }
