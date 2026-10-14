@@ -133,7 +133,7 @@ class UpdateService(
                 )
 
             val url = resolver.resolve(version, channel).getOrElse { e ->
-                // 解析器内部是 runCatching，取消也会落进 failure
+                // 兜底：解析器吞了取消也不按失败处理
                 currentCoroutineContext().ensureActive()
                 val error = mapToUpdateError(e)
                 _appProcessState.value = UpdateProcessState.Failed(error)
