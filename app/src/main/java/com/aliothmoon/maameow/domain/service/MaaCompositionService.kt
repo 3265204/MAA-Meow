@@ -89,6 +89,17 @@ class MaaCompositionService(
     private val _state = MutableStateFlow(MaaExecutionState.IDLE)
     val state: StateFlow<MaaExecutionState> = _state.asStateFlow()
 
+    @Volatile
+    private var activeRunMode: RunMode? = null
+
+    /**
+     * 每轮在进入 STARTING 前赋值，在 IDLE/ERROR 时由 setRunState 清空；赋值必须早于 setRunState(STARTING)，
+     * 因其同步拉起 TaskExecutionService 读取本值决定是否获取任务 WakeLock，写在其后或移进 try 会让后台任务静默不持锁；
+     * 运行中用户改设置只影响下一轮。
+     */
+    val currentRunMode: RunMode?
+        get() = activeRunMode
+
     /** 停止发起方：用户操作 / 回调侧（掉线等）中止 / 到达运行时长上限 */
     enum class StopOrigin { USER, CALLBACK, RUN_DURATION_LIMIT }
 
@@ -147,6 +158,7 @@ class MaaCompositionService(
         if (state != MaaExecutionState.STARTING) {
             // 自然完成走回调直接置 IDLE，不经过 finishStop，统一在这里撤掉计时和后台监视
             if (state == MaaExecutionState.IDLE || state == MaaExecutionState.ERROR) {
+                activeRunMode = null
                 runDeadlineGuard.disarm()
                 stopBackgroundMonitors()
             }
@@ -722,6 +734,7 @@ class MaaCompositionService(
         return withContext(Dispatchers.IO) {
             checkPreconditions(mode, clientType)?.let { return@withContext it }
 
+            activeRunMode = mode
             setRunState(MaaExecutionState.STARTING)
 
             try {

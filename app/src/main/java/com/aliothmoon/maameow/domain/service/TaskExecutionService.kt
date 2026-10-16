@@ -6,8 +6,11 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import com.aliothmoon.maameow.R
+import com.aliothmoon.maameow.domain.models.RunDurationLimit
+import com.aliothmoon.maameow.domain.models.RunMode
 import com.aliothmoon.maameow.domain.notification.LiveCategory
 import com.aliothmoon.maameow.domain.notification.LiveNotifyIds
 import com.aliothmoon.maameow.domain.notification.LiveSession
@@ -16,6 +19,7 @@ import com.aliothmoon.maameow.domain.state.MaaExecutionState
 import com.aliothmoon.maameow.maa.callback.TaskChainStatusTracker
 import com.aliothmoon.maameow.maa.callback.TaskRunInfo
 import com.aliothmoon.maameow.maa.callback.TaskRunStatus
+import com.aliothmoon.maameow.schedule.service.ScheduleWakeLock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,6 +37,15 @@ class TaskExecutionService : Service() {
 
     companion object {
         private const val MIN_UPDATE_INTERVAL_MS = 1000L
+        private const val WAKE_LOCK_SAFETY_MARGIN_MINUTES = 60L
+
+        // 单次超时只防异常路径永久持锁，不是整场任务累计硬上限：超时后要等下一次内容有变化的状态快照才会重新获取
+        // （combine(...).distinctUntilChanged() 会吞掉完全相同的快照），累计持有无硬边界；
+        // 任务时长限制默认关闭且辅助任务不受其约束，不能推出任务必在 MAX_WAKE_LOCK_HOLD_MS 内结束；
+        // 超时回调基于 uptime，设备真正 suspend 时不推进。
+        private const val MAX_WAKE_LOCK_HOLD_MS =
+            (RunDurationLimit.MAX_MINUTES + WAKE_LOCK_SAFETY_MARGIN_MINUTES) * 60_000L
+        private const val TASK_WAKE_LOCK_TAG = "MaaMeow:task-execution"
 
         private val VISIBLE_TASK_TITLE_RES = mapOf(
             "Fight" to R.string.maa_fight,
@@ -72,7 +85,7 @@ class TaskExecutionService : Service() {
     private var renderJob: Job? = null
     private var boundToken: Long = 0L
     private var observeToken: Long = 0L
-    private var taskWakeLock: TaskExecutionWakeLock? = null
+    private var taskWakeLock: PowerManager.WakeLock? = null
 
     /** startForeground 被系统拒绝后本实例已 stopSelf，排队中的 start 不再重试 */
     private var foregroundDenied = false
@@ -231,10 +244,11 @@ class TaskExecutionService : Service() {
     }
 
     private fun handleTerminalState(token: Long, snapshot: TaskNotificationSnapshot) {
-        if (!liveCoordinator.isCurrent(token)) return
         if (!isTerminal(compositionService.state.value)) return
-        Timber.i("TaskExecutionService: state=%s token=%s, stopping", snapshot.state, token)
+        // 锁只跟随实时运行状态；通知 token 过期不能阻止终态释放。
         releaseTaskWakeLock()
+        if (!liveCoordinator.isCurrent(token)) return
+        Timber.i("TaskExecutionService: state=%s token=%s, stopping", snapshot.state, token)
         liveCoordinator.cancelProgress(token)
         clearProgressNotification()
         stopSelf()
@@ -256,20 +270,60 @@ class TaskExecutionService : Service() {
     }
 
     private fun ensureTaskWakeLock() {
-        val holder = taskWakeLock ?: TaskExecutionWakeLock(this).also { taskWakeLock = it }
-        runCatching { holder.acquire() }
-            .onFailure { Timber.e(it, "TaskExecutionService: acquire wake lock failed, task continues without it") }
+        // 模式门控只作用于获取：前台模式靠屏幕亮着运行，持锁只会让熄屏后的识别白耗电；
+        // 释放不加 mode 前置条件，原因见 releaseTaskWakeLock。
+        if (compositionService.currentRunMode != RunMode.BACKGROUND) return
+        // isHeld 只反映客户端状态：Doze/cached 仅在系统侧禁用，重复 acquire 无法解禁；
+        // 只有客户端超时或显式 release 会翻成 false，之后的下一次状态快照才重新获取。
+        // 保留该早退以避免每个状态快照都重复 acquire：AOSP acquire(long) 每次都会重排 mReleaser，使超时无限顺延；
+        // ScheduleWakeLock.acquire 每次都会 newWakeLock，覆盖字段后旧对象便再无句柄可释放。
+        if (taskWakeLock?.isHeld == true) return
+        val lock = runCatching {
+            ScheduleWakeLock.acquire(this, MAX_WAKE_LOCK_HOLD_MS, TASK_WAKE_LOCK_TAG)
+        }
+            .onFailure {
+                Timber.e(
+                    it,
+                    "TaskExecutionService: acquire wake lock failed tag=%s, task continues without it",
+                    TASK_WAKE_LOCK_TAG,
+                )
+            }
+            .getOrNull() ?: return
+        taskWakeLock = lock
+        // ReleaseTree/FileLogTree 在发布版只放行 WARN 及以上；这是设备是否被唤醒保护的排障锚点，故用 warn 而非 info。
+        Timber.w(
+            "TaskExecutionService: wake lock acquired tag=%s timeout=%dms",
+            TASK_WAKE_LOCK_TAG,
+            MAX_WAKE_LOCK_HOLD_MS,
+        )
     }
 
     /**
      * 释放任务 WakeLock。主路径是 [onDestroy]（服务实例必经）；[handleTerminalState] 里那次是
      * stopSelf 到 onDestroy 之间的窗口期提前释放，两者共用本方法并靠字段置空保证幂等。
+     * 释放不能加 currentRunMode/状态前置条件：字段可能已被终态清空或被下一轮刷新，否则 rejectStart
+     * 的锁泄漏会回归；释放可能先于下一轮 acquire，下一轮自己的 STARTING 快照会重新取锁。
      */
     private fun releaseTaskWakeLock() {
-        val holder = taskWakeLock ?: return
+        val wakeLock = taskWakeLock ?: return
         taskWakeLock = null
-        runCatching { holder.release() }
-            .onFailure { Timber.w(it, "TaskExecutionService: release wake lock failed") }
+        runCatching {
+            if (ScheduleWakeLock.release(wakeLock)) {
+                Timber.w("TaskExecutionService: wake lock released tag=%s", TASK_WAKE_LOCK_TAG)
+            } else {
+                Timber.w(
+                    "TaskExecutionService: wake lock release skipped, already reclaimed (client timeout) tag=%s",
+                    TASK_WAKE_LOCK_TAG,
+                )
+            }
+        }
+            .onFailure {
+                Timber.w(
+                    it,
+                    "TaskExecutionService: release wake lock failed tag=%s",
+                    TASK_WAKE_LOCK_TAG,
+                )
+            }
     }
 
     private fun postForegroundNotification(
