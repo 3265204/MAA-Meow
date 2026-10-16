@@ -380,6 +380,26 @@ class MaaCompositionService(
         Unit
     }
 
+    /** 任务运行中到的资源更新，留到下次启动前重载 */
+    private val resourceReloadPending = AtomicBoolean(false)
+
+    /**
+     * 资源文件更新后重载
+     * 任务在跑时 LoadResource 会和工作线程同时改 TaskData，堆损坏后 MaaCore 直接崩，只能推迟到下次启动前
+     */
+    suspend fun reloadResources() = startMutex.withLock {
+        when (_state.value) {
+            MaaExecutionState.IDLE, MaaExecutionState.ERROR ->
+                withContext(Dispatchers.IO) { resourceLoader.load() }
+
+            else -> {
+                Timber.i("Defer resource reload while busy: %s", _state.value)
+                resourceReloadPending.set(true)
+            }
+        }
+        Unit
+    }
+
     private suspend fun checkPreconditions(mode: RunMode, clientType: String): StartResult? {
         // 服务连接中时直接拒绝，避免与后台自动 load() 并发触发 LoadResource
         // 换进程重连是资源加载自己发起的，不算，交给 ensureLoaded 等它结束
@@ -413,7 +433,10 @@ class MaaCompositionService(
             )
         }
 
-        activityManager.runIfDirty { resourceLoader.load(clientType) }
+        // 运行中推迟的资源更新在这里补，与活动数据变动合并成一次 load
+        val reloadPending = resourceReloadPending.getAndSet(false)
+        activityManager.runIfDirty { if (!reloadPending) resourceLoader.load(clientType) }
+        if (reloadPending) resourceLoader.load(clientType)
         val loaded = resourceLoader.ensureLoaded(clientType)
         if (loaded.isFailure) {
             return rejectStart(
