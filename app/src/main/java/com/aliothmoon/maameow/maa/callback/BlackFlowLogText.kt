@@ -58,6 +58,18 @@ object BlackFlowLogText {
         else -> R.string.blackflow_warning_unknown
     }
 
+    /** 秘境行商交易中止原因，带物品名的两种由调用方传入 item */
+    @StringRes
+    fun scrapTradeAborted(reason: String?): Int = when (reason) {
+        "market_unavailable" -> R.string.blackflow_scrap_trade_aborted_market_unavailable
+        "inventory_incomplete" -> R.string.blackflow_scrap_trade_aborted_inventory_incomplete
+        "page_switch_failed" -> R.string.blackflow_scrap_trade_aborted_page_switch_failed
+        "sale_search_failed" -> R.string.blackflow_scrap_trade_aborted_sale_search_failed
+        "sell_back_search_failed" -> R.string.blackflow_scrap_trade_aborted_sell_back_search_failed
+        "sale_failed" -> R.string.blackflow_scrap_trade_aborted_sale_failed
+        else -> R.string.blackflow_scrap_trade_aborted_unknown
+    }
+
     @StringRes
     fun milestoneStatus(code: String?): Int = when (code) {
         "available" -> R.string.blackflow_milestone_status_available
@@ -214,9 +226,12 @@ object BlackFlowLogText {
     fun milestone(code: String?): Int? = when (code) {
         "ending1_floor1_battles" -> R.string.blackflow_milestone_ending1_floor1_battles
         "ending1_floor1_hidden" -> R.string.blackflow_milestone_ending1_floor1_hidden
+        "ending1_floor1_scrap_shop" -> R.string.blackflow_milestone_ending1_floor1_scrap_shop
         "ending1_floor2_expedition" -> R.string.blackflow_milestone_ending1_floor2_expedition
         "ending1_floor2_scrap_shop" -> R.string.blackflow_milestone_ending1_floor2_scrap_shop
         "ending1_floor2_hidden" -> R.string.blackflow_milestone_ending1_floor2_hidden
+        "ending1_floor2_incident" -> R.string.blackflow_milestone_ending1_floor2_incident
+        "ending1_informant" -> R.string.blackflow_milestone_ending1_informant
         "ending1_floor2_employ" -> R.string.blackflow_milestone_ending1_floor2_employ
         "ending1_floor2_light" -> R.string.blackflow_milestone_ending1_floor2_light
         "ending1_floor2_wish" -> R.string.blackflow_milestone_ending1_floor2_wish

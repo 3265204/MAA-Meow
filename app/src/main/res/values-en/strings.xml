@@ -2604,6 +2604,13 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="blackflow_inventory_cleanup_discarded">Discarded part: %1$s</string>
     <string name="blackflow_inventory_cleanup_completed">Parts box cleanup completed</string>
     <string name="blackflow_inventory_cleanup_failed">Parts box cleanup failed</string>
+    <string name="blackflow_scrap_trade_aborted_market_unavailable">Scrap trader item data is unavailable; skipping the trade and leaving</string>
+    <string name="blackflow_scrap_trade_aborted_inventory_incomplete">Could not count holdings at the scrap trader; stopping the trade and leaving</string>
+    <string name="blackflow_scrap_trade_aborted_page_switch_failed">Could not switch between the buy and sell pages at the scrap trader; stopping the trade and leaving</string>
+    <string name="blackflow_scrap_trade_aborted_sale_search_failed">Could not search the sell list at the scrap trader; stopping the trade and leaving</string>
+    <string name="blackflow_scrap_trade_aborted_sell_back_search_failed">Could not find \"%1$s\" to sell back at the scrap trader; stopping the trade and leaving</string>
+    <string name="blackflow_scrap_trade_aborted_sale_failed">Selling \"%1$s\" at the scrap trader was not confirmed; stopping the trade and leaving</string>
+    <string name="blackflow_scrap_trade_aborted_unknown">The trade at the scrap trader ran into an error; stopping the trade and leaving</string>
     <string name="blackflow_decision_probe_unknown_node">Probe the nearest unclassified node on the route</string>
     <string name="blackflow_decision_policy_order">Selected by the configured policy order</string>
     <string name="blackflow_decision_detail_unknown">Decision detail unknown</string>
@@ -2655,9 +2662,12 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="blackflow_rule_burn_require_flight_on_floor2">Fly directly to the floor 2 exit with Structural Principle under the same setup</string>
     <string name="blackflow_milestone_ending1_floor1_battles">Prioritize battle nodes on floor 1</string>
     <string name="blackflow_milestone_ending1_floor1_hidden">Explore hide invisible nodes on floor 1</string>
+    <string name="blackflow_milestone_ending1_floor1_scrap_shop">Trade at the scrap trader on floor 1 when passing by</string>
     <string name="blackflow_milestone_ending1_floor2_expedition">Prioritize expedition on floor 2</string>
     <string name="blackflow_milestone_ending1_floor2_scrap_shop">Prioritize the scrap shop on floor 2</string>
     <string name="blackflow_milestone_ending1_floor2_hidden">Explore hide invisible nodes on floor 2</string>
+    <string name="blackflow_milestone_ending1_floor2_incident">Pass through Encounter nodes on floor 2</string>
+    <string name="blackflow_milestone_ending1_informant">Prefer Encounter nodes with the Informant marker on floors 2-3</string>
     <string name="blackflow_milestone_ending1_floor2_employ">Visit employ on floor 2 along the way</string>
     <string name="blackflow_milestone_ending1_floor2_light">Visit light nodes on floor 2 along the way</string>
     <string name="blackflow_milestone_ending1_floor2_wish">Visit wish nodes on floor 2 along the way</string>
@@ -2681,7 +2691,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="blackflow_milestone_baby_explore_hidden">Reveal as many unknown nodes as possible until a scrap trader is found</string>
     <string name="blackflow_milestone_baby_visit_incident">Visit an encounter along the way</string>
     <string name="blackflow_milestone_baby_floor2_shops">Continue collecting seeds when visiting a normal shop on floor 2</string>
-    <string name="blackflow_milestone_baby_floor3_shops">Sell items, refresh stock, and collect seeds when visiting a normal shop on floor 3</string>
+    <string name="blackflow_milestone_baby_floor3_shops">Continue collecting seeds when visiting a Rogue Trader on floor 3</string>
     <string name="blackflow_milestone_ending2_sandtable_a">Obtain Sandtable A</string>
     <string name="blackflow_milestone_ending2_sandtable_b">Obtain Sandtable B</string>
     <string name="blackflow_milestone_ending2_fate">Enter the fated destination on floor 5 and complete Ending 2</string>

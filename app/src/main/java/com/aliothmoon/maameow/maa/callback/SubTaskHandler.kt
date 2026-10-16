@@ -651,6 +651,14 @@ class SubTaskHandler(
 
             "BlackFlowMilestoneChanged" -> handleBlackFlowMilestoneChanged(subDetails)
             "BlackFlowInventoryCleanup" -> handleBlackFlowInventoryCleanup(subDetails)
+            "BlackFlowScrapTradeAborted" -> {
+                val item = subDetails?.getString("item").orEmpty()
+                val reason = subDetails?.getString("reason")
+                append(
+                    resources.getString(BlackFlowLogText.scrapTradeAborted(reason), item),
+                    LogLevel.WARNING,
+                )
+            }
 
             "StageDrops" -> handleStageDrops(subDetails)
             "AccountSwitch" -> {
@@ -1326,10 +1334,12 @@ class SubTaskHandler(
             ?: id.takeIf { it.isNotBlank() }
             ?: resources.getString(R.string.blackflow_milestone_unknown)
         val status = resources.getString(BlackFlowLogText.milestoneStatus(statusCode))
-        append(
-            resources.getString(R.string.blackflow_milestone_changed, milestone, status),
-            LogLevel.INFO,
-        )
+        val level = when (statusCode) {
+            "satisfied" -> LogLevel.SUCCESS
+            "missed", "impossible" -> LogLevel.WARNING
+            else -> LogLevel.INFO
+        }
+        append(resources.getString(R.string.blackflow_milestone_changed, milestone, status), level)
     }
 
     // ==================== 基建自定义排班提示 ====================

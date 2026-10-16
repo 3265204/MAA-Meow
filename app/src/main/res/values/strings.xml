@@ -2661,6 +2661,13 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="blackflow_inventory_cleanup_discarded">已丢弃零件：%1$s</string>
     <string name="blackflow_inventory_cleanup_completed">零件箱清理完成</string>
     <string name="blackflow_inventory_cleanup_failed">零件箱清理失败</string>
+    <string name="blackflow_scrap_trade_aborted_market_unavailable">秘境行商的物品数据不可用，跳过交易并离店</string>
+    <string name="blackflow_scrap_trade_aborted_inventory_incomplete">秘境行商持有物清点失败，停止交易并离店</string>
+    <string name="blackflow_scrap_trade_aborted_page_switch_failed">秘境行商买入与出售页面切换失败，停止交易并离店</string>
+    <string name="blackflow_scrap_trade_aborted_sale_search_failed">秘境行商出售列表查找失败，停止交易并离店</string>
+    <string name="blackflow_scrap_trade_aborted_sell_back_search_failed">秘境行商未能找到要卖回的「%1$s」，停止交易并离店</string>
+    <string name="blackflow_scrap_trade_aborted_sale_failed">秘境行商出售「%1$s」未得到确认，停止交易并离店</string>
+    <string name="blackflow_scrap_trade_aborted_unknown">秘境行商交易出现异常，停止交易并离店</string>
     <string name="blackflow_decision_probe_unknown_node">探测路线前方最近的未分类节点</string>
     <string name="blackflow_decision_policy_order">按照策略设定的优先顺序选择</string>
     <string name="blackflow_decision_detail_unknown">决策依据未知</string>
@@ -2712,9 +2719,12 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="blackflow_rule_burn_require_flight_on_floor2">该开局配置下第二层直接用结构性原理飞向出口</string>
     <string name="blackflow_milestone_ending1_floor1_battles">第一层优先作战</string>
     <string name="blackflow_milestone_ending1_floor1_hidden">第一层尽量探索未知的诡秘</string>
+    <string name="blackflow_milestone_ending1_floor1_scrap_shop">第一层顺路进入秘境行商交易</string>
     <string name="blackflow_milestone_ending1_floor2_expedition">第二层优先先行一步</string>
     <string name="blackflow_milestone_ending1_floor2_scrap_shop">第二层优先秘境行商</string>
     <string name="blackflow_milestone_ending1_floor2_hidden">第二层尽量探索未知的诡秘</string>
+    <string name="blackflow_milestone_ending1_floor2_incident">第二层尽量经过不期而遇</string>
+    <string name="blackflow_milestone_ending1_informant">第二、三层优先经过带线人角标的不期而遇</string>
     <string name="blackflow_milestone_ending1_floor2_employ">第二层顺路经过应急助力</string>
     <string name="blackflow_milestone_ending1_floor2_light">第二层顺路经过羽瞰点</string>
     <string name="blackflow_milestone_ending1_floor2_wish">第二层顺路经过得偿所愿</string>
@@ -2738,7 +2748,7 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="blackflow_milestone_baby_explore_hidden">尚未发现秘境行商时尽量多开未知的诡秘</string>
     <string name="blackflow_milestone_baby_visit_incident">顺路进入不期而遇</string>
     <string name="blackflow_milestone_baby_floor2_shops">第二层经过普通商店时继续获取种子</string>
-    <string name="blackflow_milestone_baby_floor3_shops">第三层经过普通商店时卖货、刷新并尽量购买种子</string>
+    <string name="blackflow_milestone_baby_floor3_shops">第三层经过普通商店时继续获取种子</string>
     <string name="blackflow_milestone_ending2_sandtable_a">获得沙盘 A</string>
     <string name="blackflow_milestone_ending2_sandtable_b">获得沙盘 B</string>
     <string name="blackflow_milestone_ending2_fate">第五层进入命运所指并完成二结局</string>
