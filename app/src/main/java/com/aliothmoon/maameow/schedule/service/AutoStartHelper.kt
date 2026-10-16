@@ -6,10 +6,10 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.content.edit
+import com.aliothmoon.maameow.utils.device.Manufacturer
 
 /**
  * 国产 ROM 自启动设置页面引导
@@ -116,17 +116,6 @@ object AutoStartHelper {
         ),
     )
 
-    private val RESTRICTIVE_MANUFACTURERS = setOf(
-        "xiaomi", "redmi", "oppo", "realme", "oneplus",
-        "vivo", "iqoo", "huawei", "honor", "samsung",
-        "meizu", "smartisan", "letv", "zte", "nubia",
-    )
-
-    fun isKnownRestrictiveManufacturer(): Boolean {
-        val manufacturer = Build.MANUFACTURER.lowercase()
-        return manufacturer in RESTRICTIVE_MANUFACTURERS
-    }
-
     /** 命中即停：一台设备只会属于一家厂商，全扫要白做 8 次跨进程 resolveActivity */
     fun resolvableOemIds(context: Context): List<String> = listOfNotNull(
         AUTOSTART_INTENTS.firstOrNull { canLaunch(context, it.intent) }?.id
@@ -150,7 +139,7 @@ object AutoStartHelper {
 
     /** null = 无需引导 */
     fun resolveTarget(context: Context): AutoStartTarget? =
-        AutoStartResolution.select(resolvableOemIds(context), isKnownRestrictiveManufacturer())
+        AutoStartResolution.select(resolvableOemIds(context), Manufacturer.isKnownRestrictive())
 
     private fun intentFor(context: Context, target: AutoStartTarget): Intent? = when (target) {
         is AutoStartTarget.Oem -> AUTOSTART_INTENTS.firstOrNull { it.id == target.id }?.intent

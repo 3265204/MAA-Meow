@@ -8,6 +8,7 @@ import com.aliothmoon.maameow.third.Ln
 import com.aliothmoon.maameow.third.wrappers.DisplayControl
 import com.aliothmoon.maameow.third.wrappers.ServiceManager
 import com.aliothmoon.maameow.third.wrappers.SurfaceControl
+import com.aliothmoon.maameow.utils.device.Manufacturer
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -37,10 +38,7 @@ object PowerController {
             Build.VERSION.SDK_INT >= AndroidVersions.API_29_ANDROID_10
 
         if (applyToMultiPhysicalDisplays
-            && Build.VERSION.SDK_INT >= AndroidVersions.API_34_ANDROID_14 && Build.BRAND.equals(
-                "honor",
-                ignoreCase = true
-            )
+            && Build.VERSION.SDK_INT >= AndroidVersions.API_34_ANDROID_14 && Manufacturer.isHonorBrand()
             && SurfaceControl.hasGetBuildInDisplayMethod()
         ) {
             applyToMultiPhysicalDisplays = false

@@ -24,6 +24,7 @@ import com.aliothmoon.maameow.maa.task.MaaTaskParams
 import com.aliothmoon.maameow.manager.RemoteAccessCoordinator
 import com.aliothmoon.maameow.manager.RemoteServiceManager
 import com.aliothmoon.maameow.schedule.model.ExecutionResult
+import com.aliothmoon.maameow.utils.device.RomDetector
 import io.sentry.Attachment
 import io.sentry.Hint
 import io.sentry.KeyValueCollectionBehavior
@@ -104,7 +105,6 @@ class TelemetryController(
 
     /** 取值不随开关变，重新初始化不必再查一遍 ActivityManager */
     private val hardware by lazy { TelemetryHardware.collect(context) }
-    private val rom by lazy { TelemetryRom.detect() }
 
     /** 须在设置读完盘之后调：读盘前开关还是默认值，照着初始化会绕过用户的关闭 */
     fun setup() {
@@ -385,6 +385,7 @@ class TelemetryController(
         Sentry.setUser(User().apply { id = TelemetryUserId.get(context) })
         setEnvTag("build_type", BuildConfig.BUILD_TYPE)
         setEnvTag("maacore.version", MaaCoreVersion.current.ifBlank { "unknown" })
+        val rom = RomDetector.current
         setEnvTag("rom", rom.name)
         if (rom.version.isNotBlank()) setEnvTag("rom.version", rom.version)
         Sentry.configureScope { it.setContexts("hardware", hardware) }

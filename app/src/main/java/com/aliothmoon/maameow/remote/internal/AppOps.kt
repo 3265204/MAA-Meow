@@ -2,8 +2,8 @@ package com.aliothmoon.maameow.remote.internal
 
 import android.app.AppOpsManager
 import android.os.Build
-import com.aliothmoon.maameow.telemetry.TelemetryRom
 import com.aliothmoon.maameow.third.Ln
+import com.aliothmoon.maameow.utils.device.RomDetector
 import java.lang.reflect.InvocationTargetException
 
 /** appop 定义：AOSP 按名解析，ROM 私有的只有编号 */
@@ -38,8 +38,6 @@ object AppOps {
 
     val SCHEDULE = arrayOf(SCHEDULE_EXACT_ALARM, MIUI_AUTO_START, MIUI_BACKGROUND_START_ACTIVITY)
 
-    private val isXiaomi by lazy { TelemetryRom.detect().isXiaomi }
-
     private val strOpToOp by lazy {
         runCatching { AppOpsManager::class.java.getMethod("strOpToOp", String::class.java) }
             .onFailure { Ln.w("AppOps: strOpToOp unavailable: $it") }
@@ -58,5 +56,5 @@ object AppOps {
             }
         }
 
-    private fun xiaomi(label: String, code: Int) = AppOp(label) { code.takeIf { isXiaomi } }
+    private fun xiaomi(label: String, code: Int) = AppOp(label) { code.takeIf { RomDetector.current.isXiaomi } }
 }
