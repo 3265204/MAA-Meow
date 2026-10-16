@@ -10,6 +10,7 @@ import com.aliothmoon.maameow.domain.service.MaaNotificationCenter
 import com.aliothmoon.maameow.domain.service.ScreenPowerController
 import com.aliothmoon.maameow.domain.service.ScreenSaverController
 import com.aliothmoon.maameow.domain.service.TaskEndRegistry
+import com.aliothmoon.maameow.domain.service.UnlockAttempt
 import com.aliothmoon.maameow.domain.service.UnlockGestureReader
 import com.aliothmoon.maameow.domain.service.WakeUnlockEngine
 import com.aliothmoon.maameow.domain.state.MaaExecutionState
@@ -190,8 +191,9 @@ class LaunchPipeline(
                 return
             }
 
-            // 须在唤醒前采样
-            outcome.tookOverIdleDevice = deviceIdle()
+            // 须在唤醒前采样；解锁失败时也要报这一刻的状态
+            val beforeWake = screenSnapshot()
+            outcome.tookOverIdleDevice = deviceIdle(beforeWake)
             val isForeground = appSettingsManager.runMode.value == RunMode.FOREGROUND
             val inUseSchedule = isBackgroundSchedule(request) && !outcome.tookOverIdleDevice
 
@@ -240,6 +242,12 @@ class LaunchPipeline(
                         log.append(uiTextOf(R.string.schedule_log_wake_ok))
                     } else {
                         log.append(uiTextOf(R.string.schedule_log_wake_failed, wake.message))
+                        outcome.unlock = UnlockAttempt(
+                            type = unlockType,
+                            ready = credential.isReady,
+                            result = wake.name.lowercase(),
+                        )
+                        recordWakeDiagnostics(log, unlockType, credential, beforeWake)
                         if (keyguardLocked()) {
                             terminalResult = ExecutionResult.SKIPPED_LOCKED
                             terminalMessage = if (deviceLocked() && !credential.isReady) {
@@ -426,7 +434,7 @@ class LaunchPipeline(
             } else if (result == ExecutionResult.STARTED && request.autoSleepAfterTask && userSaverHang) {
                 log.append(uiTextOf(R.string.schedule_log_auto_sleep_skipped_screensaver))
             }
-            log.end(result, terminalMessage)
+            log.end(result, terminalMessage, outcome.unlock)
             if (request.strategyId.isNotEmpty()) {
                 scheduleRepository.recordExecutionResult(
                     strategyId = request.strategyId,
@@ -488,13 +496,46 @@ class LaunchPipeline(
         Timber.i("LaunchPipeline: force preempt for %s", incoming.requestId)
     }
 
+    /**
+     * 解锁没成：配置摘要与提权侧过程写进触发日志；不带 PIN 与轨迹
+     * 只是取证，出错也不能改掉这一轮的结局
+     */
+    private suspend fun recordWakeDiagnostics(
+        log: ScheduleTriggerLogger.Session,
+        unlockType: String,
+        credential: UnlockCredential,
+        before: WakeSnapshot,
+    ) {
+        try {
+            log.append(
+                wakeConfigText(
+                    unlockType = unlockType,
+                    credential = credential,
+                    gestureRecordedAtMs = (credential as? UnlockCredential.Gesture)
+                        ?.let { unlockGestures.recordedAtMs() },
+                    passwordRequired = deviceLocked(),
+                    before = before,
+                ),
+            )
+            wakeUnlockEngine.lastTrace()?.let {
+                log.append(uiTextOf(R.string.schedule_log_wake_trace, it))
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "LaunchPipeline: record wake failure diagnostics failed")
+        }
+    }
+
     private fun isBackgroundSchedule(request: LaunchRequest): Boolean =
         request.source == LaunchSource.Schedule
                 && appSettingsManager.runMode.value != RunMode.FOREGROUND
 
+    private fun screenSnapshot() = WakeSnapshot(screenOn = screenInteractive(), keyguardLocked = keyguardLocked())
+
     /** 熄屏、锁屏或被熄屏挂机关着屏；无锁屏时熄屏不上锁，两者都看 */
-    private fun deviceIdle(): Boolean =
-        !screenInteractive() || keyguardLocked() || screenPower.poweredOff != null
+    private fun deviceIdle(screen: WakeSnapshot = screenSnapshot()): Boolean =
+        !screen.screenOn || screen.keyguardLocked || screenPower.poweredOff != null
 
     private sealed interface ForegroundCheck {
         data object Clear : ForegroundCheck
@@ -609,6 +650,9 @@ class LaunchPipeline(
         var tookOverIdleDevice = false
         var screenSaverEngaged = false
         var startFailureNotified = false
+
+        /** 唤醒解锁没成时记下，收尾随结果交给遥测 */
+        var unlock: UnlockAttempt? = null
     }
 
     companion object {

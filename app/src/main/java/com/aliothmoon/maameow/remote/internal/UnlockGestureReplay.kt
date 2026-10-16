@@ -69,10 +69,10 @@ internal object UnlockGestureReplay {
     fun execute(actions: List<InjectAction>, touch: ReplayTouch = MainDisplayTouch): ReplayStats {
         // 残留的多指槽位会把这一笔规划成 POINTER_DOWN，先清掉
         touch.cancel()
-        var strokes = 0
-        var strokesRejected = 0
+        var downs = 0
+        var downsOk = 0
         var events = 0
-        var accepted = 0
+        var eventsOk = 0
         try {
             for (action in actions) {
                 val ok = when (action) {
@@ -82,21 +82,21 @@ internal object UnlockGestureReplay {
                     }
 
                     is InjectAction.Down -> touch.down(action.x, action.y).also {
-                        strokes++
-                        if (!it) strokesRejected++
+                        downs++
+                        if (it) downsOk++
                     }
 
                     is InjectAction.Move -> touch.move(action.x, action.y)
                     is InjectAction.Up -> touch.up(action.x, action.y)
                 }
                 events++
-                if (ok) accepted++
+                if (ok) eventsOk++
             }
         } finally {
             // 中途被打断或 UP 没送达，别把手指留在屏上
             touch.cancel()
         }
-        return ReplayStats(strokes, strokesRejected, events, accepted)
+        return ReplayStats(downs = Delivery.of(downsOk, downs), events = Delivery.of(eventsOk, events))
     }
 
     private fun press(x: Int, y: Int, holdMs: Long): List<InjectAction> = listOf(
@@ -106,16 +106,26 @@ internal object UnlockGestureReplay {
     )
 }
 
-/** 一次回放的注入结果；不带坐标，轨迹等价于凭证 */
-internal data class ReplayStats(
-    val strokes: Int,
-    val strokesRejected: Int,
-    val events: Int,
-    val accepted: Int,
-) {
-    val allAccepted: Boolean get() = accepted == events
+/** 送达情况只分全部/部分/没有，不带个数：点按录的手势个数就是 PIN 位数 */
+internal enum class Delivery(val label: String) {
+    NONE("none"),
+    PARTIAL("partial"),
+    ALL("all");
 
-    override fun toString() = "down ${strokes - strokesRejected}/$strokes, events $accepted/$events"
+    companion object {
+        fun of(ok: Int, total: Int) = when {
+            ok == 0 -> NONE
+            ok == total -> ALL
+            else -> PARTIAL
+        }
+    }
+}
+
+/** 一次回放的注入结果；不带坐标，轨迹等价于凭证 */
+internal data class ReplayStats(val downs: Delivery, val events: Delivery) {
+    val allAccepted: Boolean get() = events == Delivery.ALL
+
+    override fun toString() = "downs ${downs.label}, events ${events.label}"
 }
 
 /** 回放的注入出口，单测替换 */

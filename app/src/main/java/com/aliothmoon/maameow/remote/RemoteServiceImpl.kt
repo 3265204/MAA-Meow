@@ -472,6 +472,9 @@ class RemoteServiceImpl : RemoteService.Stub() {
     override fun testUnlockGesture(gestureJson: String?): Int =
         WakeUnlockController.testUnlockGesture(gestureJson.orEmpty())
 
+    override fun getLastWakeTrace(sinceElapsedMs: Long): String =
+        WakeUnlockController.lastTrace(sinceElapsedMs)
+
     override fun startGestureRecord(timeoutMs: Int) = GestureRecorder.start(timeoutMs)
 
     /** @return [com.aliothmoon.maameow.domain.models.GestureRecordResult] 的 JSON */

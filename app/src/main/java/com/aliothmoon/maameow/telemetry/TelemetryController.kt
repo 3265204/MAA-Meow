@@ -17,6 +17,7 @@ import com.aliothmoon.maameow.domain.service.LaunchOutcome
 import com.aliothmoon.maameow.domain.service.RunKind
 import com.aliothmoon.maameow.domain.service.RunTelemetry
 import com.aliothmoon.maameow.domain.service.ScreenPowerController
+import com.aliothmoon.maameow.domain.service.UnlockAttempt
 import com.aliothmoon.maameow.domain.state.MaaExecutionState
 import com.aliothmoon.maameow.maa.AsstMsg
 import com.aliothmoon.maameow.maa.task.MaaTaskParams
@@ -194,7 +195,6 @@ class TelemetryController(
         // 不动追踪状态：这时任务还没开跑，没有哪一轮可收
         // 后端多半是根因
         val shizuku = RemoteAccessCoordinator.configuredBackend() == RemoteBackend.SHIZUKU
-        val locked = outcome.result == ExecutionResult.SKIPPED_LOCKED
         guarded {
             if (!active) return@guarded
             reporter.report(
@@ -206,7 +206,7 @@ class TelemetryController(
                     logFile = outcome.logFile,
                     tags = mapOf("run_mode" to outcome.runMode.lowercase()) +
                             (if (shizuku) TelemetryShizuku.tags(context) else emptyMap()) +
-                            (if (locked) unlockTags() else emptyMap()),
+                            outcome.unlock?.let(::unlockTags).orEmpty(),
                     extras = if (shizuku) TelemetryShizuku.extras() else emptyMap(),
                     withBootLogs = outcome.result == ExecutionResult.FAILED_START,
                 )
@@ -214,8 +214,11 @@ class TelemetryController(
         }
     }
 
-    private fun unlockTags(): Map<String, String> = buildMap {
-        put("unlock.type", settings.wakeUnlockType.value)
+    /** 唤醒解锁没成才有；SKIPPED_LOCKED 必然带着它 */
+    private fun unlockTags(attempt: UnlockAttempt): Map<String, String> = buildMap {
+        put("unlock.type", attempt.type)
+        put("unlock.ready", attempt.ready.toString())
+        put("unlock.result", attempt.result)
         runCatching { context.getSystemService(KeyguardManager::class.java).isDeviceSecure }
             .onSuccess { put("keyguard.secure", it.toString()) }
     }

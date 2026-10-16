@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import com.aliothmoon.maameow.data.config.MaaPathConfig
 import com.aliothmoon.maameow.domain.service.LaunchOutcome
 import com.aliothmoon.maameow.domain.service.RunTelemetry
+import com.aliothmoon.maameow.domain.service.UnlockAttempt
 import com.aliothmoon.maameow.schedule.model.ExecutionResult
 import com.aliothmoon.maameow.schedule.model.TriggerLogEntry
 import com.aliothmoon.maameow.utils.JsonUtils
@@ -236,7 +237,8 @@ class ScheduleTriggerLogger(
             )
         }
 
-        fun end(result: ExecutionResult, message: UiText? = null) {
+        /** @param unlock 唤醒解锁没成时才有，随结果交给遥测 */
+        fun end(result: ExecutionResult, message: UiText? = null, unlock: UnlockAttempt? = null) {
             if (!closed.compareAndSet(false, true)) return
             try {
                 val footer: TriggerLogEntry = TriggerLogEntry.Footer(
@@ -267,6 +269,7 @@ class ScheduleTriggerLogger(
                     delayMs = delayMs,
                     runMode = runMode,
                     logFile = logFile,
+                    unlock = unlock,
                 )
             )
         }

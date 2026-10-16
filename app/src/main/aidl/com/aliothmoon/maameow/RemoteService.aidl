@@ -126,4 +126,8 @@ interface RemoteService {
 
     // displayId 上顶层任务的包名，判不出返回 null
     String getTopPackage(int displayId) = 54;
+
+    // 最近一次唤醒解锁（含自测）的步骤与耗时，不含 PIN 与轨迹
+    // sinceElapsedMs 为 App 发起解锁时的 elapsedRealtime，更早开始的返回空串
+    String getLastWakeTrace(long sinceElapsedMs) = 55;
 }

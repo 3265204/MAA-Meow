@@ -12,6 +12,7 @@ import com.aliothmoon.maameow.domain.service.MaaNotificationCenter
 import com.aliothmoon.maameow.domain.service.ScreenPowerController
 import com.aliothmoon.maameow.domain.service.ScreenSaverController
 import com.aliothmoon.maameow.domain.service.TaskEndRegistry
+import com.aliothmoon.maameow.domain.service.UnlockAttempt
 import com.aliothmoon.maameow.domain.service.UnlockGestureReader
 import com.aliothmoon.maameow.domain.service.WakeUnlockEngine
 import com.aliothmoon.maameow.domain.state.MaaExecutionState
@@ -225,7 +226,7 @@ class LaunchPipelineTest {
         taskEndRegistry = TaskEndRegistry(composition, scope).apply { start() }
         logSession = mockk(relaxed = true) {
             every { append(any()) } just runs
-            every { end(any(), any()) } just runs
+            every { end(any(), any(), any()) } just runs
         }
         logger = mockk(relaxed = true) {
             every { open(any(), any(), any(), any()) } returns logSession
@@ -945,6 +946,58 @@ class LaunchPipelineTest {
         pipeline().execute(scheduleRequest()).join()
         assertEquals(listOf(ExecutionResult.SKIPPED_LOCKED), recorded.toList())
         assertEquals(0, startCalls.get())
+    }
+
+    @Test
+    fun unlockFailed_logsSetupAndTrace_andHandsAttemptToTelemetry() = runBlocking<Unit> {
+        givenWakeGate(interactive = false, keyguard = true, locked = true, type = "gesture", gestureJson = GESTURE_JSON)
+        coEvery { wake.unlock(any()) } returns WakeUnlockEngine.WakeResult.CREDENTIAL_REJECTED
+        coEvery { wake.lastTrace() } returns "+0ms unlock, gesture"
+        coEvery { gestures.recordedAtMs() } returns null
+        pipeline().execute(scheduleRequest()).join()
+        verify {
+            logSession.append(
+                wakeConfigText(
+                    unlockType = "gesture",
+                    credential = UnlockCredential.Gesture(GESTURE_JSON),
+                    gestureRecordedAtMs = null,
+                    passwordRequired = true,
+                    before = WakeSnapshot(screenOn = false, keyguardLocked = true),
+                ),
+            )
+        }
+        verify { logSession.append(uiTextOf(R.string.schedule_log_wake_trace, "+0ms unlock, gesture")) }
+        verify {
+            logSession.end(
+                ExecutionResult.SKIPPED_LOCKED,
+                any(),
+                UnlockAttempt(type = "gesture", ready = true, result = "credential_rejected"),
+            )
+        }
+    }
+
+    @Test
+    fun unlockDiagnosticsThrowing_keepsSkippedLocked() = runBlocking<Unit> {
+        givenWakeGate(keyguard = true, locked = true, type = "pin", pin = "1234")
+        coEvery { wake.unlock(any()) } returns WakeUnlockEngine.WakeResult.CREDENTIAL_REJECTED
+        coEvery { wake.lastTrace() } throws IllegalStateException("binder gone")
+        pipeline().execute(scheduleRequest()).join()
+        assertEquals(listOf(ExecutionResult.SKIPPED_LOCKED), recorded.toList())
+        verify {
+            logSession.end(
+                ExecutionResult.SKIPPED_LOCKED,
+                any(),
+                UnlockAttempt(type = "pin", ready = true, result = "credential_rejected"),
+            )
+        }
+    }
+
+    @Test
+    fun unlockSucceeded_handsNoAttemptToTelemetry() = runBlocking<Unit> {
+        givenWakeGate(keyguard = true, locked = true, type = "pin", pin = "1234")
+        pipeline().execute(scheduleRequest()).join()
+        verify { logSession.end(ExecutionResult.STARTED, any(), null) }
+        coVerify(exactly = 0) { wake.lastTrace() }
     }
 
     @Test

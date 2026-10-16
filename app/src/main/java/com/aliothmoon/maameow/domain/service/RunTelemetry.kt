@@ -40,6 +40,18 @@ data class LaunchOutcome(
     val runMode: String,
     /** 触发日志相对 debug 目录的路径 */
     val logFile: String,
+    /** 唤醒解锁没成时才有 */
+    val unlock: UnlockAttempt? = null,
+)
+
+/** 一次没成的唤醒解锁；不带凭证本身 */
+data class UnlockAttempt(
+    /** 设置里选的解锁方式 */
+    val type: String,
+    /** 凭证是否配好：PIN 已填或手势已录 */
+    val ready: Boolean,
+    /** 提权侧结果，[WakeUnlockEngine.WakeResult] 的小写名 */
+    val result: String,
 )
 
 enum class RunKind(val value: String) {

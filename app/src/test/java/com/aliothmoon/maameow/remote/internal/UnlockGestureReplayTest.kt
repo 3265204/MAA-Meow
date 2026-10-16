@@ -80,7 +80,7 @@ class UnlockGestureReplayTest {
     fun executeCountsAcceptedEventsAndClearsSlotsAround() {
         val touch = FakeTouch()
         val stats = UnlockGestureReplay.execute(swipe, touch)
-        assertEquals(ReplayStats(strokes = 1, strokesRejected = 0, events = 3, accepted = 3), stats)
+        assertEquals(ReplayStats(downs = Delivery.ALL, events = Delivery.ALL), stats)
         assertTrue(stats.allAccepted)
         assertEquals(listOf("cancel", "down", "move", "up", "cancel"), touch.calls)
     }
@@ -88,9 +88,15 @@ class UnlockGestureReplayTest {
     @Test
     fun rejectedDownDropsTheRestOfStroke() {
         val stats = UnlockGestureReplay.execute(swipe, FakeTouch(acceptDown = false))
-        assertEquals(ReplayStats(strokes = 1, strokesRejected = 1, events = 3, accepted = 0), stats)
+        assertEquals(ReplayStats(downs = Delivery.NONE, events = Delivery.NONE), stats)
         assertFalse(stats.allAccepted)
-        assertEquals("down 0/1, events 0/3", stats.toString())
+        assertEquals("downs none, events none", stats.toString())
+    }
+
+    @Test
+    fun emptyReplayIsNotAllAccepted() {
+        val stats = UnlockGestureReplay.execute(emptyList(), FakeTouch())
+        assertFalse(stats.allAccepted)
     }
 
     @Test
