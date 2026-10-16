@@ -14,10 +14,7 @@ object PermissionGrantHelper {
     private const val PER_USER_RANGE = 100_000
 
     fun grantAccessibilityService(serviceId: String): Boolean {
-        if (serviceId == "") {
-            return false
-        }
-        return try {
+        return serviceId != "" && try {
             val contentResolver = FakeContext.get().contentResolver
             val existingServices = Settings.Secure.getString(
                 contentResolver,
@@ -131,10 +128,7 @@ object PermissionGrantHelper {
      * 禁用 Android 12+ 的 Phantom Process Killer
      */
     fun disablePhantomProcessKiller(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            return true
-        }
-        return try {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || try {
             // Android 12L & 13+
             RemoteUtils.shellExec("device_config put activity_manager max_phantom_processes 2147483647")
             // Android 12 Beta

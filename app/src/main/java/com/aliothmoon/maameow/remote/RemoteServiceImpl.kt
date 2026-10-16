@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.system.Os
 import android.view.Surface
+import androidx.core.graphics.scale
 import com.aliothmoon.maameow.ITouchEventCallback
 import com.aliothmoon.maameow.MaaCoreService
 import com.aliothmoon.maameow.RemoteService
@@ -250,7 +251,7 @@ class RemoteServiceImpl : RemoteService.Stub() {
         // 前台模式是原生分辨率，缩到长边 1280 免得撑爆 binder 缓冲
         val scale = JPEG_MAX_EDGE.toFloat() / maxOf(frame.width, frame.height)
         val bitmap = if (scale < 1f) {
-            Bitmap.createScaledBitmap(frame, (frame.width * scale).toInt(), (frame.height * scale).toInt(), true)
+            frame.scale((frame.width * scale).toInt(), (frame.height * scale).toInt())
         } else {
             frame
         }
@@ -305,7 +306,6 @@ class RemoteServiceImpl : RemoteService.Stub() {
         val p = request.permissions
 
         with(PermissionGrantHelper) {
-            // 结果不进 PermissionStateInfo 免改 AIDL；放开失败由 App 侧预检兜底
             if (p and PermissionGrantRequest.PERM_FGS_SPECIAL_USE != 0) {
                 grantForegroundServiceSpecialUse(packageName, uid)
             }
@@ -313,28 +313,28 @@ class RemoteServiceImpl : RemoteService.Stub() {
                 grantScheduleOps(packageName, uid)
             }
             return PermissionStateInfo(
-                accessibilityPermission = if (p and PermissionGrantRequest.PERM_ACCESSIBILITY != 0) grantAccessibilityService(
+                accessibilityPermission = p and PermissionGrantRequest.PERM_ACCESSIBILITY != 0 && grantAccessibilityService(
                     request.accessibilityServiceId
-                ) else false,
-                floatingWindowPermission = if (p and PermissionGrantRequest.PERM_FLOATING_WINDOW != 0) grantFloatingWindowPermission(
+                ),
+                floatingWindowPermission = p and PermissionGrantRequest.PERM_FLOATING_WINDOW != 0 && grantFloatingWindowPermission(
                     packageName,
                     uid
-                ) else false,
-                notificationPermission = if (p and PermissionGrantRequest.PERM_NOTIFICATION != 0) grantNotificationPermission(
+                ),
+                notificationPermission = p and PermissionGrantRequest.PERM_NOTIFICATION != 0 && grantNotificationPermission(
                     packageName,
                     uid
-                ) else false,
-                batteryOptimizationExempt = if (p and PermissionGrantRequest.PERM_BATTERY != 0) grantBatteryOptimizationExemption(
+                ),
+                batteryOptimizationExempt = p and PermissionGrantRequest.PERM_BATTERY != 0 && grantBatteryOptimizationExemption(
                     packageName
-                ) else false,
-                storagePermission = if (p and PermissionGrantRequest.PERM_STORAGE != 0) grantStoragePermission(
+                ),
+                storagePermission = p and PermissionGrantRequest.PERM_STORAGE != 0 && grantStoragePermission(
                     packageName,
                     uid
-                ) else false,
-                backgroundUnrestricted = if (p and PermissionGrantRequest.PERM_BACKGROUND != 0) grantBackgroundUnrestricted(
+                ),
+                backgroundUnrestricted = p and PermissionGrantRequest.PERM_BACKGROUND != 0 && grantBackgroundUnrestricted(
                     packageName,
                     uid
-                ) else false,
+                ),
             )
         }
     }
@@ -523,8 +523,10 @@ class RemoteServiceImpl : RemoteService.Stub() {
     }
 
     override fun setPackageNetworkingEnabled(packageName: String?, enabled: Boolean): Boolean {
-        if (packageName.isNullOrBlank()) return false
-        return XmsfFirewall.setNetworkingEnabled(packageName, enabled)
+        return !packageName.isNullOrBlank() && XmsfFirewall.setNetworkingEnabled(
+            packageName,
+            enabled
+        )
     }
 
     override fun setVirtualDisplayResolution(width: Int, height: Int, dpi: Int) {
