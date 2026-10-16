@@ -776,6 +776,7 @@ private fun infrastRoomTypeLabel(roomType: InfrastRoomType): String {
         InfrastRoomType.Power -> stringResource(R.string.panel_infrast_room_power)
         InfrastRoomType.Reception -> stringResource(R.string.panel_infrast_room_reception)
         InfrastRoomType.Office -> stringResource(R.string.panel_infrast_room_office)
+        InfrastRoomType.Recycle -> stringResource(R.string.panel_infrast_room_recycle)
         InfrastRoomType.Dorm -> stringResource(R.string.panel_infrast_room_dorm)
         InfrastRoomType.Processing -> stringResource(R.string.panel_infrast_room_processing)
         InfrastRoomType.Training -> stringResource(R.string.panel_infrast_room_training)
@@ -921,7 +922,7 @@ private fun FacilitiesSection(
         val reorderable = config.mode != InfrastMode.Normal
 
         // List 不是稳定类型，不记忆会让列表每次重组都重建
-        val facilities = remember(config.facilities) { config.normalizedFacilities() }
+        val facilities = remember(config.facilities) { config.availableFacilities() }
 
         ExpandableTipContent(
             visible = tipExpanded,
@@ -934,7 +935,7 @@ private fun FacilitiesSection(
         FacilityList(
             facilities = facilities,
             reorderable = reorderable,
-            onFacilitiesChange = { onConfigChange(config.copy(facilities = it)) })
+            onFacilitiesChange = { onConfigChange(config.withAvailableFacilities(it)) })
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -943,9 +944,7 @@ private fun FacilitiesSection(
             Button(
                 onClick = {
                     onConfigChange(
-                        config.copy(
-                            facilities = facilities.map { it.first to true },
-                        ),
+                        config.withAvailableFacilities(facilities.map { it.first to true }),
                     )
                 },
                 modifier = Modifier.weight(1f),
@@ -957,9 +956,7 @@ private fun FacilitiesSection(
             OutlinedButton(
                 onClick = {
                     onConfigChange(
-                        config.copy(
-                            facilities = facilities.map { it.first to false },
-                        ),
+                        config.withAvailableFacilities(facilities.map { it.first to false }),
                     )
                 },
                 modifier = Modifier.weight(1f),

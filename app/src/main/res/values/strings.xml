@@ -184,6 +184,7 @@
     <string name="maa_control">控制中枢</string>
     <string name="maa_reception">会客室</string>
     <string name="maa_office">办公室</string>
+    <string name="maa_recycle">回收站</string>
     <string name="maa_dorm">宿舍</string>
     <string name="maa_training">训练室</string>
 
@@ -1092,6 +1093,7 @@
     <string name="panel_infrast_room_power">发电站</string>
     <string name="panel_infrast_room_reception">会客室</string>
     <string name="panel_infrast_room_office">办公室</string>
+    <string name="panel_infrast_room_recycle">回收站</string>
     <string name="panel_infrast_room_dorm">宿舍</string>
     <string name="panel_infrast_room_processing">加工站</string>
     <string name="panel_infrast_room_training">训练室</string>

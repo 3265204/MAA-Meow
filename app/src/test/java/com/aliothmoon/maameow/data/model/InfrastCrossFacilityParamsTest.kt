@@ -1,5 +1,6 @@
 package com.aliothmoon.maameow.data.model
 
+import com.aliothmoon.maameow.domain.enums.InfrastRoomType
 import com.aliothmoon.maameow.domain.enums.UiUsageConstants
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -127,6 +128,29 @@ class InfrastCrossFacilityParamsTest {
             legacy.normalizedFacilities().last(),
         )
         assertFalse(facilityOf(paramsOf(legacy)).contains("AssistantChange"))
+    }
+
+    @Test
+    fun recycle_hiddenFromOldCore_stateKeptAcrossWrites() {
+        // 旧 core 收到 Recycle 会拒掉整个基建任务，CI 默认 latest 拿到的可能还是旧 core
+        val config = InfrastConfig()
+        assertFalse(config.availableFacilities("v6.19.0").any { it.first == InfrastRoomType.Recycle })
+        assertTrue(config.availableFacilities("v6.20.0-beta.1").contains(InfrastRoomType.Recycle to true))
+
+        val cleared = config.withAvailableFacilities(
+            config.availableFacilities("v6.19.0").map { it.first to false }
+        )
+        assertEquals(InfrastRoomType.values.size, cleared.facilities.size)
+        assertTrue(cleared.normalizedFacilities().contains(InfrastRoomType.Recycle to true))
+    }
+
+    @Test
+    fun recycle_existingProfileBackfilledDisabled() {
+        val legacy = InfrastConfig(
+            facilities = InfrastRoomType.values.filter { it != InfrastRoomType.Recycle }.map { it to true }
+        )
+        assertEquals(InfrastRoomType.Recycle to false, legacy.normalizedFacilities().last())
+        assertTrue(legacy.availableFacilities("v6.20.0-beta.1").contains(InfrastRoomType.Recycle to false))
     }
 
     @Test

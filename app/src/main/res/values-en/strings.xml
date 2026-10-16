@@ -727,6 +727,7 @@
     <string name="maa_control">Control Center</string>
     <string name="maa_reception">Reception Room</string>
     <string name="maa_office">Office</string>
+    <string name="maa_recycle">Recycling Station</string>
     <string name="maa_dorm">Dormitory</string>
     <string name="maa_training">Training Room</string>
     <string name="maa_deploy">Deploy</string>
@@ -1038,6 +1039,7 @@
     <string name="panel_infrast_room_power">Power Plant</string>
     <string name="panel_infrast_room_reception">Reception Room</string>
     <string name="panel_infrast_room_office">Office</string>
+    <string name="panel_infrast_room_recycle">Recycling Station</string>
     <string name="panel_infrast_room_dorm">Dormitory</string>
     <string name="panel_infrast_room_processing">Workshop</string>
     <string name="panel_infrast_room_training">Training Room</string>
