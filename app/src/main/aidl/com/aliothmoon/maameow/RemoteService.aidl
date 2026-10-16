@@ -59,8 +59,6 @@ interface RemoteService {
 
     int isAppAlive(String packageName) = 23;
 
-    oneway void heartbeat(int pid) = 24;
-
     void setVirtualDisplayResolution(int width, int height, int dpi) = 25;
 
     oneway void setTouchCallback(ITouchEventCallback callback) = 26;
