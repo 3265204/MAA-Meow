@@ -255,6 +255,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.xzakota.focus.api)
 
+    // 提权进程代码的单测要 mock 隐藏接口
+    testImplementation(project(":hidden-api"))
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)

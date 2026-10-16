@@ -1,6 +1,8 @@
 package com.aliothmoon.maameow.telemetry
 
-internal data class Rom(val name: String, val version: String)
+internal data class Rom(val name: String, val version: String) {
+    val isXiaomi: Boolean get() = name == "hyperos" || name == "miui"
+}
 
 /**
  * 厂商 ROM 的类型与版本

@@ -307,7 +307,10 @@ class RemoteServiceImpl : RemoteService.Stub() {
         with(PermissionGrantHelper) {
             // 结果不进 PermissionStateInfo 免改 AIDL；放开失败由 App 侧预检兜底
             if (p and PermissionGrantRequest.PERM_FGS_SPECIAL_USE != 0) {
-                grantForegroundServiceSpecialUse(packageName)
+                grantForegroundServiceSpecialUse(packageName, uid)
+            }
+            if (p and PermissionGrantRequest.PERM_SCHEDULE != 0) {
+                grantScheduleOps(packageName, uid)
             }
             return PermissionStateInfo(
                 accessibilityPermission = if (p and PermissionGrantRequest.PERM_ACCESSIBILITY != 0) grantAccessibilityService(
