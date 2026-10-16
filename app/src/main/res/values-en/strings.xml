@@ -548,8 +548,6 @@
     <string name="dialog_shizuku_not_running_title">Shizuku Not Running</string>
     <string name="dialog_shizuku_not_running_message">Shizuku is installed but the service is not running. Please open Shizuku and start the service.</string>
     <string name="dialog_shizuku_open_app">Open Shizuku</string>
-    <string name="dialog_sui_detected_title">Sui Detected</string>
-    <string name="dialog_sui_detected_message">Sui is providing the Shizuku service with root privileges. MaaMeow may not work correctly; please verify by actual testing.</string>
     <string name="dialog_shizuku_need_auth_title">Shizuku Not Authorized</string>
     <string name="dialog_shizuku_need_auth_message">Shizuku is running but has not authorized MaaMeow yet. Please grant access. This prompt will keep showing until access is granted.</string>
 
@@ -1819,7 +1817,6 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="task_start_error_invalid_aspect_ratio">Current resolution is not 16:9. Adjust resolution or use background mode</string>
     <string name="task_start_error_display_mode">Failed to set display mode. Please try again</string>
     <string name="task_start_error_virtual_display">Failed to start the virtual display. Check service permissions</string>
-    <string name="task_start_error_virtual_display_shizuku_as_root">Failed to start the virtual display: Shizuku is running as root. Please switch to the built-in Root mode instead of starting Shizuku with root</string>
     <string name="task_start_error_connect_timeout">Timed out while starting MaaCore. Please try again</string>
     <string name="task_start_error_start_failed">MaaCore failed to start. Check the task configuration</string>
     <string name="task_start_success">MAA started successfully</string>
@@ -2534,7 +2531,6 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="runlog_maa_connect_failed">MaaCore connection timed out or failed</string>
     <string name="runlog_display_mode_failed">Failed to set display mode</string>
     <string name="runlog_virtual_display_failed">Failed to start virtual display</string>
-    <string name="runlog_virtual_display_failed_shizuku_as_root">Failed to start virtual display: Shizuku is running as root (uid 0). Please switch to the built-in Root mode instead of starting Shizuku with root</string>
     <string name="runlog_maa_start_failed">Failed to start MaaCore</string>
     <string name="runlog_remote_connect_failed">Cannot connect to remote service: %1$s</string>
     <string name="runlog_task_stopping">Stopping tasks...</string>

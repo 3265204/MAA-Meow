@@ -1,7 +1,6 @@
 package com.aliothmoon.maameow.manager
 
 import android.content.Context
-import android.os.Build
 import android.os.IBinder
 import android.os.Process
 import com.aliothmoon.maameow.BuildConfig
@@ -26,10 +25,6 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.milliseconds
-
-/** Android 14+ 输入注入需要 Root UID；launcher 在 shell 身份下忽略该标志 */
-internal val keepRootForInputInjection: Boolean
-    get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
 
 /**
  * 自研 starter 进程路径的公共基座：launcher 拉起 app_process，
@@ -57,8 +52,6 @@ abstract class ProcessServiceConnectorBackend(
 
     /** 各连接器独立，launcher O_TRUNC 打开，共用会互相覆盖 */
     protected abstract val logFileName: String
-
-    protected open val keepRoot: Boolean get() = false
 
     // 单并发：spawn 与 killResidual 都是阻塞调用，独占队列位，先入队者先做完
     private val scope = CoroutineScope(Dispatchers.IO.limitedParallelism(1) + SupervisorJob())
@@ -145,7 +138,6 @@ abstract class ProcessServiceConnectorBackend(
             append(" --package=").append(shellQuote(appContext.packageName))
             append(" --class=").append(shellQuote(serviceClass.name))
             append(" --uid=").append(Process.myUid())
-            if (keepRoot) append(" --keep-root")
             append(" --log-file=").append(shellQuote(logFile.absolutePath))
             if (BuildConfig.DEBUG) {
                 append(" --debug-name=").append(shellQuote(processName))
@@ -154,8 +146,8 @@ abstract class ProcessServiceConnectorBackend(
         // 独立目录下 debug/ 在 /data/local/tmp，App 进程建不了，交给 shell
         val mkdir = "mkdir -p ${shellQuote(logFile.parentFile!!.absolutePath)} 2>/dev/null; "
         // 上面 root 建出的目录归 0，降权后写不进去，连旧版建坏的一并修回
-        val repair = if (keepRoot) "" else "${shellOwnershipRepairCommand(CoreDataDir.ROOT)}; "
-        return mkdir + repair + spawner.wrapCommand(launcher.absolutePath, invocation)
+        return mkdir + "${shellOwnershipRepairCommand(CoreDataDir.ROOT)}; " +
+                spawner.wrapCommand(launcher.absolutePath, invocation)
     }
 
     protected open fun debugLogFile(): File {

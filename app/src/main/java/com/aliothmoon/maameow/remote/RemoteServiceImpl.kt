@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Process
-import android.system.Os
 import android.view.Surface
 import androidx.core.graphics.scale
 import com.aliothmoon.maameow.ITouchEventCallback
@@ -87,8 +86,6 @@ class RemoteServiceImpl : RemoteService.Stub() {
 
     init {
         // ctor 必须轻量：重活放 setup()，attach 前零阻塞
-        // Root 下放开 umask，core 与本进程写的文件对 shell 可读写（切回 Shizuku 后还能追加）；父目录 0771 挡住其他 App
-        if (Process.myUid() != Process.SHELL_UID) runCatching { Os.umask(0) }
         Workarounds.apply()
         startHeartbeatWatchdog()
         Ln.i("$TAG: RemoteServiceImpl created (lightweight ctor)")

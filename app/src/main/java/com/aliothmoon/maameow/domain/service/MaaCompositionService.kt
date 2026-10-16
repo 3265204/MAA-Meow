@@ -34,7 +34,6 @@ import com.aliothmoon.maameow.maa.task.TaskSlot
 import com.aliothmoon.maameow.manager.RemoteAccessCoordinator
 import com.aliothmoon.maameow.manager.RemoteServiceManager
 import com.aliothmoon.maameow.manager.RemoteServiceManager.useRemoteService
-import com.aliothmoon.maameow.manager.ShizukuManager
 import com.aliothmoon.maameow.remote.PermissionGrantRequest
 import com.aliothmoon.maameow.utils.EyeProtectionDetector
 import com.aliothmoon.maameow.utils.Misc
@@ -195,10 +194,9 @@ class MaaCompositionService(
             }
         }
 
-        /** 显示/连接层失败（虚拟屏幕、连接）；[shizukuAsRoot] 标记 Shizuku 后端却以 root 运行 */
+        /** 显示/连接层失败（虚拟屏幕、连接） */
         data class ConnectionError(
             val phase: ConnectPhase,
-            val shizukuAsRoot: Boolean = false,
         ) : StartResult() {
             enum class ConnectPhase {
                 DISPLAY_MODE,
@@ -530,25 +528,11 @@ class MaaCompositionService(
         return asyncConnect(maa, config)
     }
 
-    /** 虚拟显示启动失败；若是 Root 授权的 Shizuku（uid 0）则附加改用内置 Root 模式的提示 */
-    private suspend fun failVirtualDisplayStart(): StartResult {
-        val shizukuAsRoot =
-            RemoteServiceManager.connectedBackendOrNull() == RemoteBackend.SHIZUKU &&
-                    ShizukuManager.isRunningAsRoot()
-        val message = if (shizukuAsRoot) {
-            context.getString(R.string.runlog_virtual_display_failed_shizuku_as_root)
-        } else {
-            context.getString(R.string.runlog_virtual_display_failed)
-        }
-        return failStart(
-            message,
-            "VIRTUAL_DISPLAY_ERROR",
-            StartResult.ConnectionError(
-                StartResult.ConnectionError.ConnectPhase.VIRTUAL_DISPLAY,
-                shizukuAsRoot = shizukuAsRoot,
-            )
-        )
-    }
+    private suspend fun failVirtualDisplayStart(): StartResult = failStart(
+        context.getString(R.string.runlog_virtual_display_failed),
+        "VIRTUAL_DISPLAY_ERROR",
+        StartResult.ConnectionError(StartResult.ConnectionError.ConnectPhase.VIRTUAL_DISPLAY),
+    )
 
     private fun grantGameBatteryExemption(clientType: String) {
         val pkg = Packages[clientType] ?: return

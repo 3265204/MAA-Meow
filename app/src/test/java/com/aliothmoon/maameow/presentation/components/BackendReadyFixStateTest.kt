@@ -62,19 +62,6 @@ class BackendReadyFixStateTest {
         assertTrue(state.stillNotReady)
     }
 
-    @Test
-    fun sui_requestsDirectlyInsteadOfShowingCompatNotice() = runTest {
-        resolvesTo(ShizukuReadinessStage.SuiAvailable)
-        coEvery { permissionManager.requestRemoteAccess() } returns true
-        val state = state()
-
-        state.request()
-        runCurrent()
-
-        assertNull(state.guidance)
-        assertFalse(state.stillNotReady)
-        coVerify(exactly = 1) { permissionManager.requestRemoteAccess() }
-    }
 
     @Test
     fun dismiss_closesGuidance() = runTest {

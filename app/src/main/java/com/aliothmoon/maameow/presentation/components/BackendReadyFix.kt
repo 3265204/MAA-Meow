@@ -47,7 +47,7 @@ class BackendReadyFixState internal constructor(
             if (readiness.fixable) {
                 guidance = readiness
             } else if (!permissionManager.requestRemoteAccess()) {
-                // 引导覆盖不到时（Root 后端、Sui）直接请求，别静默空操作
+                // 引导覆盖不到时（Root 后端）直接请求，别静默空操作
                 stillNotReady = true
             }
         }

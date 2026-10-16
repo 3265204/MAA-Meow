@@ -800,8 +800,6 @@
     <string name="dialog_shizuku_not_running_title">Shizuku 未运行</string>
     <string name="dialog_shizuku_not_running_message">检测到 Shizuku 已安装但未运行，请打开 Shizuku 应用并启动服务。</string>
     <string name="dialog_shizuku_open_app">打开 Shizuku</string>
-    <string name="dialog_sui_detected_title">检测到 Sui</string>
-    <string name="dialog_sui_detected_message">当前使用 Sui 提供 Shizuku 服务，Sui 以 Root 权限运行，MaaMeow 可能无法正常工作，请以实际测试为主</string>
     <string name="dialog_shizuku_need_auth_title">Shizuku 未授权</string>
     <string name="dialog_shizuku_need_auth_message">检测到 Shizuku 服务正在运行但尚未授权 MaaMeow，请完成授权。授权成功前将持续显示该提示。</string>
 
@@ -1875,7 +1873,6 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="task_start_error_invalid_aspect_ratio">当前分辨率不是 16:9，请调整分辨率或改用后台模式</string>
     <string name="task_start_error_display_mode">显示模式设置失败，请重试</string>
     <string name="task_start_error_virtual_display">虚拟屏幕启动失败，请检查服务权限</string>
-    <string name="task_start_error_virtual_display_shizuku_as_root">虚拟屏幕启动失败：Shizuku 正以 Root 身份运行，请改用内置 Root 模式，不要使用 Root 授权 Shizuku 的形式</string>
     <string name="task_start_error_connect_timeout">启动 MaaCore 超时，请重试</string>
     <string name="task_start_error_start_failed">MaaCore 启动失败，请检查任务配置</string>
     <string name="task_start_success">Maa启动成功</string>
@@ -2591,7 +2588,6 @@ MAA 不会因为取消勾选此选项而提前在局内结束探索</string>
     <string name="runlog_maa_connect_failed">启动 MaaCore 超时或失败</string>
     <string name="runlog_display_mode_failed">设置显示模式失败</string>
     <string name="runlog_virtual_display_failed">启动虚拟显示失败</string>
-    <string name="runlog_virtual_display_failed_shizuku_as_root">启动虚拟显示失败：检测到 Shizuku 以 Root 身份运行（uid 0），请改用内置 Root 模式，不要使用 Root 授权 Shizuku 的形式</string>
     <string name="runlog_maa_start_failed">MaaCore 启动失败</string>
     <string name="runlog_remote_connect_failed">无法连接远程服务：%1$s</string>
     <string name="runlog_task_stopping">正在停止任务...</string>
