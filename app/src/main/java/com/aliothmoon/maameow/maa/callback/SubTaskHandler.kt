@@ -12,6 +12,7 @@ import com.aliothmoon.maameow.data.model.LogLevel
 import com.aliothmoon.maameow.data.model.RecruitCombination
 import com.aliothmoon.maameow.data.model.RecruitOper
 import com.aliothmoon.maameow.data.model.RoguelikeConfig
+import com.aliothmoon.maameow.data.preferences.AppSettingsManager
 import com.aliothmoon.maameow.data.preferences.TaskChainState
 import com.aliothmoon.maameow.data.repository.DepotRepository
 import com.aliothmoon.maameow.data.resource.ActivityManager
@@ -50,6 +51,7 @@ class SubTaskHandler(
     private val packageName = applicationContext.packageName
     private val operProgressHandler: OperProgressHandler
             by inject(OperProgressHandler::class.java)
+    private val appSettings: AppSettingsManager by inject(AppSettingsManager::class.java)
 
     // 懒取：实现方 MaaCompositionService 反过来依赖本类，构造注入会成环
     private val executionStateHolder: MaaExecutionStateHolder
@@ -66,6 +68,9 @@ class SubTaskHandler(
 
     private var pendingFight = PendingFightState()
     private val themeTargets = ConcurrentHashMap<Int, String>()
+
+    // 最近一条设施行的 facility#序号，同房间的原因提示据此省掉重复的设施行
+    private var lastFacilityKey: String? = null
 
     // 本次会话累计用药数（跨战斗累计，session 开始时重置）
     private var medicineUsedTotal = 0
@@ -89,6 +94,13 @@ class SubTaskHandler(
         medicineUsedTotal = 0
         expiringMedicineUsedTotal = 0
         lastSanitySnapshot = null
+        lastFacilityKey = null
+    }
+
+    /** 新任务链开始，上一链的主题目标与设施行标识不再有效 */
+    fun onTaskChainStart(taskId: Int) {
+        clearThemeTarget(taskId)
+        lastFacilityKey = null
     }
 
     fun clearThemeTarget(taskId: Int) {
@@ -661,16 +673,8 @@ class SubTaskHandler(
             "EnterFacility" -> {
                 val facility = subDetails?.getString("facility") ?: ""
                 val index = (subDetails?.getIntValue("index") ?: 0) + 1
-                append(
-                    "${str("ThisFacility")}${str(facility)} ${
-                        String.format(
-                            Locale.US,
-                            "%02d",
-                            index
-                        )
-                    }",
-                    LogLevel.TRACE
-                )
+                append(facilityLine(facility, index), LogLevel.TRACE)
+                lastFacilityKey = "$facility#$index"
             }
 
             "ProductIncorrect" -> append(str("ProductIncorrect"), LogLevel.ERROR)
@@ -683,13 +687,34 @@ class SubTaskHandler(
             }
 
             "CustomInfrastRoomGroupsMatchFailed" -> {
-                val groups = subDetails?.getJSONArray("groups")?.joinToString(", ") ?: ""
-                append("${str("RoomGroupsMatchFailed")}$groups", LogLevel.TRACE)
+                // 识别失败时 core 不带组名列表
+                if (subDetails?.getString("reason") == "recognition_failed") {
+                    append(str("RoomGroupsMatchRecogFailed"), LogLevel.TRACE)
+                } else {
+                    val groups = subDetails?.getJSONArray("groups")?.joinToString(", ") ?: ""
+                    append("${str("RoomGroupsMatchFailed")}$groups", LogLevel.TRACE)
+                }
             }
 
             "CustomInfrastRoomOperators" -> {
                 val names = subDetails?.getJSONArray("names")?.joinToString(", ") ?: ""
                 append("${str("RoomOperators")}$names", LogLevel.TRACE)
+            }
+
+            "CustomInfrastTraineeNotFound" -> {
+                val names = localizedOperNames(subDetails?.getJSONArray("candidates"))
+                append(str("InfrastTraineeNotFound", names.joinToString(", ")), LogLevel.WARNING)
+            }
+
+            "CustomInfrastAssistantNotFound" -> handleInfrastAssistantNotFound(subDetails)
+            "CustomInfrastRoomKeptUnchanged" -> handleInfrastRoomKeptUnchanged(subDetails)
+            "CustomInfrastRoomsNotConfigured" -> {
+                val index = subDetails?.getIntValue("index") ?: 0
+                appendFacilityReason(
+                    subDetails?.getString("facility").orEmpty(),
+                    index,
+                    str("InfrastRoomsNotConfigured", String.format(Locale.US, "%02d", index + 1)),
+                )
             }
 
             "InfrastTrainingIdle" -> append(str("TrainingIdle"), LogLevel.TRACE)
@@ -1306,6 +1331,61 @@ class SubTaskHandler(
             LogLevel.INFO,
         )
     }
+
+    // ==================== 基建自定义排班提示 ====================
+
+    /** 命中但在班/心情不足被排除时 core 单独带名单，有名单就提示计划内排除，不误报成名单错误 */
+    private fun handleInfrastAssistantNotFound(subDetails: JSONObject?) {
+        val working = localizedOperNames(subDetails?.getJSONArray("working_excluded"))
+        val lowMood = localizedOperNames(subDetails?.getJSONArray("low_mood_excluded"))
+        val (key, names) = when {
+            working.isNotEmpty() -> "InfrastAssistantWorkingExcluded" to working
+            lowMood.isNotEmpty() -> "InfrastAssistantLowMood" to lowMood
+            else -> "InfrastAssistantNotFound" to
+                    localizedOperNames(subDetails?.getJSONArray("candidates"))
+        }
+        append(str(key, names.joinToString(", ")), LogLevel.WARNING)
+    }
+
+    private fun handleInfrastRoomKeptUnchanged(subDetails: JSONObject?) {
+        val facility = subDetails?.getString("facility").orEmpty()
+        val reason = subDetails?.getString("reason")
+        // 整设施未配置房间，没有有意义的房间序号
+        if (reason == "facility_empty") {
+            append(facilityLine(facility, null), LogLevel.TRACE)
+            append(str("InfrastFacilityKeptUnchanged"), LogLevel.TRACE)
+            return
+        }
+        val reasonKey = when (reason) {
+            "candidates_working" -> "InfrastCandidatesWorking"
+            "candidates_low_mood" -> "InfrastCandidatesLowMood"
+            "candidates_unavailable" -> "InfrastCandidatesUnavailable"
+            else -> "InfrastRoomKeptUnchanged"
+        }
+        appendFacilityReason(facility, subDetails?.getIntValue("index") ?: 0, str(reasonKey))
+    }
+
+    /** 同房间已打过设施行时只追加原因，进设施前的拦截没有设施行，先补一行 */
+    private fun appendFacilityReason(facility: String, index: Int, reason: String) {
+        val displayIndex = index + 1
+        val key = "$facility#$displayIndex"
+        if (key != lastFacilityKey) {
+            append(facilityLine(facility, displayIndex), LogLevel.TRACE)
+            lastFacilityKey = key
+        }
+        append(reason, LogLevel.TRACE)
+    }
+
+    private fun facilityLine(facility: String, displayIndex: Int?): String {
+        val head = "${str("ThisFacility")}${str(facility)}"
+        return displayIndex?.let { "$head ${String.format(Locale.US, "%02d", it)}" } ?: head
+    }
+
+    /** 未收录的干员保留配置原名 */
+    private fun localizedOperNames(names: JSONArray?): List<String> =
+        names.orEmpty().mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }.map {
+            resourceDataManager.getLocalizedCharacterName(it, appSettings.displayLanguage) ?: it
+        }
 
     // ==================== 字符串资源辅助方法 ====================
 

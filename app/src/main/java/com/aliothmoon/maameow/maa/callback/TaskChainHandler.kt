@@ -53,7 +53,7 @@ class TaskChainHandler(
      */
     fun onTaskChainStart(details: JSONObject) {
         val taskId = details.getIntValue("taskid", 0)
-        subTaskHandler.clearThemeTarget(taskId)
+        subTaskHandler.onTaskChainStart(taskId)
         statusTracker.updateStatus(taskId, TaskRunStatus.IN_PROGRESS)
         chainStartNanos[taskId] = System.nanoTime()
 
