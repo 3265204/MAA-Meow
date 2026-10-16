@@ -37,6 +37,7 @@ import com.aliothmoon.maameow.manager.RemoteServiceManager.useRemoteService
 import com.aliothmoon.maameow.remote.PermissionGrantRequest
 import com.aliothmoon.maameow.utils.EyeProtectionDetector
 import com.aliothmoon.maameow.utils.Misc
+import com.aliothmoon.maameow.utils.device.XiaomiAdbInput
 import com.aliothmoon.maameow.utils.i18n.UiText
 import com.aliothmoon.maameow.utils.i18n.resolve
 import kotlinx.coroutines.CancellationException
@@ -724,6 +725,13 @@ class MaaCompositionService(
             )
             sessionLogger.appendAndWait(eyeProtectionMsg, LogLevel.WARNING)
             Timber.w("isEyeProtectionEnabled at runtime: true (source=%s)", eyeProtection.source)
+        }
+        if (XiaomiAdbInput.isRestricted()) {
+            sessionLogger.appendAndWait(
+                context.getString(R.string.task_start_adb_input_restricted_warning_log),
+                LogLevel.WARNING
+            )
+            Timber.w("adb input restricted at runtime (persist.security.adbinput!=1)")
         }
 
         return withContext(Dispatchers.IO) {

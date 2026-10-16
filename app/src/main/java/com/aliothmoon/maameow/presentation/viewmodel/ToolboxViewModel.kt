@@ -208,7 +208,7 @@ class ToolboxViewModel(
             )) {
                 is GameReadiness.RequiresConfirmation -> {
                     pendingStartContext = context.acknowledged(readiness.acknowledgement)
-                    _dialog.value = appContext.createStartWarningDialog(readiness.acknowledgement.message)
+                    _dialog.value = appContext.createStartWarningDialog(readiness.acknowledgement)
                     return@launch
                 }
 

@@ -7,6 +7,7 @@ import com.aliothmoon.maameow.domain.usecase.PrepareTaskStartUseCase
 import com.aliothmoon.maameow.domain.usecase.SwitchCoreDataLocationUseCase
 import com.aliothmoon.maameow.manager.RemoteServiceManager
 import com.aliothmoon.maameow.utils.EyeProtectionDetector
+import com.aliothmoon.maameow.utils.device.XiaomiAdbInput
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.koin.androidContext
@@ -58,6 +59,7 @@ val useCaseModule = module {
                     }
                 }
             },
+            isAdbInputRestricted = XiaomiAdbInput::isRestricted,
         )
     }
     factory {

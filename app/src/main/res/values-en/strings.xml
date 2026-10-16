@@ -1799,6 +1799,11 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="task_start_warning_wake_up_skipped">The game is not running and this run starts partway through, skipping the Login task. Continuing may fail immediately. Start anyway?</string>
     <string name="task_start_warning_game_not_installed">The game package for the current client type was not detected. Check the client type in Wake Up. Start anyway?</string>
     <string name="task_start_warning_eye_protection_enabled">Eye comfort / night mode is enabled, which may affect color recognition accuracy. Start anyway?</string>
+    <string name="task_start_warning_adb_input_restricted">“USB debugging (Security settings)” is off, so the system blocks MaaMeow\'s touch input. Please enable it in Developer options (reboot if it does not take effect). Start anyway?</string>
+    <string name="task_start_enable_adb_input_with_root">Enable with Root</string>
+    <string name="task_start_fix_open_developer_settings">Open Developer options</string>
+    <string name="task_start_fix_open_display_settings">Open display settings</string>
+    <string name="task_start_enable_adb_input_failed">Failed to enable with Root. Please turn on “USB debugging (Security settings)” in Developer options manually</string>
     <string name="task_start_warning_smart_resolution_enabled">System “Smart resolution” is enabled, which breaks recognition in background mode. Please turn it off in the system display settings first. Start anyway?</string>
     <string name="task_start_error_no_task_selected">Please select the tasks to run first</string>
     <string name="task_start_error_conflicting_client_types">The task chain contains different client types. Please keep them consistent</string>
@@ -1832,6 +1837,7 @@ MAA will not end an in-progress exploration early because this option is uncheck
     <string name="task_start_device_memory_low"> [system is low on memory]</string>
     <string name="task_start_device_memory_unavailable">Device memory: unavailable</string>
     <string name="task_start_eye_protection_warning_log">Eye comfort / night mode is active (%1$s), which may affect normal image recognition. Please turn it off manually</string>
+    <string name="task_start_adb_input_restricted_warning_log">“USB debugging (Security settings)” is off, so the system blocks touch input. Please enable it in Developer options (reboot if it does not take effect)</string>
     <string name="task_start_smart_resolution_warning_log">System “Smart resolution” is enabled, which breaks recognition in background mode. Please turn it off manually in the system display settings</string>
 
     <!-- i18n: toolbox / mini game -->

@@ -42,7 +42,6 @@ import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
@@ -129,6 +128,7 @@ import com.aliothmoon.maameow.manager.PermissionManager
 import com.aliothmoon.maameow.overlay.screensaver.ScreenSaverOverlayManager
 import com.aliothmoon.maameow.presentation.LocalInputFocusManager
 import com.aliothmoon.maameow.presentation.components.AdaptiveTaskPromptDialog
+import com.aliothmoon.maameow.presentation.components.PanelPromptDialog
 import com.aliothmoon.maameow.presentation.components.BackendReadyFixHost
 import com.aliothmoon.maameow.presentation.components.LocalPageVisible
 import com.aliothmoon.maameow.presentation.components.PageBackHandler
@@ -157,7 +157,6 @@ import com.aliothmoon.maameow.presentation.state.PreviewPointerSlots
 import com.aliothmoon.maameow.presentation.view.panel.AutoBattlePanel
 import com.aliothmoon.maameow.presentation.view.panel.LocalToolboxFileExporter
 import com.aliothmoon.maameow.presentation.view.panel.LogPanel
-import com.aliothmoon.maameow.presentation.view.panel.PanelDialogType
 import com.aliothmoon.maameow.presentation.view.panel.PanelHeader
 import com.aliothmoon.maameow.presentation.view.panel.PanelTab
 import com.aliothmoon.maameow.presentation.view.panel.TaskListDetailLayout
@@ -173,7 +172,6 @@ import com.aliothmoon.maameow.theme.MaaThemeAlphas
 import com.aliothmoon.maameow.theme.OpaqueTheme
 import com.aliothmoon.maameow.theme.PagerPageSpacing
 import com.aliothmoon.maameow.theme.rememberMaaPagerFling
-import com.aliothmoon.maameow.utils.i18n.asString
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -980,34 +978,7 @@ fun BackgroundTaskView(
         }
         activeDialog?.let { dialog ->
             val (onDismiss, onConfirm) = activeDialogCallbacks!!
-            val confirmColor = when (dialog.type) {
-                PanelDialogType.SUCCESS -> MaterialTheme.colorScheme.primary
-                PanelDialogType.WARNING -> MaterialTheme.colorScheme.tertiary
-                PanelDialogType.ERROR -> MaterialTheme.colorScheme.error
-            }
-            val dialogTitle = dialog.title.asString()
-            val dialogMessage = dialog.message.asString()
-            val dialogConfirmText = dialog.confirmText.asString()
-            val dialogDismissText = dialog.dismissText.asString()
-            AdaptiveTaskPromptDialog(
-                visible = true,
-                title = dialogTitle,
-                message = AnnotatedString(dialogMessage),
-                onDismissRequest = onDismiss,
-                onConfirm = onConfirm,
-                confirmText = dialogConfirmText.ifBlank {
-                    stringResource(R.string.common_confirm)
-                },
-                dismissText = dialogDismissText.ifBlank {
-                    stringResource(R.string.common_close)
-                },
-                icon = when (dialog.type) {
-                    PanelDialogType.SUCCESS -> Icons.Filled.CheckCircle
-                    else -> Icons.Filled.Warning
-                },
-                iconTint = confirmColor,
-                confirmColor = confirmColor,
-            )
+            PanelPromptDialog(dialog, onDismiss = onDismiss, onConfirm = onConfirm)
         }
 
         if (showCloseConfirm) {

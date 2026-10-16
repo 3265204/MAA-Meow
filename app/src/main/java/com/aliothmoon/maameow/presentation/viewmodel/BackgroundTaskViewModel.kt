@@ -477,7 +477,7 @@ class BackgroundTaskViewModel(
             is TaskStartDecision.RequiresConfirmation -> {
                 pendingStart = PendingStart(context.acknowledged(decision.acknowledgement))
                 val message = decision.message
-                showDialog(application.createStartWarningDialog(message))
+                showDialog(application.createStartWarningDialog(decision.acknowledgement, message))
                 return message
             }
         }
