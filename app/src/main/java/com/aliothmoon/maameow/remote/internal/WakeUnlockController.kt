@@ -224,14 +224,19 @@ object WakeUnlockController {
         keyguardGoneBeforeInject(wm, "gesture")?.let { return it }
         val actions = UnlockGestureReplay.timeline(gesture, screen.width, screen.height)
         Ln.i("$TAG: replaying ${gesture.steps.size} steps / ${actions.size} actions")
-        UnlockGestureReplay.execute(actions)
+        val stats = UnlockGestureReplay.execute(actions)
 
         return if (pollUntil(KEYGUARD_GONE_TIMEOUT_MS) { wm.isKeyguardLocked == false }) {
-            Ln.i("$TAG: unlocked (gesture accepted)")
+            Ln.i("$TAG: unlocked (gesture accepted), injected $stats")
             WakeUnlockResult.OK
         } else {
             // 与 PIN 一致：不重试，避免连错触发系统锁定
-            Ln.w("$TAG: still locked after gesture replay — 轨迹失效，或 keyguard 忽略注入事件")
+            val cause = if (stats.allAccepted) {
+                "注入均已送达：轨迹失效，或 keyguard 不认注入事件"
+            } else {
+                "有注入未送达：事件可能被系统拦截"
+            }
+            Ln.w("$TAG: still locked after gesture replay, injected $stats — $cause")
             WakeUnlockResult.CREDENTIAL_REJECTED
         }
     }
