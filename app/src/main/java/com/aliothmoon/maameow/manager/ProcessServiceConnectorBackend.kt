@@ -153,7 +153,9 @@ abstract class ProcessServiceConnectorBackend(
         }
         // 独立目录下 debug/ 在 /data/local/tmp，App 进程建不了，交给 shell
         val mkdir = "mkdir -p ${shellQuote(logFile.parentFile!!.absolutePath)} 2>/dev/null; "
-        return mkdir + spawner.wrapCommand(launcher.absolutePath, invocation)
+        // 上面 root 建出的目录归 0，降权后写不进去，连旧版建坏的一并修回
+        val repair = if (keepRoot) "" else "${shellOwnershipRepairCommand(CoreDataDir.ROOT)}; "
+        return mkdir + repair + spawner.wrapCommand(launcher.absolutePath, invocation)
     }
 
     protected open fun debugLogFile(): File {
