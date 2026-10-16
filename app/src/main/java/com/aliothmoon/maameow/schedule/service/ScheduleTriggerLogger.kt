@@ -17,6 +17,8 @@ import timber.log.Timber
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
+import java.io.IOException
+import java.io.Writer
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -39,6 +41,13 @@ class ScheduleTriggerLogger(
     }
 
     private val json = JsonUtils.common
+
+    /** Writer.nullWriter() 要 API 33 */
+    private object NullWriter : Writer() {
+        override fun write(cbuf: CharArray, off: Int, len: Int) = Unit
+        override fun flush() = Unit
+        override fun close() = Unit
+    }
 
     private val logDir: File
         get() = File(pathConfig.debugDir, LOG_DIR).apply {
@@ -64,7 +73,13 @@ class ScheduleTriggerLogger(
             .atZone(ZoneId.systemDefault())
             .format(FILE_DATE_FORMAT)
         val file = File(logDir, "$LOG_PREFIX$timeStr$LOG_EXTENSION")
-        val writer = BufferedWriter(FileWriter(file, true))
+        val writer = try {
+            BufferedWriter(FileWriter(file, true))
+        } catch (e: IOException) {
+            // 存储没就绪（ENOENT / ENOTCONN）不能把这次触发弄崩，日志落不了盘就算了
+            Timber.e(e, "$TAG: Failed to create trigger log")
+            BufferedWriter(NullWriter)
+        }
         val session = Session(
             writer = writer,
             logFile = "$LOG_DIR/${file.name}",
