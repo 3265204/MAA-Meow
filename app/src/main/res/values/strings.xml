@@ -328,6 +328,7 @@
     <string name="settings_core_data_clear_busy">任务运行中，请先停止再清除</string>
     <string name="dialog_core_dir_inaccessible_title">无法访问资源目录</string>
     <string name="dialog_core_dir_inaccessible_message">当前系统限制了对应用目录的访问，切换到独立目录并重启后即可正常使用。</string>
+    <string name="dialog_core_dir_local_tmp_inaccessible_message">独立目录无法写入，多半是 Root 方式建出的目录归 root 所有。用 Root 方式启动一次即可自动修复，或切回应用目录并重启。</string>
     <!-- settings: monet theme color (system Material You toggle, Android 12+) -->
     <string name="settings_monet_color_title">莫奈主题色</string>
     <string name="settings_monet_color_desc">根据壁纸动态取色，关闭则使用内置蓝色主题</string>

@@ -249,11 +249,14 @@ fun HomeView(
         AdaptiveTaskPromptDialog(
             visible = true,
             title = stringResource(R.string.dialog_core_dir_inaccessible_title),
-            message = stringResource(R.string.dialog_core_dir_inaccessible_message),
+            message = stringResource(
+                if (viewModel.isCoreSeparated) R.string.dialog_core_dir_local_tmp_inaccessible_message
+                else R.string.dialog_core_dir_inaccessible_message
+            ),
             icon = Icons.Rounded.Warning,
             confirmText = stringResource(R.string.dialog_core_data_location_switch_confirm),
             dismissText = stringResource(R.string.common_cancel),
-            onConfirm = { viewModel.switchCoreDataToLocalTmp() },
+            onConfirm = { viewModel.switchCoreDataLocationForAccess() },
             onDismissRequest = { viewModel.dismissCoreDirInaccessibleDialog() }
         )
     }

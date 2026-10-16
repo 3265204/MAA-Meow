@@ -82,6 +82,7 @@
     <string name="settings_core_data_clear_busy">A task is running. Stop it before clearing</string>
     <string name="dialog_core_dir_inaccessible_title">Resource directory inaccessible</string>
     <string name="dialog_core_dir_inaccessible_message">This system restricts access to the app directory. Switch to the separate directory and restart to continue.</string>
+    <string name="dialog_core_dir_local_tmp_inaccessible_message">The separate directory is not writable, most likely because the Root backend created it as root. Starting once with the Root backend repairs it automatically, or switch back to the app directory and restart.</string>
     <!-- settings: monet theme color (system Material You toggle, Android 12+) -->
     <string name="settings_monet_color_title">Monet Theme Color</string>
     <string name="settings_monet_color_desc">Generate colors from your wallpaper; off uses the built-in blue theme.</string>
