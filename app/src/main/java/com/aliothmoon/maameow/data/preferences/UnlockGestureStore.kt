@@ -82,8 +82,9 @@ class UnlockGestureStore(private val context: Context) : UnlockGestureReader {
 
     /** 轨迹里不存录制时间：本进程录的用内存记的时刻，否则取文件修改时间 */
     override suspend fun recordedAtMs(): Long? = savedAtMs ?: withContext(Dispatchers.IO) {
-        // 与 read() 一致，只剩 .bak 时取它的时间
-        runCatching { AtomicFile(gestureFile).lastModifiedTime }.getOrNull()?.takeIf { it > 0 }
+        // 与 read() 一致，只剩 .bak 时取它的时间；AtomicFile.getLastModifiedTime 要 API 31
+        val backup = File(gestureFile.path + ".bak")
+        (if (backup.isFile) backup else gestureFile).lastModified().takeIf { it > 0 }
     }
 
     private suspend fun read(): UnlockGesture? = withContext(Dispatchers.IO) {
