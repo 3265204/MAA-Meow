@@ -401,7 +401,7 @@ class RemoteServiceImpl : RemoteService.Stub() {
                 val result = startBackgroundDisplay(
                     useVdm = useVdm,
                     sdkInt = Build.VERSION.SDK_INT,
-                    startVdm = { VdmDisplayController.start(vdmUserId.get()) },
+                    startVdm = { startVdmDisplay() },
                     startLegacy = { VirtualDisplayManager.start() },
                     onVdmFailure = { Ln.e("$TAG: VDM display start failed: ${it.message}") },
                 )
@@ -422,6 +422,13 @@ class RemoteServiceImpl : RemoteService.Stub() {
         activeDisplayId.set(backgroundDisplayId)
         StaleFrameGuard.setActiveDisplayId(backgroundDisplayId)
         return displayId
+    }
+
+    /** VDM 入口需要 API 34+；startBackgroundDisplay 的 sdkInt 守卫与这里同为运行时保护。 */
+    private fun startVdmDisplay(): Int = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        VdmDisplayController.start(vdmUserId.get())
+    } else {
+        DefaultDisplayConfig.DISPLAY_NONE
     }
 
     @Synchronized
