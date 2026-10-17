@@ -37,7 +37,7 @@ internal fun shellQuote(value: String): String = "'${value.replace("'", "'\"'\"'
  * 以 shell 身份执行时没权限也用不着，直接跳过
  */
 internal fun shellOwnershipRepairCommand(dir: String): String =
-    "[ \"\$(id -u)\" = 0 ] && find ${shellQuote(dir)} ! -user 2000 -exec chown 2000:2000 {} + 2>/dev/null"
+    $$"[ \"$(id -u)\" = 0 ] && find $${shellQuote(dir)} ! -user 2000 -exec chown -h 2000:2000 {} + 2>/dev/null"
 
 /** 硬杀残留进程：ART 收到 SIGTERM 不跑 shutdown hook，清理不依赖此路径 */
 internal fun killByNameCommand(processName: String): String =
@@ -45,7 +45,7 @@ internal fun killByNameCommand(processName: String): String =
 
 /** 没有同名进程时 pidof 失败、无输出 */
 internal fun findProcessesCommand(processName: String): String =
-    "p=$(pidof ${shellQuote(processName)}) && ps -o PID,ETIME -p \${p// /,}"
+    $$"p=$(pidof $${shellQuote(processName)}) && ps -o PID,ETIME -p ${p// /,}"
 
 /** 跳过表头，取 PID 与 ETIME 两列 */
 internal fun parseProcesses(lines: List<String>): List<ResidualProcess> = lines.mapNotNull { line ->

@@ -376,9 +376,7 @@ class RemoteServiceImpl : RemoteService.Stub() {
         }
     }
 
-    override fun setDisplayPower(on: Boolean) {
-        PowerController.setDisplayPower(on)
-    }
+    override fun setDisplayPower(on: Boolean): Boolean = PowerController.setDisplayPower(on)
 
     override fun startVirtualDisplay(): Int {
         Ln.i("$TAG: startVirtualDisplay() ${virtualDisplayMode.get()}")
