@@ -107,18 +107,33 @@ object VdmDisplayController {
         val active = session ?: return
         session = null
         val displayId = active.display.display.displayId
-        var failure: Throwable? = null
-        failure = captureCleanup(failure, "releaseDisplay") { releaseDisplay(active.display) }
-        failure = captureCleanup(failure, "closeVirtualDevice") { closeVirtualDevice(active.device) }
-        failure = captureCleanup(failure, "removeAssociation") {
-            removeAssociation(active.address, active.userId)
-        }
+        val failure = cleanupInReverseOrder(
+            releaseDisplay = { releaseDisplay(active.display) },
+            closeVirtualDevice = { closeVirtualDevice(active.device) },
+            removeAssociation = { removeAssociation(active.address, active.userId) },
+        )
         NativeBridgeLib.releaseNativeCapturer()
         if (failure == null) {
             Ln.i("$TAG stopped: displayId=$displayId")
         } else {
             Ln.w("$TAG cleanup failed: displayId=$displayId", failure)
         }
+    }
+
+    /**
+     * 按 display → device → association 逆序释放。
+     * 单步失败不中断后续步骤；返回首个失败，后续失败作为 suppressed 附加。
+     */
+    internal fun cleanupInReverseOrder(
+        releaseDisplay: () -> Unit,
+        closeVirtualDevice: () -> Unit,
+        removeAssociation: () -> Unit,
+    ): Throwable? {
+        var failure: Throwable? = null
+        failure = captureCleanup(failure, "releaseDisplay", releaseDisplay)
+        failure = captureCleanup(failure, "closeVirtualDevice", closeVirtualDevice)
+        failure = captureCleanup(failure, "removeAssociation", removeAssociation)
+        return failure
     }
 
     @Synchronized

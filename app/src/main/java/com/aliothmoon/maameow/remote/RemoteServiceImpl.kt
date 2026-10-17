@@ -399,13 +399,13 @@ class RemoteServiceImpl : RemoteService.Stub() {
             DisplayMode.PRIMARY -> PrimaryDisplayManager.start()
             DisplayMode.BACKGROUND -> {
                 val useVdm = useVirtualDeviceDisplay.get()
-                val result = if (useVdm && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                    runCatching { VdmDisplayController.start(vdmUserId.get()) }
-                        .onFailure { Ln.e("$TAG: VDM display start failed: ${it.message}") }
-                        .getOrDefault(DefaultDisplayConfig.DISPLAY_NONE)
-                } else {
-                    VirtualDisplayManager.start()
-                }
+                val result = startBackgroundDisplay(
+                    useVdm = useVdm,
+                    sdkInt = Build.VERSION.SDK_INT,
+                    startVdm = { VdmDisplayController.start(vdmUserId.get()) },
+                    startLegacy = { VirtualDisplayManager.start() },
+                    onVdmFailure = { Ln.e("$TAG: VDM display start failed: ${it.message}") },
+                )
                 if (result != DefaultDisplayConfig.DISPLAY_NONE) {
                     activeBackgroundIsVdm.set(useVdm)
                     PowerController.startUserActivityKeepAlive(result)
@@ -657,3 +657,20 @@ internal fun canReuseActiveDisplay(
 ): Boolean = activeDisplayId != DefaultDisplayConfig.DISPLAY_NONE &&
     activeUsesVdm == requestedUsesVdm &&
     (!requestedUsesVdm || activeVdmUserId == requestedUserId)
+
+/**
+ * 后台虚拟屏启动的后端分流：仅 VDM 且 Android 14+ 才尝试 VDM。
+ * VDM 启动失败时返回 [DefaultDisplayConfig.DISPLAY_NONE]，不自动回退 Legacy。
+ */
+internal fun startBackgroundDisplay(
+    useVdm: Boolean,
+    sdkInt: Int,
+    startVdm: () -> Int,
+    startLegacy: () -> Int,
+    onVdmFailure: (Throwable) -> Unit,
+): Int {
+    if (!useVdm || sdkInt < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return startLegacy()
+    return runCatching(startVdm)
+        .onFailure(onVdmFailure)
+        .getOrDefault(DefaultDisplayConfig.DISPLAY_NONE)
+}
