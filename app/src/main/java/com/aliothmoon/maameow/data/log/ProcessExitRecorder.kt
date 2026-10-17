@@ -8,6 +8,7 @@ import com.aliothmoon.maameow.constant.Packages
 import com.aliothmoon.maameow.domain.service.ProcessExitJournal
 import com.aliothmoon.maameow.manager.RemoteServiceManager
 import com.aliothmoon.maameow.remote.ProcessExitRecord
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -25,15 +26,13 @@ class ProcessExitRecorder(context: Context) : ProcessExitJournal {
     private val mutex = Mutex()
 
     /** App 启动时调，不依赖提权服务，服务起不来也记得下 */
-    suspend fun recordSelf() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+    suspend fun recordSelf() = guarded(appContext.packageName) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return@guarded
         val records = withContext(Dispatchers.IO) {
-            runCatching {
-                appContext.getSystemService(ActivityManager::class.java)
-                    .getHistoricalProcessExitReasons(appContext.packageName, 0, ProcessExitLog.MAX_RECORDS)
-                    .map(ProcessExitRecord::from)
-            }.onFailure { Timber.w(it, "read own process exit reasons failed") }.getOrNull()
-        } ?: return
+            appContext.getSystemService(ActivityManager::class.java)
+                .getHistoricalProcessExitReasons(appContext.packageName, 0, ProcessExitLog.MAX_RECORDS)
+                .map(ProcessExitRecord::from)
+        }
         record(ExitSubject.SELF, appContext.packageName, records)
     }
 
@@ -41,10 +40,21 @@ class ProcessExitRecorder(context: Context) : ProcessExitJournal {
         for ((_, packageName) in Packages) recordGame(packageName)
     }
 
-    override suspend fun recordGame(packageName: String) {
+    override suspend fun recordGame(packageName: String) = guarded(packageName) {
         val since = mutex.withLock { watermark(packageName) }?.timestamp ?: 0L
-        val records = fetch(packageName, since) ?: return
+        val records = fetch(packageName, since) ?: return@guarded
         record(ExitSubject.GAME, packageName, records)
+    }
+
+    /** 只是记日志，出什么错都不能挡住调用方：启动、连上服务、游戏死亡后的中止；取消照常上抛 */
+    private suspend inline fun guarded(packageName: String, block: () -> Unit) {
+        try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "record process exit failed: %s", packageName)
+        }
     }
 
     private suspend fun fetch(packageName: String, sinceMs: Long): List<ProcessExitRecord>? {
