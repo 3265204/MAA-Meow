@@ -130,4 +130,7 @@ interface RemoteService {
     // 最近一次唤醒解锁（含自测）的步骤与耗时，不含 PIN 与轨迹
     // sinceElapsedMs 为 App 发起解锁时的 elapsedRealtime，更早开始的返回空串
     String getLastWakeTrace(long sinceElapsedMs) = 55;
+
+    // 每轮启动前设置一次；false=Legacy，true=VirtualDevice。后端变化时先释放上一轮显示。
+    boolean setUseVirtualDeviceDisplay(boolean enabled, int userId) = 56;
 }
