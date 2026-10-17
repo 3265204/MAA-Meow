@@ -24,6 +24,7 @@ import com.aliothmoon.maameow.remote.internal.LogcatRetention
 import com.aliothmoon.maameow.remote.internal.PermissionGrantHelper
 import com.aliothmoon.maameow.remote.internal.PowerController
 import com.aliothmoon.maameow.remote.internal.PrimaryDisplayManager
+import com.aliothmoon.maameow.remote.internal.ProcessExitQuery
 import com.aliothmoon.maameow.remote.internal.ProcessLiveness
 import com.aliothmoon.maameow.remote.internal.RemoteUtils
 import com.aliothmoon.maameow.remote.internal.ScreenManager
@@ -487,6 +488,9 @@ class RemoteServiceImpl : RemoteService.Stub() {
         if (processPrefix.isNullOrEmpty()) return "# missing process prefix"
         return SystemLogDump.dump(sinceMs, untilMs, pid, processPrefix)
     }
+
+    override fun getProcessExitRecords(packageName: String?, sinceMs: Long, maxNum: Int): List<ProcessExitRecord> =
+        ProcessExitQuery.query(packageName, sinceMs, maxNum)
 
     override fun isSmartResolutionEnabled(): Boolean {
         return try {

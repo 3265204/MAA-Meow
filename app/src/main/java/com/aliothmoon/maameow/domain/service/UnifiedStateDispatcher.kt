@@ -32,6 +32,7 @@ class UnifiedStateDispatcher(
     private val permissionManager: PermissionManager,
     private val chainState: TaskChainState,
     private val resourceInitService: ResourceInitService,
+    private val processExitJournal: ProcessExitJournal,
 ) {
     private val dispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -141,6 +142,7 @@ class UnifiedStateDispatcher(
                 Timber.w(e, "onServiceConnected: remote call failed")
             }
         }
+        processExitJournal.recordGames()
     }
 
     fun onServiceDied() {
