@@ -24,6 +24,7 @@ import com.aliothmoon.maameow.remote.internal.LogcatRetention
 import com.aliothmoon.maameow.remote.internal.PermissionGrantHelper
 import com.aliothmoon.maameow.remote.internal.PowerController
 import com.aliothmoon.maameow.remote.internal.PrimaryDisplayManager
+import com.aliothmoon.maameow.remote.internal.ProcessExitQuery
 import com.aliothmoon.maameow.remote.internal.ProcessLiveness
 import com.aliothmoon.maameow.remote.internal.RemoteUtils
 import com.aliothmoon.maameow.remote.internal.ScreenManager
@@ -34,6 +35,7 @@ import com.aliothmoon.maameow.remote.internal.VdmDisplayController
 import com.aliothmoon.maameow.remote.internal.VirtualDisplayManager
 import com.aliothmoon.maameow.remote.internal.WakeUnlockController
 import com.aliothmoon.maameow.remote.internal.XmsfFirewall
+import com.aliothmoon.maameow.root.ProcessExit
 import com.aliothmoon.maameow.third.Command
 import com.aliothmoon.maameow.third.FakeContext
 import com.aliothmoon.maameow.third.Ln
@@ -46,36 +48,41 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.system.exitProcess
 
 class RemoteServiceImpl : RemoteService.Stub() {
 
     companion object {
         private const val TAG = "RemoteService"
-        private const val HEARTBEAT_INTERVAL_MS = 5_000L
         private const val JPEG_MAX_EDGE = 1280
         private const val PREVIEW_SHUTDOWN_TIMEOUT_MS = 1_000L
 
+        /**
+         * 逐项兜错，一项失败不连累后面的；退出期限可能截断，用户看得见又不会自愈的排前面
+         * xmsf 下次 setup 会兜底，MaaCore 最可能卡住且随进程释放，垫底
+         */
         @JvmStatic
         fun performEmergencyCleanup() {
             Ln.i("$TAG: performEmergencyCleanup triggered")
-            runCatching {
-                GameAudioMuteController.restoreAll()
-                XmsfFirewall.restoreIfNeeded()
-                PowerController.destroy()
-                ScreenManager.destroy()
+            cleanupStep("display size") { ScreenManager.destroy() }
+            cleanupStep("display power") { PowerController.destroy() }
+            cleanupStep("game audio") { GameAudioMuteController.restoreAll() }
+            cleanupStep("xmsf firewall") { XmsfFirewall.restoreIfNeeded() }
+            cleanupStep("virtual display") {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                     VdmDisplayController.stop()
                 }
-                MaaCoreManager.destroy()
-            }.onFailure {
-                Ln.e("$TAG: Emergency cleanup failed: ${it.message}")
             }
+            cleanupStep("maa core") { MaaCoreManager.destroy() }
+        }
+
+        private inline fun cleanupStep(name: String, block: () -> Unit) {
+            runCatching(block).onFailure { Ln.e("$TAG: cleanup $name failed: ${it.message}") }
         }
     }
 
     init {
         RemoteBootTrace.mark("CTOR_START")
+        // 正常退出走 ProcessExit 的 halt 不经这里，只兜直接 System.exit 的路径
         Runtime.getRuntime().addShutdownHook(Thread {
             runCatching { performEmergencyCleanup() }
         }.apply { name = "remote-shutdown-hook" })
@@ -86,8 +93,6 @@ class RemoteServiceImpl : RemoteService.Stub() {
     private val vdmUserId = AtomicInteger(0)
     private val activeDisplayId = AtomicInteger(DefaultDisplayConfig.DISPLAY_NONE)
     private val activeBackgroundIsVdm = AtomicBoolean(false)
-    private val appPid = AtomicInteger(0)
-    private val destroyed = AtomicBoolean(false)
     /** 同一进程内 setup 幂等：成功后再调直接返回 OK，失败则下次重试 */
     private var setup = false
     private val coreData = CoreDataStore()
@@ -95,22 +100,18 @@ class RemoteServiceImpl : RemoteService.Stub() {
     init {
         // ctor 必须轻量：重活放 setup()，attach 前零阻塞
         Workarounds.apply()
-        startHeartbeatWatchdog()
         Ln.i("$TAG: RemoteServiceImpl created (lightweight ctor)")
         RemoteBootTrace.mark("CTOR_DONE")
     }
 
     override fun destroy() {
-        if (!destroyed.compareAndSet(false, true)) {
-            return
+        ProcessExit.exit("destroy requested") {
+            InputControlUtils.setTouchCallback(null)
+            GameFpsMonitor.stop()
+            StaleFrameGuard.stop()
+            shutdownPreview()
+            performEmergencyCleanup()
         }
-        Ln.i("$TAG: destroy()")
-        InputControlUtils.setTouchCallback(null)
-        GameFpsMonitor.stop()
-        StaleFrameGuard.stop()
-        shutdownPreview()
-        performEmergencyCleanup()
-        exitProcess(0)
     }
 
     /**
@@ -387,9 +388,7 @@ class RemoteServiceImpl : RemoteService.Stub() {
         }
     }
 
-    override fun setDisplayPower(on: Boolean) {
-        PowerController.setDisplayPower(on)
-    }
+    override fun setDisplayPower(on: Boolean): Boolean = PowerController.setDisplayPower(on)
 
     @Synchronized
     override fun startVirtualDisplay(): Int {
@@ -467,11 +466,6 @@ class RemoteServiceImpl : RemoteService.Stub() {
         ProcessLiveness.UNKNOWN -> AppAliveStatus.UNKNOWN
     }
 
-    override fun heartbeat(pid: Int) {
-        appPid.set(pid)
-        Ln.i("$TAG: heartbeat received, app pid=$pid")
-    }
-
     override fun isAppOnVirtualDisplay(packageName: String): Boolean {
         val targetDisplayId = activeDisplayId.get()
         if (targetDisplayId == DefaultDisplayConfig.DISPLAY_NONE) return true
@@ -535,6 +529,9 @@ class RemoteServiceImpl : RemoteService.Stub() {
         if (processPrefix.isNullOrEmpty()) return "# missing process prefix"
         return SystemLogDump.dump(sinceMs, untilMs, pid, processPrefix)
     }
+
+    override fun getProcessExitRecords(packageName: String?, sinceMs: Long, maxNum: Int): List<ProcessExitRecord> =
+        ProcessExitQuery.query(packageName, sinceMs, maxNum)
 
     override fun isSmartResolutionEnabled(): Boolean {
         return try {
@@ -621,30 +618,6 @@ class RemoteServiceImpl : RemoteService.Stub() {
             }
         }
         return false
-    }
-
-    private fun startHeartbeatWatchdog() {
-        Thread {
-            while (!destroyed.get()) {
-                try {
-                    Thread.sleep(HEARTBEAT_INTERVAL_MS)
-                } catch (_: InterruptedException) {
-                    return@Thread
-                }
-                val pid = appPid.get()
-                if (pid <= 0) {
-                    continue
-                }
-                if (!File("/proc/$pid").exists()) {
-                    Ln.w("$TAG: app process (pid=$pid) no longer exists, destroying remote service")
-                    destroy()
-                    return@Thread
-                }
-            }
-        }.apply {
-            name = "remote-heartbeat-watchdog"
-            isDaemon = true
-        }.start()
     }
 }
 

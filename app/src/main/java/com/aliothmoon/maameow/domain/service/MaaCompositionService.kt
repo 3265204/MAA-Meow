@@ -86,6 +86,7 @@ class MaaCompositionService(
     private val coreDataPusher: CoreDataPusher,
     private val telemetry: RunTelemetry,
     private val screenGate: ForegroundScreenGate,
+    private val processExitJournal: ProcessExitJournal,
 ) : MaaExecutionStateHolder {
 
     private val _state = MutableStateFlow(MaaExecutionState.IDLE)
@@ -257,6 +258,8 @@ class MaaCompositionService(
                     context.getString(R.string.runlog_game_process_gone, packageName),
                     LogLevel.ERROR
                 )
+                // 系统记下的死因当场进应用日志，任务日志只留上面这条
+                processExitJournal.recordGame(packageName)
                 // 游戏没了剩下的任务链也是白跑，整轮中止
                 if (_state.value == MaaExecutionState.RUNNING) {
                     notificationCenter.notifySubTaskFailure(

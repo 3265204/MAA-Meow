@@ -103,6 +103,8 @@ import com.aliothmoon.maameow.domain.service.ScreenSaverController
 import com.aliothmoon.maameow.domain.service.TaskEndRegistry
 import com.aliothmoon.maameow.domain.service.ToolboxExportService
 import com.aliothmoon.maameow.domain.service.UnifiedStateDispatcher
+import com.aliothmoon.maameow.domain.service.ProcessExitJournal
+import com.aliothmoon.maameow.data.log.ProcessExitRecorder
 import com.aliothmoon.maameow.domain.service.UnlockGestureReader
 import com.aliothmoon.maameow.domain.service.WakeUnlockEngine
 import com.aliothmoon.maameow.domain.service.update.UpdateService
@@ -375,6 +377,7 @@ val appModule = module {
     singleOf(::WakeUnlockEngine)
 
     singleOf(::UnifiedStateDispatcher)
+    singleOf(::ProcessExitRecorder) { bind<ProcessExitJournal>() }
     // scope 走构造默认值，singleOf 会试图解析它
     single {
         val settings = get<AppSettingsManager>()

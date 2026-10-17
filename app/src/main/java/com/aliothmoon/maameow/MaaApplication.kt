@@ -27,6 +27,7 @@ import com.aliothmoon.maameow.utils.CrashHandler
 import com.aliothmoon.maameow.utils.NightModeBootstrap
 import com.aliothmoon.maameow.utils.i18n.LocaleBootstrap
 import com.aliothmoon.maameow.utils.log.LogTreeHolder
+import com.aliothmoon.maameow.data.log.ProcessExitRecorder
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -96,6 +97,7 @@ class MaaApplication : Application() {
 
     private fun postCreateApplication() {
         telemetry.setup()
+        applicationScope.launch { get<ProcessExitRecorder>().recordSelf() }
         RemoteServiceManager.initialize(this, appSettingsManager, pathConfig)
         overlayController.setup()
         unifiedStateDispatcher.start()

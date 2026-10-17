@@ -7,6 +7,7 @@ import com.aliothmoon.maameow.ITouchEventCallback;
 import com.aliothmoon.maameow.MaaCoreService;
 import com.aliothmoon.maameow.remote.PermissionGrantRequest;
 import com.aliothmoon.maameow.remote.PermissionStateInfo;
+import com.aliothmoon.maameow.remote.ProcessExitRecord;
 
 interface RemoteService {
 
@@ -51,15 +52,14 @@ interface RemoteService {
     // 后台模式游戏实时帧率，未监控返回 -1
     float getGameFps() = 43;
 
-    oneway void setDisplayPower(boolean on) = 20;
+    // 同步返回远端实际结果，oneway 时失败了 App 还当已熄屏
+    boolean setDisplayPower(boolean on) = 20;
 
     boolean setPlayAudioOpAllowed(String packageName, boolean isAllowed) = 21;
 
     int pid() = 22;
 
     int isAppAlive(String packageName) = 23;
-
-    oneway void heartbeat(int pid) = 24;
 
     void setVirtualDisplayResolution(int width, int height, int dpi) = 25;
 
@@ -131,6 +131,9 @@ interface RemoteService {
     // sinceElapsedMs 为 App 发起解锁时的 elapsedRealtime，更早开始的返回空串
     String getLastWakeTrace(long sinceElapsedMs) = 55;
 
+    // 系统记下的进程退出（含被杀、崩溃），只返回不早于 sinceMs 的；查别的包靠 shell 自带的 DUMP 权限
+    List<ProcessExitRecord> getProcessExitRecords(String packageName, long sinceMs, int maxNum) = 56;
+
     // 每轮启动前设置一次；false=Legacy，true=VirtualDevice。后端变化时先释放上一轮显示。
-    boolean setUseVirtualDeviceDisplay(boolean enabled, int userId) = 56;
+    boolean setUseVirtualDeviceDisplay(boolean enabled, int userId) = 57;
 }
